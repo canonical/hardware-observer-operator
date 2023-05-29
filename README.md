@@ -24,3 +24,13 @@ Describe your charm in one or two sentences.
 - [Contributing](CONTRIBUTING.md) <!-- or link to other contribution documentation -->
 
 - See the [Juju SDK documentation](https://juju.is/docs/sdk) for more information about developing and improving charms.
+
+
+## Features
+
+- [ ] Resources management
+    - [ ] Upload resources to `$SNAP_COMMON` folder
+    - [ ] Action: List resources
+
+- [ ] Snap install
+    - [x] Download libs `charms.operator_libs_linux.v2.snap`

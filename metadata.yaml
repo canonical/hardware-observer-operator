@@ -20,3 +20,22 @@ description: |
   A third paragraph that explains what need the charm meets.
 
   Finally, a paragraph that describes whom the charm is useful for.
+
+
+resources:
+
+  exporter-snap:
+  type: file
+  description: |
+    (Optional) Snap that implements actual data conllection and export.
+    If not provided, charm will try to download prometheus-hardware-exporter
+    from snap storecraft.
+  filename: proemtheus-hardware-exporter.snap
+
+  exporter-channel:
+    type: string
+    default: "stable"
+    description: |
+      Install prometheus-juju-backup-all-exporter snap from "exporter-channel".
+      Supported values are: "stable", "candidate", "beta" and "edge". Note that
+      it will be superseded by local resources: "exporter-snap".
