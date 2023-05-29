@@ -1,0 +1,17 @@
+# This is a template `sonar.yaml` file for ops charms
+# This file is managed by bootstack-charms-spec and should not be modified
+# within individual charm repos. https://launchpad.net/bootstack-charms-spec
+
+name: SonarCloud
+on:
+  workflow_run:
+    workflows: 
+      - PR workflow running lint checkers, unit and functional tests
+    types: [completed]
+
+jobs:
+  sonar:
+    uses: canonical/bootstack-actions/.github/workflows/sonar.yaml@main
+    secrets: inherit
+    with:
+      workflow-name: PR workflow running lint checkers, unit and functional tests

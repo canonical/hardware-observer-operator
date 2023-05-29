@@ -1,0 +1,87 @@
+# This is a template `pyproject.toml` file for ops charms
+# This file is managed by bootstack-charms-spec and should not be modified
+# within individual charm repos. https://launchpad.net/bootstack-charms-spec
+
+[tool.flake8]
+ignore = ["D100", "D101", "D102", "D103", "W503", "W504"]
+exclude = ['.eggs', '.git', '.tox', '.venv', '.build', 'lib', 'report']
+max-line-length = 99
+max-complexity = 10
+
+[tool.black]
+line-length = 99
+exclude = '''
+/(
+    | .eggs
+    | .git
+    | .tox
+    | .venv
+    | .build
+    | lib
+    | report
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 99
+skip_glob = [
+  ".eggs",
+  ".git",
+  ".tox",
+  ".venv",
+  ".build",
+  "lib",
+  "report"
+]
+
+[tool.pylint]
+max-line-length = 99
+ignore-paths = [
+  ".eggs",
+  ".git",
+  ".tox",
+  ".venv",
+  ".build",
+  "lib",
+  "report",
+  "tests",
+]
+
+[tool.mypy]
+warn_unused_ignores = true
+warn_unused_configs = true
+warn_unreachable = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+exclude = [
+  ".eggs",
+  ".git",
+  ".tox",
+  ".venv",
+  ".build",
+  "lib",
+  "report",
+  "tests",
+]
+
+## Ignore unsupported imports
+[[tool.mypy.overrides]]
+module = [
+  "charmhelpers.*"
+]
+
+[tool.coverage.run]
+relative_files = true
+source = ["src"]
+omit = ["tests/**", "docs/**", "templates/**"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+
+[tool.coverage.html]
+directory = "tests/unit/report/html"
+
+[tool.coverage.xml]
+output = "tests/unit/report/coverage.xml"

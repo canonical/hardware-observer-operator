@@ -1,0 +1,23 @@
+# This is a template `pr.yaml` file for ops charms
+# This file is managed by bootstack-charms-spec and should not be modified
+# within individual charm repos. https://launchpad.net/bootstack-charms-spec
+
+name: PR workflow running lint checkers, unit and functional tests
+
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+    branches: [ master, main ]
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+
+jobs:
+  pr:
+    uses: canonical/bootstack-actions/.github/workflows/pull-request.yaml@main
+    secrets: inherit
+    with:
+      python-version-unit: "['3.8', '3.10']"
+      python-version-func: "3.10"
+      tox-version: "<4"
+      commands: "['FUNC_ARGS=\"--series jammy\" make functional']"

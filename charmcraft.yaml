@@ -1,0 +1,26 @@
+# Learn more about charmcraft.yaml configuration at:
+# https://juju.is/docs/sdk/charmcraft-config
+# This is a template `charmcraft.yaml` file for ops charms
+# This file is managed by bootstack-charms-spec and should not be modified
+# within individual charm repos. https://launchpad.net/bootstack-charms-spec
+
+type: charm
+
+bases:
+  - build-on:
+    - name: ubuntu
+      channel: "22.04"
+      architectures: ["amd64"]
+    run-on:
+      - name: ubuntu
+        channel: "22.04"
+        architectures:
+          - amd64
+      - name: ubuntu
+        channel: "20.04"
+        architectures:
+          - amd64
+      - name: ubuntu
+        channel: "18.04"
+        architectures:
+          - amd64
