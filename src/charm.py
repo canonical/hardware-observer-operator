@@ -24,6 +24,8 @@ class CharmPrometheusHardwareExporterCharm(ops.CharmBase):
     def __init__(self, *args):
         """Init."""
         super().__init__(*args)
+        self.framework.observe(self.on.install, self._on_install_or_upgrade)
+        self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
         # Initialise helpers, etc.
@@ -32,6 +34,17 @@ class CharmPrometheusHardwareExporterCharm(ops.CharmBase):
 
         self.exporter = Exporter(self, "exporter")
         self._stored.set_default(installed=False, config={})
+
+
+    def _on_install_or_upgrade(self, event):
+        """Install and upgrade."""
+
+        self.model.unit.status = ActiveStatus("Install complete")
+        logger.debug(self.model.resources)
+        logger.debug(self.model.resources._paths)
+
+        if not self._stored.installed = True
+        logger.info("Install complete")
 
     @property
     def snap_path(self):
