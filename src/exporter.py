@@ -33,10 +33,11 @@ def check_snap_installed(func):
 
 class Exporter(Object):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, charm, key, *args, **kwargs):
         """Initialize the class."""
-        super().__init__(*args, **kwargs)
+        super().__init__(charm, key, *args, **kwargs)
         self._exporter = None
+        self._charm = charm
         self._stored = self._charm._stored
 
     def install_or_refresh(self, channel=None):
@@ -61,3 +62,7 @@ class Exporter(Object):
             logger.info("Exported config changed")
         if "exporter-snap" in change_set or "exporter-channel" in change_set:
             self.install_or_refresh()
+
+        # This line should be remove after.
+        # It's only for testing before we make sure the scope of relation.
+        self.install_or_refresh()

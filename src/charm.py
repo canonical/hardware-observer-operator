@@ -5,10 +5,13 @@
 """Charm the application."""
 
 import logging
+import os
 
 import ops
 from ops.framework import StoredState
-from ops.model import ActiveStatus
+from ops.model import ActiveStatus, ModelError
+
+from exporter import Exporter
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +22,16 @@ class CharmPrometheusHardwareExporterCharm(ops.CharmBase):
     _stored = StoredState()
 
     def __init__(self, *args):
+        """Init."""
         super().__init__(*args)
-        self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
-
 
         # Initialise helpers, etc.
         self._snap_path = None
         self._snap_path_set = False
+
+        self.exporter = Exporter(self, "exporter")
+        self._stored.set_default(installed=False, config={})
 
     @property
     def snap_path(self):
