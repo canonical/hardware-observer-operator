@@ -1,8 +1,15 @@
+"""Config."""
+from pathlib import Path
+
 # EXPORTER_NAME = "prometheus-hardware-exporter"
-EXPORTER_NAME = "prometheus-juju-backup-all-exporter"
+EXPORTER_NAME = "cocona"
 
 
-class Paths:
-    """Namespace for path constants."""
+# Register every vendoer's tool here.
+VENDOR_TOOLS = [
+    "storecli-deb",
+]
 
-    pass
+# SNAP envionment
+
+SNAP_COMMON = Path(f"/var/snap/{EXPORTER_NAME}/common")
