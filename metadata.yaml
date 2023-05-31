@@ -2,40 +2,41 @@
 
 # The charm package name, no spaces (required)
 # See https://juju.is/docs/sdk/naming#heading--naming-charms for guidance.
-name: charm-prometheus-hardware-exporter
+name: prometheus-hardware-exporter
 
 # The following metadata are human-readable and will be published prominently on Charmhub.
 
 # (Recommended)
-display-name: Charm Template
+display-name: prometheus-hardware-exporter
 
-# (Required)
-summary: A very short one-line summary of the charm.
+summary: subordinate charm for hardware health monitor.
 
 description: |
-  A single sentence that says what the charm is, concisely and memorably.
+  todo
+  todo
+  todo
+  todo
 
-  A paragraph of one to three short sentences, that describe what the charm does.
-
-  A third paragraph that explains what need the charm meets.
-
-  Finally, a paragraph that describes whom the charm is useful for.
-
+subordinate: true
 
 resources:
 
   exporter-snap:
-  type: file
-  description: |
-    (Optional) Snap that implements actual data conllection and export.
-    If not provided, charm will try to download prometheus-hardware-exporter
-    from snap storecraft.
-  filename: proemtheus-hardware-exporter.snap
-
-  exporter-channel:
-    type: string
-    default: "stable"
+    type: file
     description: |
-      Install prometheus-juju-backup-all-exporter snap from "exporter-channel".
-      Supported values are: "stable", "candidate", "beta" and "edge". Note that
-      it will be superseded by local resources: "exporter-snap".
+      (Optional) Snap that implements actual data conllection and export.
+      If not provided, charm will try to download prometheus-hardware-exporter
+      from snap storecraft.
+    filename: proemtheus-hardware-exporter.snap
+  storecli-deb:
+    type: file
+    description: |
+      (Optional) un-republish tool.
+      StorCLI deb file publish by Broadcom for their RAID devices.
+      Download it from https://www.broadcom.com/products/storage/raid-controllers .
+    filename: storecli.deb
+
+requires:
+  general-info:
+    interface: juju-info
+    scope: container

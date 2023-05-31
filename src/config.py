@@ -1,8 +1,15 @@
-import pathlib
+"""Config."""
+from pathlib import Path
 
-EXPORTER_NAME = "prometheus-hardware-exporter"
+# EXPORTER_NAME = "prometheus-hardware-exporter"
+EXPORTER_NAME = "cocona"
 
 
-class Paths:
-    """Namespace for path constants."""
-    pass
+# Register every vendoer's tool here.
+VENDOR_TOOLS = [
+    "storecli-deb",
+]
+
+# SNAP envionment
+
+SNAP_COMMON = Path(f"/var/snap/{EXPORTER_NAME}/common")

@@ -47,6 +47,9 @@ ignore-paths = [
   "report",
   "tests",
 ]
+disable = [
+    "E1102",
+]
 
 [tool.mypy]
 warn_unused_ignores = true
