@@ -10,10 +10,11 @@ Use links instead.
 
 # charm-prometheus-hardware-exporter
 
-Charmhub package name: operator-template
+Charmhub package name: charm-prometheus-hardware-exporter
 More information: https://charmhub.io/charm-prometheus-hardware-exporter
 
-Describe your charm in one or two sentences.
+
+The charm to install the exporter which export hardware metrices for IPMI, RedFish and RAID devices from different vendor.
 
 ## Other resources
 
@@ -29,8 +30,11 @@ Describe your charm in one or two sentences.
 ## Features
 
 - [ ] Resources management
-    - [ ] Upload resources to `$SNAP_COMMON` folder
+    - [x] Upload resources to `$SNAP_COMMON/bin` folder
     - [ ] Action: List resources
 
-- [ ] Snap install
+- [ ] Exporter and monitor part
+    - [ ] Build relation with COS
+
+- [x] Snap install
     - [x] Download libs `charms.operator_libs_linux.v2.snap`
