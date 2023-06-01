@@ -1,0 +1,39 @@
+groups:
+- name: MegaRAID
+  rules:
+
+  - alert: StorcliCommandFailed
+    expr: storcli_command_success == 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: Failed to run storcli. (instance {{ $labels.instance }})
+      description: |
+        Failed to get MegaRAID controller information using storcli.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: MegaRAIDControllerNotFound
+    expr: (megaraid_controllers == 0) and on (instance) (storcli_command_success == 1)
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: MegaRAID controller not found. (instance {{ $labels.instance }})
+      description: |
+        Cannot found MegaRAID controller on this host machine.
+          NUMBER_OF_CONTROLLERS = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: MegaRAIDVirtualDriveNotOptimal
+    expr: (megaraid_virtual_drive_state{state != "Optl"} == 1) and on (instance) (storcli_command_success == 1)
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: MegaRAID virtual drives are not in optimal state. (instance {{ $labels.instance }})
+      description: |
+        MegaRAID virtual drives are not in optimal state. Please check the if the virtual drives are working as expected.
+          STATE = {{ $labels.state }}
+          LABELS = {{ $labels }}
