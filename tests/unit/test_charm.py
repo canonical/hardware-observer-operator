@@ -35,9 +35,7 @@ class TestCharm(unittest.TestCase):
         """Test charm initialise."""
         self.harness.begin()
         self.assertFalse(self.harness.charm._stored.installed)
-        self.assertTrue(
-            isinstance(self.harness.charm._stored.config, ops.framework.StoredDict)
-        )
+        self.assertTrue(isinstance(self.harness.charm._stored.config, ops.framework.StoredDict))
 
     @mock.patch("charm.VendorHelper", return_value=mock.MagicMock())
     def test_02_install(self, mock_vendor_helper) -> None:
@@ -49,7 +47,8 @@ class TestCharm(unittest.TestCase):
 
         print(self.harness.charm.vendor_helper.install)
         self.harness.charm.vendor_helper.install.assert_called_with(
-            self.harness.charm.model.resources)
+            self.harness.charm.model.resources
+        )
 
     @mock.patch("charm.VendorHelper", return_value=mock.MagicMock())
     def test_03_upgrade_charm(self, mock_vendor_helper) -> None:
@@ -61,7 +60,8 @@ class TestCharm(unittest.TestCase):
 
         print(self.harness.charm.vendor_helper.install)
         self.harness.charm.vendor_helper.install.assert_called_with(
-            self.harness.charm.model.resources)
+            self.harness.charm.model.resources
+        )
 
         self.harness.charm.unit.status = ActiveStatus("Install complete")
 
@@ -76,22 +76,16 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.on.config_changed.emit()
 
         for k, v in self.harness.charm.model.config.items():
-            self.assertTrue(
-                self.harness.charm._stored.config.get(k) == v)
+            self.assertTrue(self.harness.charm._stored.config.get(k) == v)
 
-        self.assertTrue(
-            self.harness.charm._stored.config["exporter-snap"] == None
-        )
+        self.assertTrue(self.harness.charm._stored.config["exporter-snap"] is None)
 
-        self.assertTrue(
-            self.harness.charm._stored.config["fake-config"] == "fake-value"
-        )
+        self.assertTrue(self.harness.charm._stored.config["fake-config"] == "fake-value")
         self.harness.charm.exporter.on_config_changed.assert_called_with(
             set({"exporter-snap", "exporter-channel"})
         )
 
         self.assertTrue(self.harness.charm.unit.status == ActiveStatus("Unit is ready"))
-
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     def test_05_config_changed_before_install_complete(self, mock_exporter):
@@ -102,18 +96,17 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.on.config_changed.emit()
         self.assertEqual(self._get_notice_count("config_changed"), 1)
 
-
     def test_06_snap_path_resource_provided(self):
         """snap_path is set up correctly if resource is provided."""
         self.harness.begin()
         self.harness.add_resource("exporter-snap", "exporter-snap-contont")
-        snap_path = self.harness.charm.snap_path
+        self.harness.charm.snap_path
         self.assertTrue(self.harness.charm._snap_path_set)
         self.assertTrue(self.harness.charm._snap_path is not None)
 
     def test_07_snap_path_resource_missing(self):
         """snap_path is set up correctly if resource is not provided."""
         self.harness.begin()
-        snap_path = self.harness.charm.snap_path
+        self.harness.charm.snap_path
         self.assertTrue(self.harness.charm._snap_path_set)
         self.assertTrue(self.harness.charm._snap_path is None)
