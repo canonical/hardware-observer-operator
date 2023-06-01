@@ -18,7 +18,7 @@ from vendor import VendorHelper
 logger = logging.getLogger(__name__)
 
 
-class CharmPrometheusHardwareExporterCharm(ops.CharmBase):
+class PrometheusHardwareExporterCharm(ops.CharmBase):
     """Charm the application."""
 
     _stored = StoredState()
@@ -93,4 +93,4 @@ class CharmPrometheusHardwareExporterCharm(ops.CharmBase):
 
 
 if __name__ == "__main__":  # pragma: nocover
-    ops.main(CharmPrometheusHardwareExporterCharm)  # type: ignore
+    ops.main(PrometheusHardwareExporterCharm)  # type: ignore
