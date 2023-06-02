@@ -96,8 +96,7 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.on.config_changed.emit()
         self.assertEqual(self._get_notice_count("config_changed"), 1)
 
-
-    @mock.patch("charm.os.path.getsize", return_value = 1)
+    @mock.patch("charm.os.path.getsize", return_value=1)
     def test_06_snap_path_resource_provided(self, mock_getsize):
         """snap_path is set up correctly if resource is provided."""
         self.harness.begin()
@@ -106,7 +105,7 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(self.harness.charm._snap_path_set)
         self.assertTrue(self.harness.charm._snap_path is not None)
 
-    @mock.patch("charm.os.path.getsize", return_value = 0)
+    @mock.patch("charm.os.path.getsize", return_value=0)
     def test_07_snap_path_resource_provided(self, mock_getsize):
         """snap_path is set to None if resource size if zero."""
         self.harness.begin()

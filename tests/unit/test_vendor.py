@@ -9,14 +9,19 @@ from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError
 
 from charm import PrometheusHardwareExporterCharm
-from config import VENDOR_TOOLS, SNAP_COMMON
-from vendor import DebInstallStrategy, InstallStrategyABC, StorCLIInstallStrategy, VendorHelper, copy_to_snap_common_bin
+from config import SNAP_COMMON, VENDOR_TOOLS
+from vendor import (
+    DebInstallStrategy,
+    InstallStrategyABC,
+    StorCLIInstallStrategy,
+    VendorHelper,
+    copy_to_snap_common_bin,
+)
 
 
 @mock.patch("vendor.shutil")
 @mock.patch("vendor.Path")
 def test_copy_to_snap_common_bin(mock_path, mock_shutil):
-
     mock_path_obj = mock.MagicMock()
     mock_path.return_value = mock_path_obj
 
@@ -25,6 +30,7 @@ def test_copy_to_snap_common_bin(mock_path, mock_shutil):
     mock_path.assert_called_with(f"{SNAP_COMMON}/bin")
 
     mock_path_obj.mkdir.assert_called()
+
 
 class TestVendorHelper(unittest.TestCase):
     def setUp(self):
@@ -95,13 +101,12 @@ class TestVendorHelper(unittest.TestCase):
         return_value={},
         new_callable=mock.PropertyMock,
     )
-    @mock.patch(
-        "vendor.logger"
-    )
+    @mock.patch("vendor.logger")
     def test_05_install_not_strategies(self, mock_logger, mock_strategies):
         """logger.warning is triggered if strategy has not been defined."""
         self.harness.add_resource(
-            "storecli-deb", "storcli.deb",
+            "storecli-deb",
+            "storcli.deb",
         )
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
