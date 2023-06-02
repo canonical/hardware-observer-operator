@@ -19,8 +19,8 @@ def check_snap_installed(func: t.Callable) -> t.Callable:
     def wrapper(self, *args, **kwargs):  # type: ignore
         """Wrap func."""
         try:
-            self._exporter = (  # pylint: disable=W0212
-                self._exporter or snap.SnapCache()[EXPORTER_NAME]  # pylint: disable=W0212
+            self._exporter = self._exporter or snap.SnapCache().get(  # pylint: disable=W0212
+                EXPORTER_NAME
             )
             logger.info("%s exporter snap.", func.__name__.capitalize())
             if not (self._exporter and self._exporter.present):  # pylint: disable=W0212
@@ -50,7 +50,7 @@ class Exporter(Object):
         logger.info("Installing exporter snap.")
         channel = channel or self._stored.config["exporter-channel"]
         try:
-            if self._stored.config["exporter-snap"]:
+            if self._stored.config.get("exporter-snap"):
                 snap.install_local(self._stored.config["exporter-snap"], dangerous=True)
             else:
                 snap.add([EXPORTER_NAME], channel=channel)
