@@ -9,9 +9,22 @@ from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError
 
 from charm import PrometheusHardwareExporterCharm
-from config import VENDOR_TOOLS
-from vendor import DebInstallStrategy, InstallStrategyABC, StorCLIInstallStrategy, VendorHelper
+from config import VENDOR_TOOLS, SNAP_COMMON
+from vendor import DebInstallStrategy, InstallStrategyABC, StorCLIInstallStrategy, VendorHelper, copy_to_snap_common_bin
 
+
+@mock.patch("vendor.shutil")
+@mock.patch("vendor.Path")
+def test_copy_to_snap_common_bin(mock_path, mock_shutil):
+
+    mock_path_obj = mock.MagicMock()
+    mock_path.return_value = mock_path_obj
+
+    copy_to_snap_common_bin(Path("/tmp"), "abc.py")
+
+    mock_path.assert_called_with(f"{SNAP_COMMON}/bin")
+
+    mock_path_obj.mkdir.assert_called()
 
 class TestVendorHelper(unittest.TestCase):
     def setUp(self):
@@ -20,7 +33,7 @@ class TestVendorHelper(unittest.TestCase):
 
         self.vendor_helper = VendorHelper()
 
-    def test_strategies(self):
+    def test_01_strategies(self):
         """Check strategies define correctly."""
         strategies = self.vendor_helper.strategies
         assert strategies.keys() == {"storecli-deb"}
@@ -31,7 +44,7 @@ class TestVendorHelper(unittest.TestCase):
         # Special cases
         assert isinstance(strategies.get("storecli-deb"), StorCLIInstallStrategy)
 
-    def test_fetch_tools(self):
+    def test__02_fetch_tools(self):
         """Check each vendor_tool has been fetched."""
         mock_resources = unittest.mock.MagicMock()
         mock_resources._paths = {"resource-a": "path-a", "resource-b": "path-b"}
@@ -46,7 +59,7 @@ class TestVendorHelper(unittest.TestCase):
 
         self.assertEqual(fetch_tools, VENDOR_TOOLS)
 
-    def test_fetch_tools_error_handling(self):
+    def test_03_fetch_tools_error_handling(self):
         """The fetch fail error should be handled."""
         mock_resources = unittest.mock.MagicMock()
         mock_resources._paths = {}
@@ -66,7 +79,7 @@ class TestVendorHelper(unittest.TestCase):
         },
         new_callable=mock.PropertyMock,
     )
-    def test_install(self, mock_strategies):
+    def test_04_install(self, mock_strategies):
         """Check strategy is been called."""
         self.harness.add_resource("storecli-deb", "storcli.deb")
         self.harness.begin()
@@ -76,6 +89,26 @@ class TestVendorHelper(unittest.TestCase):
         for name, value in mock_strategies.return_value.items():
             path = self.harness.charm.model.resources.fetch(name)
             value.install.assert_called_with(name, path)
+
+    @mock.patch(
+        "vendor.VendorHelper.strategies",
+        return_value={},
+        new_callable=mock.PropertyMock,
+    )
+    @mock.patch(
+        "vendor.logger"
+    )
+    def test_05_install_not_strategies(self, mock_logger, mock_strategies):
+        """logger.warning is triggered if strategy has not been defined."""
+        self.harness.add_resource(
+            "storecli-deb", "storcli.deb",
+        )
+        self.harness.begin()
+        mock_resources = self.harness.charm.model.resources
+        self.vendor_helper.install(mock_resources)
+        mock_logger.warning.assert_called_with(
+            "Could not find install strategy for tool %s", "storecli-deb"
+        )
 
 
 class TestStorCLIInstrallStrategy(unittest.TestCase):

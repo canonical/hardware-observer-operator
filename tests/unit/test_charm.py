@@ -96,7 +96,9 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.on.config_changed.emit()
         self.assertEqual(self._get_notice_count("config_changed"), 1)
 
-    def test_06_snap_path_resource_provided(self):
+
+    @mock.patch("charm.os.path.getsize", return_value = 1)
+    def test_06_snap_path_resource_provided(self, mock_getsize):
         """snap_path is set up correctly if resource is provided."""
         self.harness.begin()
         self.harness.add_resource("exporter-snap", "exporter-snap-contont")
@@ -104,7 +106,16 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(self.harness.charm._snap_path_set)
         self.assertTrue(self.harness.charm._snap_path is not None)
 
-    def test_07_snap_path_resource_missing(self):
+    @mock.patch("charm.os.path.getsize", return_value = 0)
+    def test_07_snap_path_resource_provided(self, mock_getsize):
+        """snap_path is set to None if resource size if zero."""
+        self.harness.begin()
+        self.harness.add_resource("exporter-snap", "exporter-snap-contont")
+        self.harness.charm.snap_path
+        self.assertTrue(self.harness.charm._snap_path_set)
+        self.assertTrue(self.harness.charm._snap_path is None)
+
+    def test_08_snap_path_resource_missing(self):
         """snap_path is set up correctly if resource is not provided."""
         self.harness.begin()
         self.harness.charm.snap_path

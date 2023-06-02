@@ -26,7 +26,6 @@ class InstallStrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
     @abstractmethod
     def install(self, name: str, path: Path) -> None:
         """Installation details."""
-        raise NotImplementedError
 
 
 class DebInstallStrategy(InstallStrategyABC):  # pylint: disable=R0903
