@@ -10,9 +10,9 @@ import typing as t
 
 import ops
 from ops.framework import EventBase, StoredState
-from ops.model import ActiveStatus, ModelError
+from ops.model import ActiveStatus, BlockedStatus, ModelError
 
-from exporter import Exporter
+from service import Exporter
 from vendor import VendorHelper
 
 logger = logging.getLogger(__name__)
@@ -26,6 +26,8 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
     def __init__(self, *args: t.Any) -> None:
         """Init."""
         super().__init__(*args)
+        self.framework.observe(self.on.remove, self._on_remove)
+        self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.install, self._on_install_or_upgrade)
         self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -36,17 +38,35 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
         self._snap_path_set = False
         self.vendor_helper = VendorHelper()
 
-        self.exporter = Exporter(self, "exporter")
+        self.exporter = Exporter(
+            self,
+            metrics_endpoints=[
+                {"path": "/metrics", "port": int(self.model.config["exporter-port"])}
+            ],
+        )
         self._stored.set_default(installed=False, config={})
 
     def _on_install_or_upgrade(self, _: EventBase) -> None:
         """Install and upgrade."""
+        self.exporter.install()
         self.vendor_helper.install(self.model.resources)
-
         self._stored.installed = True
-
         self.model.unit.status = ActiveStatus("Install complete")
         logger.info("Install complete")
+
+    def _on_remove(self, _: EventBase) -> None:
+        """Uninstall event."""
+        self.exporter.uninstall()
+        logger.info("Remove complete")
+
+    def _on_update_status(self, _: EventBase) -> None:
+        if not self.exporter.check_relation():
+            self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
+            return
+        if not self.exporter.check_health():
+            self.model.unit.status = BlockedStatus("Exporter is unhealthy")
+            return
+        self.model.unit.status = ActiveStatus("Unit is ready")
 
     @property
     def snap_path(self) -> t.Optional[str]:
@@ -79,8 +99,6 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
                 logger.info("Setting %s to: %s", key, value)
                 self._stored.config[key] = value  # type: ignore
                 change_set.add(key)
-
-        self.exporter.on_config_changed(change_set)
 
         if not self._stored.installed:  # type: ignore
             logging.info(  # type: ignore

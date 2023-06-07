@@ -6,6 +6,10 @@
 
 type: charm
 
+parts:
+  charm:
+    build-packages: [git]
+
 bases:
   - build-on:
     - name: ubuntu

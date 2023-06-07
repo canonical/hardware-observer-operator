@@ -36,6 +36,10 @@ resources:
       Download it from https://www.broadcom.com/products/storage/raid-controllers .
     filename: storecli.deb
 
+provides:
+  cos-agent:
+    interface: cos_agent
+
 requires:
   general-info:
     interface: juju-info

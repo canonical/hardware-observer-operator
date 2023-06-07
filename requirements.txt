@@ -1,1 +1,4 @@
+cosl
 ops >= 2.2.0
+jinja2
+git+https://github.com/canonical/prometheus-hardware-exporter.git
