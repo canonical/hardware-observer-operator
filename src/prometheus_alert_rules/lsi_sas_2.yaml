@@ -1,0 +1,72 @@
+groups:
+
+- name: LSI SAS-2 controller
+  rules:
+
+  - alert: Sas2ircuCommandFailed
+    expr: sas2ircu_command_success == 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: Failed to run sas2ircu. (instance {{ $labels.instance }})
+      description: |
+        Failed to get LSI SAS-2 controller information using sas2ircu.
+          INSTANCE = {{ $labels.instance }}
+          SUCCESS = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: LSISAS2ControllerNotFound
+    expr: (lsi_sas_2_controllers == 0) and on (instance) (sas2ircu_command_success == 1)
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: LSI SAS-2 controller not found. (instance {{ $labels.instance }})
+      description: |
+        Cannot found LSI SAS-2 controller on this host machine.
+          INSTANCE = {{ $labels.instance }}
+          NUMBER_OF_CONTROLLERS = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: LSISAS2IRVolumeNotFound
+    expr: (lsi_sas_2_ir_volumes == 0) and on (instance) (sas2ircu_command_success == 1)
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: LSI SAS-2 IR volume not found. (instance {{ $labels.instance }})
+      description: |
+        Cannot found LSI SAS-2 integrated RAID volumes on this controller.
+          CONTROLLER_ID = {{ $labels.controller_id }}
+          NUMBER_OF_VOLUMES = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: LSISAS2IRVolumeUnhealthy
+    expr: (lsi_sas_2_ir_volume_info{status !~ "(Okay.*|Initializing.*|Online.*)"} == 1) and on (instance) (sas2ircu_command_success == 1)
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: LSI SAS-2 volume is not healthy. (instance {{ $labels.instance }})
+      description: |
+        LSI SAS-2 volume is not in "Okay", "Initializing", or "Online" state. Please check the if the volume is working as expected.
+          CONTROLLER_ID = {{ $labels.controller_id }}
+          VOLUME_ID = {{ $labels.volume_id}}
+          STATUS = {{ $labels.status }}
+          LABELS = {{ $labels }}
+
+  - alert: LSISAS2PhysicalDiskUnhealthy
+    expr: (lsi_sas_2_physical_device_info{state !~ "(Online.*|Hot Spare.*|Ready.*|Optimal.*)"} == 1) and on (instance) (sas2ircu_command_success == 1)
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: LSI SAS-2 physical disk is not healthy. (instance {{ $labels.instance }})
+      description: |
+        LSI SAS-2 physical disk not in "Online", "Hot Spare", "Ready", or "Optimal" state. Please check the if the physical disk is working as expected.
+          CONTROLLER_ID = {{ $labels.controller_id }}
+          ENCLOSURE_ID = {{ $labels.enclosure_id }}
+          SLOT_ID = {{ $labels.slot_id }}
+          STATE = {{ $labels.state }}
+          LABELS = {{ $labels }}
