@@ -53,7 +53,7 @@ tests:
     input_series:
       - series: 'sas2ircu_command_success{instance="ubuntu-2"}'
         values: '1x15'
-      - series: 'lsi_sas_2_ir_volumes{controller_id="0", instance="ubuntu-2"}'
+      - series: 'lsi_sas_2_ir_volumes{instance="ubuntu-2", controller_id="0"}'
         values: '0x15' # error: LSISAS2IRVolumeNotFound
 
     alert_rule_test:
@@ -80,19 +80,19 @@ tests:
       - series: 'lsi_sas_2_ir_volume_info{instance="ubuntu-3", controller_id="0", volume_id="200", status="Okay (OKY)", size_mb="139236", boot="Primary", raid_level="RAID1", hard_disk="1:0,1:1"}'
         values: '1x15' # okay
       - series: 'lsi_sas_2_ir_volume_info{instance="ubuntu-3", controller_id="0", volume_id="201", status="Degraded (DGD)", size_mb="239236", boot="Primary", raid_level="RAID1", hard_disk="2:0,2:1"}'
-        values: '1x15' # error: LSISAS2IRVolumeUnhealthy
+        values: '1x15' # error: LSISAS2IRVolumeUnready
       - series: 'lsi_sas_2_ir_volume_info{instance="ubuntu-3", controller_id="0", volume_id="202", status="Failed (FLD)", size_mb="339236", boot="Primary", raid_level="RAID1", hard_disk="3:0,3:1"}'
-        values: '1x15' # error: LSISAS2IRVolumeUnhealthy
+        values: '1x15' # error: LSISAS2IRVolumeUnready
       - series: 'lsi_sas_2_ir_volume_info{instance="ubuntu-3", controller_id="0", volume_id="203", status="Missing (MIS)", size_mb="439236", boot="Primary", raid_level="RAID1", hard_disk="4:0,4:1"}'
-        values: '1x15' # error: LSISAS2IRVolumeUnhealthy
+        values: '1x15' # error: LSISAS2IRVolumeUnready
       - series: 'lsi_sas_2_ir_volume_info{instance="ubuntu-3", controller_id="0", volume_id="204", status="Initializing (INIT)", size_mb="539236", boot="Primary", raid_level="RAID1", hard_disk="5:0,5:1"}'
-        values: '1x15' # okay
+        values: '1x15' # error: LSISAS2IRVolumeUnready
       - series: 'lsi_sas_2_ir_volume_info{instance="ubuntu-3", controller_id="0", volume_id="205", status="Online (ONL)", size_mb="639236", boot="Primary", raid_level="RAID1", hard_disk="6:0,6:1"}'
-        values: '1x15' # okay
+        values: '1x15' # error: LSISAS2IRVolumeUnready
 
     alert_rule_test:
       - eval_time: 0m
-        alertname: LSISAS2IRVolumeUnhealthy
+        alertname: LSISAS2IRVolumeUnready
         exp_alerts:
           - exp_labels:
               severity: critical
@@ -105,9 +105,9 @@ tests:
               raid_level: RAID1
               hard_disk: "2:0,2:1"
             exp_annotations:
-              summary: LSI SAS-2 volume is not healthy. (instance ubuntu-3)
+              summary: LSI SAS-2 volume is not ready. (instance ubuntu-3)
               description: |
-                LSI SAS-2 volume is not in "Okay", "Initializing", or "Online" state. Please check the if the volume is working as expected.
+                LSI SAS-2 volume is not in "Okay" state. Please check the if the volume is working as expected.
                   CONTROLLER_ID = 0
                   VOLUME_ID = 201
                   STATUS = Degraded (DGD)
@@ -123,9 +123,9 @@ tests:
               raid_level: RAID1
               hard_disk: "3:0,3:1"
             exp_annotations:
-              summary: LSI SAS-2 volume is not healthy. (instance ubuntu-3)
+              summary: LSI SAS-2 volume is not ready. (instance ubuntu-3)
               description: |
-                LSI SAS-2 volume is not in "Okay", "Initializing", or "Online" state. Please check the if the volume is working as expected.
+                LSI SAS-2 volume is not in "Okay" state. Please check the if the volume is working as expected.
                   CONTROLLER_ID = 0
                   VOLUME_ID = 202
                   STATUS = Failed (FLD)
@@ -141,46 +141,120 @@ tests:
               raid_level: RAID1
               hard_disk: "4:0,4:1"
             exp_annotations:
-              summary: LSI SAS-2 volume is not healthy. (instance ubuntu-3)
+              summary: LSI SAS-2 volume is not ready. (instance ubuntu-3)
               description: |
-                LSI SAS-2 volume is not in "Okay", "Initializing", or "Online" state. Please check the if the volume is working as expected.
+                LSI SAS-2 volume is not in "Okay" state. Please check the if the volume is working as expected.
                   CONTROLLER_ID = 0
                   VOLUME_ID = 203
                   STATUS = Missing (MIS)
                   LABELS = map[__name__:lsi_sas_2_ir_volume_info boot:Primary controller_id:0 hard_disk:4:0,4:1 instance:ubuntu-3 raid_level:RAID1 size_mb:439236 status:Missing (MIS) volume_id:203]
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: 0
+              volume_id: 204
+              status: Initializing (INIT)
+              size_mb: 539236
+              boot: Primary
+              raid_level: RAID1
+              hard_disk: "5:0,5:1"
+            exp_annotations:
+              summary: LSI SAS-2 volume is not ready. (instance ubuntu-3)
+              description: |
+                LSI SAS-2 volume is not in "Okay" state. Please check the if the volume is working as expected.
+                  CONTROLLER_ID = 0
+                  VOLUME_ID = 204
+                  STATUS = Initializing (INIT)
+                  LABELS = map[__name__:lsi_sas_2_ir_volume_info boot:Primary controller_id:0 hard_disk:5:0,5:1 instance:ubuntu-3 raid_level:RAID1 size_mb:539236 status:Initializing (INIT) volume_id:204]
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: 0
+              volume_id: 205
+              status: Online (ONL)
+              size_mb: 639236
+              boot: Primary
+              raid_level: RAID1
+              hard_disk: "6:0,6:1"
+            exp_annotations:
+              summary: LSI SAS-2 volume is not ready. (instance ubuntu-3)
+              description: |
+                LSI SAS-2 volume is not in "Okay" state. Please check the if the volume is working as expected.
+                  CONTROLLER_ID = 0
+                  VOLUME_ID = 205
+                  STATUS = Online (ONL)
+                  LABELS = map[__name__:lsi_sas_2_ir_volume_info boot:Primary controller_id:0 hard_disk:6:0,6:1 instance:ubuntu-3 raid_level:RAID1 size_mb:639236 status:Online (ONL) volume_id:205]
 
 
   - interval: 1m
     input_series:
-      - series: 'sas2ircu_command_success{instance="ubuntu-4"}'
+      - series: 'sas3ircu_command_success{instance="ubuntu-4"}'
         values: '1x15'
       - series: 'lsi_sas_2_physical_device_info{instance="ubuntu-4", controller_id="1", enclosure_id="1", slot_id="0", size_mb_sectors="176940/976773167", drive_type="SATA_HDD", protocol="SATA", state="Online (ONL)"}'
-        values: '1x15' # okay
+        values: '1x15' # error: LSISAS2PhysicalDiskUnready
       - series: 'lsi_sas_2_physical_device_info{instance="ubuntu-4", controller_id="1", enclosure_id="1", slot_id="1", size_mb_sectors="276940/976773167", drive_type="SATA_HDD", protocol="SATA", state="Hot Spare (HSP)"}'
-        values: '1x15' # okay
+        values: '1x15' # error: LSISAS2PhysicalDiskUnready
       - series: 'lsi_sas_2_physical_device_info{instance="ubuntu-4", controller_id="1", enclosure_id="1", slot_id="2", size_mb_sectors="376940/976773167", drive_type="SATA_HDD", protocol="SATA", state="Ready (RDY)"}'
         values: '1x15' # okay
       - series: 'lsi_sas_2_physical_device_info{instance="ubuntu-4", controller_id="1", enclosure_id="1", slot_id="4", size_mb_sectors="476940/976773167", drive_type="SATA_HDD", protocol="SATA", state="Available (AVL)"}'
-        values: '1x15' # error: LSISAS2PhysicalDiskUnhealthy
+        values: '1x15' # error: LSISAS2PhysicalDiskUnready
       - series: 'lsi_sas_2_physical_device_info{instance="ubuntu-4", controller_id="1", enclosure_id="1", slot_id="5", size_mb_sectors="576940/976773167", drive_type="SATA_HDD", protocol="SATA", state="Failed (FLD)"}'
-        values: '1x15' # error: LSISAS2PhysicalDiskUnhealthy
+        values: '1x15' # error: LSISAS2PhysicalDiskUnready
       - series: 'lsi_sas_2_physical_device_info{instance="ubuntu-4", controller_id="1", enclosure_id="1", slot_id="6", size_mb_sectors="676940/976773167", drive_type="SATA_HDD", protocol="SATA", state="Missing (MIS)"}'
-        values: '1x15' # error: LSISAS2PhysicalDiskUnhealthy
+        values: '1x15' # error: LSISAS2PhysicalDiskUnready
       - series: 'lsi_sas_2_physical_device_info{instance="ubuntu-4", controller_id="1", enclosure_id="1", slot_id="7", size_mb_sectors="776940/976773167", drive_type="SATA_HDD", protocol="SATA", state="Standby (SBY)"}'
-        values: '1x15' # error: LSISAS2PhysicalDiskUnhealthy
+        values: '1x15' # error: LSISAS2PhysicalDiskUnready
       - series: 'lsi_sas_2_physical_device_info{instance="ubuntu-4", controller_id="1", enclosure_id="1", slot_id="8", size_mb_sectors="876940/976773167", drive_type="SATA_HDD", protocol="SATA", state="Out of Sync (OSY)"}'
-        values: '1x15' # error: LSISAS2PhysicalDiskUnhealthy
+        values: '1x15' # error: LSISAS2PhysicalDiskUnready
       - series: 'lsi_sas_2_physical_device_info{instance="ubuntu-4", controller_id="1", enclosure_id="1", slot_id="9", size_mb_sectors="976940/976773167", drive_type="SATA_HDD", protocol="SATA", state="Degraded (DGD)"}'
-        values: '1x15' # error: LSISAS2PhysicalDiskUnhealthy
+        values: '1x15' # error: LSISAS2PhysicalDiskUnready
       - series: 'lsi_sas_2_physical_device_info{instance="ubuntu-4", controller_id="1", enclosure_id="1", slot_id="10", size_mb_sectors="1076940/976773167", drive_type="SATA_HDD", protocol="SATA", state="Rebuilding (RBLD)"}'
-        values: '1x15' # error: LSISAS2PhysicalDiskUnhealthy
+        values: '1x15' # error: LSISAS2PhysicalDiskUnready
       - series: 'lsi_sas_2_physical_device_info{instance="ubuntu-4", controller_id="1", enclosure_id="1", slot_id="11", size_mb_sectors="1176940/976773167", drive_type="SATA_HDD", protocol="SATA", state="Optimal (OPT)"}'
         values: '1x15' # okay
 
     alert_rule_test:
       - eval_time: 0m
-        alertname: LSISAS2PhysicalDiskUnhealthy
+        alertname: LSISAS2PhysicalDiskUnready
         exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-4
+              controller_id: 1
+              enclosure_id: 1
+              slot_id: 0
+              size_mb_sectors: 176940/976773167
+              drive_type: SATA_HDD
+              protocol: SATA
+              state: Online (ONL)
+            exp_annotations:
+              summary: LSI SAS-2 physical disk is not ready. (instance ubuntu-4)
+              description: |
+                LSI SAS-2 physical disk not in "Ready" or "Optimal" state. Please check the if the physical disk is working as expected.
+                  CONTROLLER_ID = 1
+                  ENCLOSURE_ID = 1
+                  SLOT_ID = 0
+                  STATE = Online (ONL)
+                  LABELS = map[__name__:lsi_sas_2_physical_device_info controller_id:1 drive_type:SATA_HDD enclosure_id:1 instance:ubuntu-4 protocol:SATA size_mb_sectors:176940/976773167 slot_id:0 state:Online (ONL)]
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-4
+              controller_id: 1
+              enclosure_id: 1
+              slot_id: 1
+              size_mb_sectors: 276940/976773167
+              drive_type: SATA_HDD
+              protocol: SATA
+              state: Hot Spare (HSP)
+            exp_annotations:
+              summary: LSI SAS-2 physical disk is not ready. (instance ubuntu-4)
+              description: |
+                LSI SAS-2 physical disk not in "Ready" or "Optimal" state. Please check the if the physical disk is working as expected.
+                  CONTROLLER_ID = 1
+                  ENCLOSURE_ID = 1
+                  SLOT_ID = 1
+                  STATE = Hot Spare (HSP)
+                  LABELS = map[__name__:lsi_sas_2_physical_device_info controller_id:1 drive_type:SATA_HDD enclosure_id:1 instance:ubuntu-4 protocol:SATA size_mb_sectors:276940/976773167 slot_id:1 state:Hot Spare (HSP)]
           - exp_labels:
               severity: critical
               instance: ubuntu-4
@@ -192,9 +266,9 @@ tests:
               protocol: SATA
               state: Available (AVL)
             exp_annotations:
-              summary: LSI SAS-2 physical disk is not healthy. (instance ubuntu-4)
+              summary: LSI SAS-2 physical disk is not ready. (instance ubuntu-4)
               description: |
-                LSI SAS-2 physical disk not in "Online", "Hot Spare", "Ready", or "Optimal" state. Please check the if the physical disk is working as expected.
+                LSI SAS-2 physical disk not in "Ready" or "Optimal" state. Please check the if the physical disk is working as expected.
                   CONTROLLER_ID = 1
                   ENCLOSURE_ID = 1
                   SLOT_ID = 4
@@ -211,9 +285,9 @@ tests:
               protocol: SATA
               state: Failed (FLD)
             exp_annotations:
-              summary: LSI SAS-2 physical disk is not healthy. (instance ubuntu-4)
+              summary: LSI SAS-2 physical disk is not ready. (instance ubuntu-4)
               description: |
-                LSI SAS-2 physical disk not in "Online", "Hot Spare", "Ready", or "Optimal" state. Please check the if the physical disk is working as expected.
+                LSI SAS-2 physical disk not in "Ready" or "Optimal" state. Please check the if the physical disk is working as expected.
                   CONTROLLER_ID = 1
                   ENCLOSURE_ID = 1
                   SLOT_ID = 5
@@ -230,9 +304,9 @@ tests:
               protocol: SATA
               state: Missing (MIS)
             exp_annotations:
-              summary: LSI SAS-2 physical disk is not healthy. (instance ubuntu-4)
+              summary: LSI SAS-2 physical disk is not ready. (instance ubuntu-4)
               description: |
-                LSI SAS-2 physical disk not in "Online", "Hot Spare", "Ready", or "Optimal" state. Please check the if the physical disk is working as expected.
+                LSI SAS-2 physical disk not in "Ready" or "Optimal" state. Please check the if the physical disk is working as expected.
                   CONTROLLER_ID = 1
                   ENCLOSURE_ID = 1
                   SLOT_ID = 6
@@ -249,9 +323,9 @@ tests:
               protocol: SATA
               state: Standby (SBY)
             exp_annotations:
-              summary: LSI SAS-2 physical disk is not healthy. (instance ubuntu-4)
+              summary: LSI SAS-2 physical disk is not ready. (instance ubuntu-4)
               description: |
-                LSI SAS-2 physical disk not in "Online", "Hot Spare", "Ready", or "Optimal" state. Please check the if the physical disk is working as expected.
+                LSI SAS-2 physical disk not in "Ready" or "Optimal" state. Please check the if the physical disk is working as expected.
                   CONTROLLER_ID = 1
                   ENCLOSURE_ID = 1
                   SLOT_ID = 7
@@ -268,9 +342,9 @@ tests:
               protocol: SATA
               state: Out of Sync (OSY)
             exp_annotations:
-              summary: LSI SAS-2 physical disk is not healthy. (instance ubuntu-4)
+              summary: LSI SAS-2 physical disk is not ready. (instance ubuntu-4)
               description: |
-                LSI SAS-2 physical disk not in "Online", "Hot Spare", "Ready", or "Optimal" state. Please check the if the physical disk is working as expected.
+                LSI SAS-2 physical disk not in "Ready" or "Optimal" state. Please check the if the physical disk is working as expected.
                   CONTROLLER_ID = 1
                   ENCLOSURE_ID = 1
                   SLOT_ID = 8
@@ -287,9 +361,9 @@ tests:
               protocol: SATA
               state: Degraded (DGD)
             exp_annotations:
-              summary: LSI SAS-2 physical disk is not healthy. (instance ubuntu-4)
+              summary: LSI SAS-2 physical disk is not ready. (instance ubuntu-4)
               description: |
-                LSI SAS-2 physical disk not in "Online", "Hot Spare", "Ready", or "Optimal" state. Please check the if the physical disk is working as expected.
+                LSI SAS-2 physical disk not in "Ready" or "Optimal" state. Please check the if the physical disk is working as expected.
                   CONTROLLER_ID = 1
                   ENCLOSURE_ID = 1
                   SLOT_ID = 9
@@ -306,9 +380,9 @@ tests:
               protocol: SATA
               state: Rebuilding (RBLD)
             exp_annotations:
-              summary: LSI SAS-2 physical disk is not healthy. (instance ubuntu-4)
+              summary: LSI SAS-2 physical disk is not ready. (instance ubuntu-4)
               description: |
-                LSI SAS-2 physical disk not in "Online", "Hot Spare", "Ready", or "Optimal" state. Please check the if the physical disk is working as expected.
+                LSI SAS-2 physical disk not in "Ready" or "Optimal" state. Please check the if the physical disk is working as expected.
                   CONTROLLER_ID = 1
                   ENCLOSURE_ID = 1
                   SLOT_ID = 10
