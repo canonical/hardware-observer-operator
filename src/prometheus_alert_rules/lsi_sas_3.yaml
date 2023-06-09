@@ -17,7 +17,7 @@ groups:
           LABELS = {{ $labels }}
 
   - alert: LSISAS3ControllerNotFound
-    expr: (lsi_sas_3_controllers == 0) and on (instance) (sas3ircu_command_success == 1)
+    expr: lsi_sas_3_controllers == 0
     for: 0m
     labels:
       severity: warning
@@ -30,10 +30,12 @@ groups:
           LABELS = {{ $labels }}
 
   - alert: LSISAS3IRVolumeNotFound
-    expr: (lsi_sas_3_ir_volumes == 0) and on (instance) (sas3ircu_command_success == 1)
+    expr: lsi_sas_3_ir_volumes == 0
     for: 0m
     labels:
       severity: warning
+      controller_id: 0
+      instance: ubuntu-2
     annotations:
       summary: LSI SAS-3 IR volume not found. (instance {{ $labels.instance }})
       description: |
@@ -42,29 +44,29 @@ groups:
           NUMBER_OF_VOLUMES = {{ $value }}
           LABELS = {{ $labels }}
 
-  - alert: LSISAS3IRVolumeUnhealthy
-    expr: (lsi_sas_3_ir_volume_info{status !~ "(Okay.*|Initializing.*|Online.*)"} == 1) and on (instance) (sas3ircu_command_success == 1)
+  - alert: LSISAS3IRVolumeUnready
+    expr: lsi_sas_3_ir_volume_info{status !~ "Okay.*"} == 1
     for: 0m
     labels:
       severity: critical
     annotations:
-      summary: LSI SAS-3 volume is not healthy. (instance {{ $labels.instance }})
+      summary: LSI SAS-3 volume is not ready. (instance {{ $labels.instance }})
       description: |
-        LSI SAS-3 volume is not in "Okay", "Initializing", or "Online" state. Please check the if the volume is working as expected.
+        LSI SAS-3 volume is not in "Okay" state. Please check the if the volume is working as expected.
           CONTROLLER_ID = {{ $labels.controller_id }}
           VOLUME_ID = {{ $labels.volume_id}}
           STATUS = {{ $labels.status }}
           LABELS = {{ $labels }}
 
-  - alert: LSISAS3PhysicalDiskUnhealthy
-    expr: (lsi_sas_3_physical_device_info{state !~ "(Online.*|Hot Spare.*|Ready.*|Optimal.*)"} == 1) and on (instance) (sas3ircu_command_success == 1)
+  - alert: LSISAS3PhysicalDiskUnready
+    expr: lsi_sas_3_physical_device_info{state !~ "(Ready.*|Optimal.*)"} == 1
     for: 0m
     labels:
       severity: critical
     annotations:
-      summary: LSI SAS-3 physical disk is not healthy. (instance {{ $labels.instance }})
+      summary: LSI SAS-3 physical disk is not ready. (instance {{ $labels.instance }})
       description: |
-        LSI SAS-3 physical disk not in "Online", "Hot Spare", "Ready", or "Optimal" state. Please check the if the physical disk is working as expected.
+        LSI SAS-3 physical disk not in "Ready" or "Optimal" state. Please check the if the physical disk is working as expected.
           CONTROLLER_ID = {{ $labels.controller_id }}
           ENCLOSURE_ID = {{ $labels.enclosure_id }}
           SLOT_ID = {{ $labels.slot_id }}
