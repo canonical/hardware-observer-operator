@@ -1,0 +1,47 @@
+rule_files:
+  - ../../../src/prometheus_alert_rules/ipmi_dcmi.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: ipmi_dcmi_command_success{instance="ubuntu-0"}
+        values: '0x15'
+
+      - series: ipmi_dcmi_command_success{instance="ubuntu-1"}
+        values: '1x15'
+      - series: ipmi_dcmi_power_cosumption_watts{instance="ubuntu-1"}
+        values: '102x15'
+
+      - series: ipmi_dcmi_command_success{instance="ubuntu-2"}
+        values: '1x15'
+      - series: ipmi_dcmi_power_cosumption_watts{instance="ubuntu-2"}
+        values: '220x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: IPMIDCMICommandFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-0
+            exp_annotations:
+              summary: Failed to run ipmi_dcmi. (instance ubuntu-0)
+              description: |
+                Failed to get system power statistics using ipmi_dcmi.
+                  VALUE = 0
+                  LABELS = map[__name__:ipmi_dcmi_command_success instance:ubuntu-0]
+
+      - eval_time: 10m
+        alertname: IPMIDCMIPowerConsumptionOutstanding
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-2
+            exp_annotations:
+              summary: IPMI DCMI power consumption is high. (instance ubuntu-2)
+              description: |
+                IPMI DCMI power consumption is high for over 5 minutes.
+                  POWER_CONSUMPTiON_WATTS = 220
+                  LABELS = map[__name__:ipmi_dcmi_power_cosumption_watts instance:ubuntu-2]
