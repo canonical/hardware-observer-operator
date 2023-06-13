@@ -14,146 +14,74 @@ groups:
             VALUE = {{ $value }}
             LABELS = {{ $labels }}
 
-    - alert: IPMITemperatureStateWarning
-      expr: ipmi_temperature_celsius{state="Warning"}
+    - alert: IPMITemperatureStateNotOk
+      expr: ipmi_temperature_celsius{state=~"Warning|Critical"}
       for: 0m
       labels: 
-        severity: warning
+        severity: "{{ toLower $labels.state }}"
       annotations:
-        summary: Temperature in warning state. (instance {{ $labels.instance }})
+        summary: Temperature in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
         description: |
-          Temperature, recorded by ipmi sensor, in warning state.
+          Temperature, recorded by ipmi sensor, in {{ toLower $labels.state }} state.
             TEMPERATURE_CELSIUS = {{ $value }}
             LABELS = {{ $labels }}
 
-    - alert: IPMITemperatureStateCritical
-      expr: ipmi_temperature_celsius{state="Critical"}
+    - alert: IPMIPowerStateNotOk
+      expr: ipmi_power_watts{state=~"Warning|Critical"}
       for: 0m
       labels: 
-        severity: critical
+        severity: "{{ toLower $labels.state }}"
       annotations:
-        summary: Temperature in critical state. (instance {{ $labels.instance }})
+        summary: Power in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
         description: |
-          Temperature, recorded by ipmi sensor, in critical state.
-            TEMPERATURE_CELSIUS = {{ $value }}
-            LABELS = {{ $labels }}
-
-    - alert: IPMIPowerStateWarning
-      expr: ipmi_power_watts{state="Warning"}
-      for: 0m
-      labels: 
-        severity: warning
-      annotations:
-        summary: Power in warning state. (instance {{ $labels.instance }})
-        description: |
-          Power, recorded by ipmi sensor, in warning state.
+          Power, recorded by ipmi sensor, in {{ toLower $labels.state }} state.
             POWER_WATTS = {{ $value }}
             LABELS = {{ $labels }}
 
-    - alert: IPMIPowerStateCritical
-      expr: ipmi_power_watts{state="Critical"}
+    - alert: IPMIVoltageStateNotOk
+      expr: ipmi_voltage_volts{state=~"Warning|Critical"}
       for: 0m
       labels: 
-        severity: critical
+        severity: "{{ toLower $labels.state }}"
       annotations:
-        summary: Power in critical state. (instance {{ $labels.instance }})
+        summary: Voltage in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
         description: |
-          Power, recorded by ipmi sensor, in critical state.
-            POWER_WATTS = {{ $value }}
-            LABELS = {{ $labels }}
-
-    - alert: IPMIVoltageStateWarning
-      expr: ipmi_voltage_volts{state="Warning"}
-      for: 0m
-      labels: 
-        severity: warning
-      annotations:
-        summary: Voltage in warning state. (instance {{ $labels.instance }})
-        description: |
-          Voltage, recorded by ipmi sensor, in warning state.
+          Voltage, recorded by ipmi sensor, in {{ toLower $labels.state }} state.
             VOLTAGE_VOLTS = {{ $value }}
             LABELS = {{ $labels }}
 
-    - alert: IPMIVoltageStateCritical
-      expr: ipmi_voltage_volts{state="Critical"}
+    - alert: IPMICurrentStateNotOk
+      expr: ipmi_current_amperes{state=~"Warning|Critical"}
       for: 0m
       labels: 
-        severity: critical
+        severity: "{{ toLower $labels.state }}"
       annotations:
-        summary: Voltage in critical state. (instance {{ $labels.instance }})
+        summary: Current in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
         description: |
-          Voltage, recorded by ipmi sensor, in critical state.
-            VOLTAGE_VOLTS = {{ $value }}
-            LABELS = {{ $labels }}
-
-    - alert: IPMICurrentStateWarning
-      expr: ipmi_current_amperes{state="Warning"}
-      for: 0m
-      labels: 
-        severity: warning
-      annotations:
-        summary: Current in warning state. (instance {{ $labels.instance }})
-        description: |
-          Current, recorded by ipmi sensor, in warning state.
+          Current, recorded by ipmi sensor, in {{ toLower $labels.state }} state.
             CURRENT_AMPERES = {{ $value }}
             LABELS = {{ $labels }}
 
-    - alert: IPMICurrentStateCritical
-      expr: ipmi_current_amperes{state="Critical"}
+    - alert: IPMIFanSpeedStateNotOk
+      expr: ipmi_fan_speed_rpm{state=~"Warning|Critical"}
       for: 0m
       labels: 
-        severity: critical
+        severity: "{{ toLower $labels.state }}"
       annotations:
-        summary: Current in critical state. (instance {{ $labels.instance }})
+        summary: Fan speed in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
         description: |
-          Current, recorded by ipmi sensor, in critical state.
-            CURRENT_AMPERES = {{ $value }}
-            LABELS = {{ $labels }}
-
-    - alert: IPMIFanSpeedStateWarning
-      expr: ipmi_fan_speed_rpm{state="Warning"}
-      for: 0m
-      labels: 
-        severity: warning
-      annotations:
-        summary: Fan speed in warning state. (instance {{ $labels.instance }})
-        description: |
-          Fan speed, recorded by ipmi sensor, in warning state.
+          Fan speed, recorded by ipmi sensor, in {{ toLower $labels.state }} state.
             FAN_SPEED_RPM = {{ $value }}
             LABELS = {{ $labels }}
 
-    - alert: IPMIFanSpeedStateCritical
-      expr: ipmi_fan_speed_rpm{state="Critical"}
+    - alert: IPMISensorStateNotOk
+      expr: ipmi_generic_sensor_value{state=~"Warning|Critical"}
       for: 0m
       labels: 
-        severity: critical
+        severity: "{{ toLower $labels.state }}"
       annotations:
-        summary: Fan speed in critical state. (instance {{ $labels.instance }})
+        summary: IPMI sensor value in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
         description: |
-          Fan speed, recorded by ipmi sensor, in critical state.
-            FAN_SPEED_RPM = {{ $value }}
-            LABELS = {{ $labels }}
-
-    - alert: IPMISensorStateWarning
-      expr: ipmi_generic_sensor_value{state="Warning"}
-      for: 0m
-      labels: 
-        severity: warning
-      annotations:
-        summary: IPMI sensor value in warning state. (instance {{ $labels.instance }})
-        description: |
-          A sensor value, recorded by ipmi sensor, in warning state.
-            VALUE = {{ $value }}
-            LABELS = {{ $labels }}
-
-    - alert: IPMISensorStateCritical
-      expr: ipmi_generic_sensor_value{state="Critical"}
-      for: 0m
-      labels: 
-        severity: critical
-      annotations:
-        summary: IPMI sensor value in critical state. (instance {{ $labels.instance }})
-        description: |
-          A sensor value, recorded by ipmi sensor, in critical state.
+          A sensor value, recorded by ipmi sensor, in {{ toLower $labels.state }} state.
             VALUE = {{ $value }}
             LABELS = {{ $labels }}
