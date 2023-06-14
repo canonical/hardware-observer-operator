@@ -1,0 +1,37 @@
+groups:
+- name: IpmiSel
+  rules:
+
+    - alert: IPMISELCommandFailed
+      expr: ipmi_sel_command_success == 0
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: Failed to run ipmi-sel. (instance {{ $labels.instance }})
+        description: |
+          Failed to get system event logs using ipmi-sel.
+            VALUE = {{ $value }}
+            LABELS = {{ $labels }}
+
+    - alert: IPMISELStateWarning
+      expr: ipmi_sel_state == 1
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: IPMI system event log in warning state. (instance {{ $labels.instance }})
+        description: |
+          IPMI SEL entry in warning state.
+            LABELS = {{ $labels }}
+
+    - alert: IPMISELStateCritical
+      expr: ipmi_sel_state == 2
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: IPMI system event log in critical state. (instance {{ $labels.instance }})
+        description: |
+          IPMI SEL entry in critical state.
+            LABELS = {{ $labels }}

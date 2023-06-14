@@ -1,0 +1,87 @@
+groups:
+- name: IpmiSensors
+  rules:
+
+    - alert: IPMIMonitoringCommandFailed
+      expr: ipmimonitoring_command_success == 0
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: Failed to run ipmimonitoring. (instance {{ $labels.instance }})
+        description: |
+          Failed to get ipmi sensor data using ipmimonitoring.
+            VALUE = {{ $value }}
+            LABELS = {{ $labels }}
+
+    - alert: IPMITemperatureStateNotOk
+      expr: ipmi_temperature_celsius{state=~"Warning|Critical"}
+      for: 0m
+      labels: 
+        severity: "{{ toLower $labels.state }}"
+      annotations:
+        summary: Temperature in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
+        description: |
+          Temperature, recorded by ipmi sensor, in {{ toLower $labels.state }} state.
+            TEMPERATURE_CELSIUS = {{ $value }}
+            LABELS = {{ $labels }}
+
+    - alert: IPMIPowerStateNotOk
+      expr: ipmi_power_watts{state=~"Warning|Critical"}
+      for: 0m
+      labels: 
+        severity: "{{ toLower $labels.state }}"
+      annotations:
+        summary: Power in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
+        description: |
+          Power, recorded by ipmi sensor, in {{ toLower $labels.state }} state.
+            POWER_WATTS = {{ $value }}
+            LABELS = {{ $labels }}
+
+    - alert: IPMIVoltageStateNotOk
+      expr: ipmi_voltage_volts{state=~"Warning|Critical"}
+      for: 0m
+      labels: 
+        severity: "{{ toLower $labels.state }}"
+      annotations:
+        summary: Voltage in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
+        description: |
+          Voltage, recorded by ipmi sensor, in {{ toLower $labels.state }} state.
+            VOLTAGE_VOLTS = {{ $value }}
+            LABELS = {{ $labels }}
+
+    - alert: IPMICurrentStateNotOk
+      expr: ipmi_current_amperes{state=~"Warning|Critical"}
+      for: 0m
+      labels: 
+        severity: "{{ toLower $labels.state }}"
+      annotations:
+        summary: Current in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
+        description: |
+          Current, recorded by ipmi sensor, in {{ toLower $labels.state }} state.
+            CURRENT_AMPERES = {{ $value }}
+            LABELS = {{ $labels }}
+
+    - alert: IPMIFanSpeedStateNotOk
+      expr: ipmi_fan_speed_rpm{state=~"Warning|Critical"}
+      for: 0m
+      labels: 
+        severity: "{{ toLower $labels.state }}"
+      annotations:
+        summary: Fan speed in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
+        description: |
+          Fan speed, recorded by ipmi sensor, in {{ toLower $labels.state }} state.
+            FAN_SPEED_RPM = {{ $value }}
+            LABELS = {{ $labels }}
+
+    - alert: IPMISensorStateNotOk
+      expr: ipmi_generic_sensor_value{state=~"Warning|Critical"}
+      for: 0m
+      labels: 
+        severity: "{{ toLower $labels.state }}"
+      annotations:
+        summary: IPMI sensor value in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
+        description: |
+          A sensor value, recorded by ipmi sensor, in {{ toLower $labels.state }} state.
+            VALUE = {{ $value }}
+            LABELS = {{ $labels }}

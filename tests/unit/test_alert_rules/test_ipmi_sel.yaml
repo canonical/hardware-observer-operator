@@ -1,0 +1,58 @@
+rule_files:
+  - ../../../src/prometheus_alert_rules/ipmi_sel.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: ipmi_sel_command_success{instance="ubuntu-0"}
+        values: '0x15'
+
+      - series: ipmi_sel_command_success{instance="ubuntu-1"}
+        values: '1x15'
+      - series: ipmi_sel_state{instance="ubuntu-1"}
+        values: '1x15'
+
+      - series: ipmi_sel_command_success{instance="ubuntu-2"}
+        values: '1x15'
+      - series: ipmi_sel_state{instance="ubuntu-2"}
+        values: '2x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: IPMISELCommandFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-0
+            exp_annotations:
+              summary: Failed to run ipmi-sel. (instance ubuntu-0)
+              description: |
+                Failed to get system event logs using ipmi-sel.
+                  VALUE = 0
+                  LABELS = map[__name__:ipmi_sel_command_success instance:ubuntu-0]
+
+      - eval_time: 0m
+        alertname: IPMISELStateWarning
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-1
+            exp_annotations:
+              summary: IPMI system event log in warning state. (instance ubuntu-1)
+              description: |
+                IPMI SEL entry in warning state.
+                  LABELS = map[__name__:ipmi_sel_state instance:ubuntu-1]
+
+      - eval_time: 0m
+        alertname: IPMISELStateCritical
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-2
+            exp_annotations:
+              summary: IPMI system event log in critical state. (instance ubuntu-2)
+              description: |
+                IPMI SEL entry in critical state.
+                  LABELS = map[__name__:ipmi_sel_state instance:ubuntu-2]

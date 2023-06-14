@@ -1,0 +1,241 @@
+rule_files:
+  - ../../../src/prometheus_alert_rules/ipmi_sensors.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: ipmimonitoring_command_success{instance="ubuntu-0"}
+        values: '0x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: IPMIMonitoringCommandFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-0
+            exp_annotations:
+              summary: Failed to run ipmimonitoring. (instance ubuntu-0)
+              description: |
+                Failed to get ipmi sensor data using ipmimonitoring.
+                  VALUE = 0
+                  LABELS = map[__name__:ipmimonitoring_command_success instance:ubuntu-0]
+
+  - interval: 1m
+    input_series:
+      - series: ipmimonitoring_command_success{instance="ubuntu-1"}
+        values: '1x15'
+      - series: ipmi_temperature_celsius{state="Warning", instance="ubuntu-1"}
+        values: '80x15'
+      - series: ipmimonitoring_command_success{instance="ubuntu-2"}
+        values: '1x15'
+      - series: ipmi_temperature_celsius{state="Critical", instance="ubuntu-2"}
+        values: '120x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: IPMITemperatureStateNotOk
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              state: Warning
+              instance: ubuntu-1
+            exp_annotations:
+              summary: Temperature in warning state. (instance ubuntu-1)
+              description: |
+                Temperature, recorded by ipmi sensor, in warning state.
+                  TEMPERATURE_CELSIUS = 80
+                  LABELS = map[__name__:ipmi_temperature_celsius instance:ubuntu-1 state:Warning]
+          - exp_labels:
+              severity: critical
+              state: Critical
+              instance: ubuntu-2
+            exp_annotations:
+              summary: Temperature in critical state. (instance ubuntu-2)
+              description: |
+                Temperature, recorded by ipmi sensor, in critical state.
+                  TEMPERATURE_CELSIUS = 120
+                  LABELS = map[__name__:ipmi_temperature_celsius instance:ubuntu-2 state:Critical]
+
+  - interval: 1m
+    input_series:
+      - series: ipmimonitoring_command_success{instance="ubuntu-3"}
+        values: '1x15'
+      - series: ipmi_power_watts{state="Warning", instance="ubuntu-3"}
+        values: '155x15'
+      - series: ipmimonitoring_command_success{instance="ubuntu-4"}
+        values: '1x15'
+      - series: ipmi_power_watts{state="Critical", instance="ubuntu-4"}
+        values: '240x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: IPMIPowerStateNotOk
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              state: Warning
+              instance: ubuntu-3
+            exp_annotations:
+              summary: Power in warning state. (instance ubuntu-3)
+              description: |
+                Power, recorded by ipmi sensor, in warning state.
+                  POWER_WATTS = 155
+                  LABELS = map[__name__:ipmi_power_watts instance:ubuntu-3 state:Warning]
+          - exp_labels:
+              severity: critical
+              state: Critical
+              instance: ubuntu-4
+            exp_annotations:
+              summary: Power in critical state. (instance ubuntu-4)
+              description: |
+                Power, recorded by ipmi sensor, in critical state.
+                  POWER_WATTS = 240
+                  LABELS = map[__name__:ipmi_power_watts instance:ubuntu-4 state:Critical]
+
+  - interval: 1m
+    input_series:
+      - series: ipmimonitoring_command_success{instance="ubuntu-5"}
+        values: '1x15'
+      - series: ipmi_voltage_volts{state="Warning", instance="ubuntu-5"}
+        values: '235x15'
+      - series: ipmimonitoring_command_success{instance="ubuntu-6"}
+        values: '1x15'
+      - series: ipmi_voltage_volts{state="Critical", instance="ubuntu-6"}
+        values: '280x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: IPMIVoltageStateNotOk
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              state: Warning
+              instance: ubuntu-5
+            exp_annotations:
+              summary: Voltage in warning state. (instance ubuntu-5)
+              description: |
+                Voltage, recorded by ipmi sensor, in warning state.
+                  VOLTAGE_VOLTS = 235
+                  LABELS = map[__name__:ipmi_voltage_volts instance:ubuntu-5 state:Warning]
+          - exp_labels:
+              severity: critical
+              state: Critical
+              instance: ubuntu-6
+            exp_annotations:
+              summary: Voltage in critical state. (instance ubuntu-6)
+              description: |
+                Voltage, recorded by ipmi sensor, in critical state.
+                  VOLTAGE_VOLTS = 280
+                  LABELS = map[__name__:ipmi_voltage_volts instance:ubuntu-6 state:Critical]
+
+  - interval: 1m
+    input_series:
+      - series: ipmimonitoring_command_success{instance="ubuntu-7"}
+        values: '1x15'
+      - series: ipmi_current_amperes{state="Warning", instance="ubuntu-7"}
+        values: '100x15'
+
+      - series: ipmimonitoring_command_success{instance="ubuntu-8"}
+        values: '1x15'
+      - series: ipmi_current_amperes{state="Critical", instance="ubuntu-8"}
+        values: '200x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: IPMICurrentStateNotOk
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              state: Warning
+              instance: ubuntu-7
+            exp_annotations:
+              summary: Current in warning state. (instance ubuntu-7)
+              description: |
+                Current, recorded by ipmi sensor, in warning state.
+                  CURRENT_AMPERES = 100
+                  LABELS = map[__name__:ipmi_current_amperes instance:ubuntu-7 state:Warning]
+          - exp_labels:
+              severity: critical
+              state: Critical
+              instance: ubuntu-8
+            exp_annotations:
+              summary: Current in critical state. (instance ubuntu-8)
+              description: |
+                Current, recorded by ipmi sensor, in critical state.
+                  CURRENT_AMPERES = 200
+                  LABELS = map[__name__:ipmi_current_amperes instance:ubuntu-8 state:Critical]
+
+  - interval: 1m
+    input_series:
+      - series: ipmimonitoring_command_success{instance="ubuntu-9"}
+        values: '1x15'
+      - series: ipmi_fan_speed_rpm{state="Warning", instance="ubuntu-9"}
+        values: '2000x15'
+      - series: ipmimonitoring_command_success{instance="ubuntu-10"}
+        values: '1x15'
+      - series: ipmi_fan_speed_rpm{state="Critical", instance="ubuntu-10"}
+        values: '4000x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: IPMIFanSpeedStateNotOk
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              state: Warning
+              instance: ubuntu-9
+            exp_annotations:
+              summary: Fan speed in warning state. (instance ubuntu-9)
+              description: |
+                Fan speed, recorded by ipmi sensor, in warning state.
+                  FAN_SPEED_RPM = 2000
+                  LABELS = map[__name__:ipmi_fan_speed_rpm instance:ubuntu-9 state:Warning]
+          - exp_labels:
+              severity: critical
+              state: Critical
+              instance: ubuntu-10
+            exp_annotations:
+              summary: Fan speed in critical state. (instance ubuntu-10)
+              description: |
+                Fan speed, recorded by ipmi sensor, in critical state.
+                  FAN_SPEED_RPM = 4000
+                  LABELS = map[__name__:ipmi_fan_speed_rpm instance:ubuntu-10 state:Critical]
+
+  - interval: 1m
+    input_series:
+      - series: ipmimonitoring_command_success{instance="ubuntu-11"}
+        values: '1x15'
+      - series: ipmi_generic_sensor_value{state="Warning", instance="ubuntu-11"}
+        values: '20x15'
+      - series: ipmimonitoring_command_success{instance="ubuntu-12"}
+        values: '1x15'
+      - series: ipmi_generic_sensor_value{state="Critical", instance="ubuntu-12"}
+        values: '50x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: IPMISensorStateNotOk
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              state: Warning
+              instance: ubuntu-11
+            exp_annotations:
+              summary: IPMI sensor value in warning state. (instance ubuntu-11)
+              description: |
+                A sensor value, recorded by ipmi sensor, in warning state.
+                  VALUE = 20
+                  LABELS = map[__name__:ipmi_generic_sensor_value instance:ubuntu-11 state:Warning]
+          - exp_labels:
+              severity: critical
+              state: Critical
+              instance: ubuntu-12
+            exp_annotations:
+              summary: IPMI sensor value in critical state. (instance ubuntu-12)
+              description: |
+                A sensor value, recorded by ipmi sensor, in critical state.
+                  VALUE = 50
+                  LABELS = map[__name__:ipmi_generic_sensor_value instance:ubuntu-12 state:Critical]

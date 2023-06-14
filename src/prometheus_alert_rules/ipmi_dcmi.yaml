@@ -1,0 +1,27 @@
+groups:
+- name: IpmiDcmi
+  rules:
+
+    - alert: IPMIDCMICommandFailed
+      expr: ipmi_dcmi_command_success == 0
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: Failed to run ipmi_dcmi. (instance {{ $labels.instance }})
+        description: |
+          Failed to get system power statistics using ipmi_dcmi.
+            VALUE = {{ $value }}
+            LABELS = {{ $labels }}
+
+    - alert: IPMIDCMIPowerConsumptionOutstanding
+      expr: ipmi_dcmi_power_cosumption_watts >= 200
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: IPMI DCMI power consumption is high. (instance {{ $labels.instance }})
+        description: |
+          IPMI DCMI power consumption is high for over 5 minutes.
+            POWER_CONSUMPTiON_WATTS = {{ $value }}
+            LABELS = {{ $labels }}
