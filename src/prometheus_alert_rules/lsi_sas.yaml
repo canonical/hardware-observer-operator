@@ -1,0 +1,74 @@
+groups:
+
+- name: LSI SAS controller alert rules
+  rules:
+
+  - alert: SasircuCommandFailed
+    expr: '{__name__=~"sas[2,3]ircu_command_success"} == 0'
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: Failed to run sas2ircu or sas3ircu. (instance {{ $labels.instance }})
+      description: |
+        Failed to get LSI SAS controller information using sas2ircu or sas3ircu.
+          INSTANCE = {{ $labels.instance }}
+          SUCCESS = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: LSISASControllerNotFound
+    expr: '{__name__=~"lsi_sas_[2,3]_controllers"} == 0'
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: LSI SAS controller not found. (instance {{ $labels.instance }})
+      description: |
+        Cannot found LSI SAS controller on this host machine.
+          INSTANCE = {{ $labels.instance }}
+          NUMBER_OF_CONTROLLERS = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: LSISASIRVolumeNotFound
+    expr: '{__name__=~"lsi_sas_[2,3]_ir_volumes"} == 0'
+    for: 0m
+    labels:
+      severity: warning
+      controller_id: 0
+      instance: ubuntu-2
+    annotations:
+      summary: LSI SAS IR volume not found. (instance {{ $labels.instance }})
+      description: |
+        Cannot found LSI SAS integrated RAID volumes on this controller.
+          CONTROLLER_ID = {{ $labels.controller_id }}
+          NUMBER_OF_VOLUMES = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: LSISASIRVolumeUnready
+    expr: '{__name__=~"lsi_sas_[2,3]_ir_volume_info", status !~ "Okay.*"} == 1'
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: LSI SAS volume is not ready. (instance {{ $labels.instance }})
+      description: |
+        LSI SAS volume is not in "Okay" state. Please check the if the volume is working as expected.
+          CONTROLLER_ID = {{ $labels.controller_id }}
+          VOLUME_ID = {{ $labels.volume_id}}
+          STATUS = {{ $labels.status }}
+          LABELS = {{ $labels }}
+
+  - alert: LSISASPhysicalDiskUnready
+    expr: '{__name__=~"lsi_sas_[2,3]_physical_device_info", state !~ "(Ready.*|Optimal.*)"} == 1'
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: LSI SAS physical disk is not ready. (instance {{ $labels.instance }})
+      description: |
+        LSI SAS physical disk not in "Ready" or "Optimal" state. Please check the if the physical disk is working as expected.
+          CONTROLLER_ID = {{ $labels.controller_id }}
+          ENCLOSURE_ID = {{ $labels.enclosure_id }}
+          SLOT_ID = {{ $labels.slot_id }}
+          STATE = {{ $labels.state }}
+          LABELS = {{ $labels }}
