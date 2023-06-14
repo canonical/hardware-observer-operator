@@ -15,7 +15,7 @@ groups:
           LABELS = {{ $labels }}
 
   - alert: MegaRAIDControllerNotFound
-    expr: (megaraid_controllers == 0) and on (instance) (storcli_command_success == 1)
+    expr: megaraid_controllers == 0
     for: 0m
     labels:
       severity: warning
@@ -27,7 +27,7 @@ groups:
           LABELS = {{ $labels }}
 
   - alert: MegaRAIDVirtualDriveNotOptimal
-    expr: (megaraid_virtual_drive_state{state != "Optl"} == 1) and on (instance) (storcli_command_success == 1)
+    expr: megaraid_virtual_drive_info{state != "Optl"} == 1
     for: 0m
     labels:
       severity: critical
