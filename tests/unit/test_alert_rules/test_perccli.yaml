@@ -1,0 +1,91 @@
+rule_files:
+  - ../../../src/prometheus_alert_rules/perccli.yaml
+
+evaluation_interval: 1m
+
+tests:
+
+  - interval: 1m
+    input_series: 
+      - series: 'perccli_command_success{instance="ubuntu-0"}'
+        values: '0x15'  # error: PerccliCommandFailed
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: PerccliCommandFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-0
+            exp_annotations:
+              summary: Failed to run perccli or controller not available. (instance ubuntu-0)
+              description: |
+                Failed to get PowerEdgeRAID controller information using perccli.
+                  INSTANCE = ubuntu-0
+                  SUCCESS = 0
+                  LABELS = map[__name__:perccli_command_success instance:ubuntu-0]
+
+  - interval: 1m
+    input_series:
+      - series: 'perccli_command_success{instance="ubuntu-1"}'
+        values: '1x15'
+      - series: 'poweredgeraid_controllers{instance="ubuntu-1"}'
+        values: '0x15' # error: PowerEdgeRAIDControllerNotFound 
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: PowerEdgeRAIDControllerNotFound
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-1
+            exp_annotations:
+              summary: PowerEdge RAID controller not found. (instance ubuntu-1)
+              description: |
+                Cannot find PowerEdge RAID controller on this host machine.
+                  INSTANCE = ubuntu-1
+                  LABELS = map[__name__:poweredgeraid_controllers instance:ubuntu-1]
+
+  - interval: 1m
+    input_series:
+      - series: 'perccli_command_ctrl_success{instance="ubuntu-1", controller_id="0"}'
+        values: '0x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: PowerEdgeRAIDControllerSuccess
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-1
+              controller_id: 0
+            exp_annotations:
+              summary: PowerEdge RAID controller command not successful.  (instance ubuntu-1)
+              description: |
+                Failed to get PowerEdge RAID controller information on controller 0.
+                  INSTANCE = ubuntu-1
+                  CONTROLLER_ID = 0
+                  LABELS = map[__name__:perccli_command_ctrl_success controller_id:0 instance:ubuntu-1]
+
+  - interval: 1m
+    input_series:
+      - series: 'poweredgeraid_virtual_info{instance="ubuntu-1", controller_id="0", device_group="1", virtual_drive_id="2", state="Dgrd", cache_policy="NRWTD"}'
+        values: '1x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: PowerEdgeRAIDVirtualDriveNotOptimal
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-1
+              controller_id: 0
+              device_group: 1
+              virtual_drive_id: 2
+              state: Dgrd
+              cache_policy: NRWTD
+            exp_annotations:
+              summary: PowerEdge RAID virtual drives are not in optimal state. (instance ubuntu-1)
+              description: |
+                PowerEdge RAID virtual drives are not in optimal state. Please check the if the virtual drives are working as expected.
+                  STATE = Dgrd
+                  LABELS = map[__name__:poweredgeraid_virtual_info cache_policy:NRWTD controller_id:0 device_group:1 instance:ubuntu-1 state:Dgrd virtual_drive_id:2]
