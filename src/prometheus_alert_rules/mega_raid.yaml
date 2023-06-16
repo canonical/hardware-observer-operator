@@ -30,7 +30,7 @@ groups:
     expr: megaraid_virtual_drive_info{state != "Optl"} == 1
     for: 0m
     labels:
-      severity: critical
+      severity: warning
     annotations:
       summary: MegaRAID virtual drives are not in optimal state. (instance {{ $labels.instance }})
       description: |

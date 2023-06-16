@@ -63,7 +63,7 @@ tests:
         alertname: MegaRAIDVirtualDriveNotOptimal
         exp_alerts:
           - exp_labels:
-              severity: critical
+              severity: warning
               controller_id: 0
               drive_group: 0
               virtual_drive_group: 239
