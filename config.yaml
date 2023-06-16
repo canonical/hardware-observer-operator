@@ -3,13 +3,6 @@
 #
 
 options:
-  exporter-channel:
-    type: string
-    default: "stable"
-    description: |
-      Install prometheus-hardware-exporter snap from "exporter-channel".
-      Supported values are: "stable", "candidate", "beta" and "edge". Note that
-      it will be superseded by local resources: "exporter-snap".
   exporter-port:
     type: int
     default: 10000

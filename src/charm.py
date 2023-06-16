@@ -5,12 +5,11 @@
 """Charm the application."""
 
 import logging
-import os
-import typing as t
+from typing import Any, Dict, Optional
 
 import ops
 from ops.framework import EventBase, StoredState
-from ops.model import ActiveStatus, BlockedStatus, ModelError
+from ops.model import ActiveStatus, BlockedStatus
 
 from service import Exporter
 from vendor import VendorHelper
@@ -23,7 +22,7 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
 
     _stored = StoredState()
 
-    def __init__(self, *args: t.Any) -> None:
+    def __init__(self, *args: Any) -> None:
         """Init."""
         super().__init__(*args)
         self.framework.observe(self.on.remove, self._on_remove)
@@ -33,9 +32,6 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.remove, self._on_remove)
 
-        # Initialise helpers, etc.
-        self._snap_path: t.Optional[str] = None
-        self._snap_path_set = False
         self.vendor_helper = VendorHelper()
 
         self.exporter = Exporter(
@@ -68,32 +64,13 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
             return
         self.model.unit.status = ActiveStatus("Unit is ready")
 
-    @property
-    def snap_path(self) -> t.Optional[str]:
-        """Get local path to exporter snap.
-
-        Returns:
-          snap_path: the path to the snap file
-        """
-        if not self._snap_path_set:
-            try:
-                self._snap_path = str(self.model.resources.fetch("exporter-snap").absolute())
-                if not os.path.getsize(self._snap_path) > 0:
-                    self._snap_path = None
-            except ModelError:
-                self._snap_path = None
-            finally:
-                self._snap_path_set = True
-        return self._snap_path
-
     def _on_config_changed(self, event: EventBase) -> None:
         """Reconfigure charm."""
         # Keep track of what model config options + some extra config related
         # information are changed. This can be helpful when we want to respond
         # to the change of a specific config option.
         change_set = set()
-        model_config: t.Dict[str, t.Optional[str]] = dict(self.model.config.items())
-        model_config.update({"exporter-snap": self.snap_path})
+        model_config: Dict[str, Optional[str]] = dict(self.model.config.items())
         for key, value in model_config.items():
             if key not in self._stored.config or self._stored.config[key] != value:  # type: ignore
                 logger.info("Setting %s to: %s", key, value)

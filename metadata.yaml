@@ -21,13 +21,6 @@ subordinate: true
 
 resources:
 
-  exporter-snap:
-    type: file
-    description: |
-      (Optional) Snap that implements actual data conllection and export.
-      If not provided, charm will try to download prometheus-hardware-exporter
-      from snap storecraft.
-    filename: proemtheus-hardware-exporter.snap
   storecli-deb:
     type: file
     description: |
