@@ -10,24 +10,6 @@ tests:
       - series: 'storcli_command_success{instance="ubuntu-0"}'
         values: '0x15' # error
 
-      - series: 'storcli_command_success{instance="ubuntu-1"}'
-        values: '1x15'
-      - series: 'megaraid_controllers{instance="ubuntu-1", hostname="ubuntu-1"}'
-        values: '0x15' # error
-      - series: 'megaraid_virtual_drive_state{instance="ubuntu-1", controller_id="0", virtual_drive_id="239", state="Optl"}'
-        values: '1x15' # okay
-      - series: 'megaraid_virtual_drive_state{instance="ubuntu-1", controller_id="0", virtual_drive_id="239", state="Dgrd"}'
-        values: '0x15' # okay
-
-      - series: 'storcli_command_success{instance="ubuntu-2"}'
-        values: '1x15'
-      - series: 'megaraid_controllers{instance="ubuntu-2", hostname="ubuntu-2"}'
-        values: '1x15' # okay
-      - series: 'megaraid_virtual_drive_state{instance="ubuntu-2", controller_id="0", virtual_drive_id="239", state="Optl"}'
-        values: '0x15' # error
-      - series: 'megaraid_virtual_drive_state{instance="ubuntu-2", controller_id="0", virtual_drive_id="239", state="Dgrd"}'
-        values: '1x15' # okay
-
     alert_rule_test:
       - eval_time: 0m
         alertname: StorcliCommandFailed
@@ -43,33 +25,54 @@ tests:
                   LABELS = map[__name__:storcli_command_success instance:ubuntu-0]
 
 
+  - interval: 1m
+    input_series:
+      - series: 'storcli_command_success{instance="ubuntu-1"}'
+        values: '1x15'
+      - series: 'megaraid_controllers{instance="ubuntu-1"}'
+        values: '0x15' # error
+
+    alert_rule_test:
       - eval_time: 0m
         alertname: MegaRAIDControllerNotFound
         exp_alerts:
           - exp_labels:
               severity: warning
               instance: ubuntu-1
-              hostname: ubuntu-1
             exp_annotations:
               summary: MegaRAID controller not found. (instance ubuntu-1)
               description: |
                 Cannot found MegaRAID controller on this host machine.
                   NUMBER_OF_CONTROLLERS = 0
-                  LABELS = map[__name__:megaraid_controllers hostname:ubuntu-1 instance:ubuntu-1]
+                  LABELS = map[__name__:megaraid_controllers instance:ubuntu-1]
 
 
+  - interval: 1m
+    input_series:
+      - series: 'storcli_command_success{instance="ubuntu-2"}'
+        values: '1x15'
+      - series: 'megaraid_controllers{instance="ubuntu-2", hostname="ubuntu-2"}'
+        values: '1x15'
+      - series: 'megaraid_virtual_drive_info{instance="ubuntu-2", controller_id="0", drive_group="0", virtual_drive_group="239", state="Dgrd", name="NVMe-RAID-1" }'
+        values: '1x15' # error
+      - series: 'megaraid_virtual_drive_info{instance="ubuntu-2", controller_id="0", drive_group="0", virtual_drive_group="240", state="Optl", name="NVMe-RAID-2" }'
+        values: '0x15' # okay
+
+    alert_rule_test:
       - eval_time: 0m
         alertname: MegaRAIDVirtualDriveNotOptimal
         exp_alerts:
           - exp_labels:
-              severity: critical
-              instance: ubuntu-2
+              severity: warning
               controller_id: 0
-              virtual_drive_id: 239
+              drive_group: 0
+              virtual_drive_group: 239
+              name: NVMe-RAID-1
+              instance: ubuntu-2
               state: Dgrd
             exp_annotations:
               summary: MegaRAID virtual drives are not in optimal state. (instance ubuntu-2)
               description: |
                 MegaRAID virtual drives are not in optimal state. Please check the if the virtual drives are working as expected.
                   STATE = Dgrd
-                  LABELS = map[__name__:megaraid_virtual_drive_state controller_id:0 instance:ubuntu-2 state:Dgrd virtual_drive_id:239]
+                  LABELS = map[__name__:megaraid_virtual_drive_info controller_id:0 drive_group:0 instance:ubuntu-2 name:NVMe-RAID-1 state:Dgrd virtual_drive_group:239]
