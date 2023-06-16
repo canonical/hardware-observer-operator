@@ -1,0 +1,52 @@
+groups:
+- name: PowerEdgeRAID
+  rules:
+  - alert: PerccliCommandFailed
+    expr: perccli_command_success == 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: Failed to run perccli or controller not available. (instance {{ $labels.instance }})
+      description: |
+        Failed to get PowerEdgeRAID controller information using perccli.
+          INSTANCE = {{ $labels.instance }}
+          SUCCESS = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: PowerEdgeRAIDControllerNotFound
+    expr: poweredgeraid_controllers == 0
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: PowerEdge RAID controller not found. (instance {{ $labels.instance }})
+      description: |
+        Cannot find PowerEdge RAID controller on this host machine.
+          INSTANCE = {{ $labels.instance }}
+          LABELS = {{ $labels }}
+
+  - alert: PowerEdgeRAIDControllerSuccess
+    expr: perccli_command_ctrl_success == 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: PowerEdge RAID controller command not successful.  (instance {{ $labels.instance }})
+      description: |
+        Failed to get PowerEdge RAID controller information on controller {{ $labels.controller_id }}.
+          INSTANCE = {{ $labels.instance }}
+          CONTROLLER_ID = {{ $labels.controller_id }}
+          LABELS = {{ $labels }}
+
+  - alert: PowerEdgeRAIDVirtualDriveNotOptimal
+    expr: poweredgeraid_virtual_info{state != "Optl"} == 1
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: PowerEdge RAID virtual drives are not in optimal state. (instance {{ $labels.instance }})
+      description: |
+        PowerEdge RAID virtual drives are not in optimal state. Please check the if the virtual drives are working as expected.
+          STATE = {{ $labels.state }}
+          LABELS = {{ $labels }}
