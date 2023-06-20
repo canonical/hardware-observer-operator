@@ -21,13 +21,38 @@ subordinate: true
 
 resources:
 
-  storecli-deb:
+  storcli-deb:
     type: file
     description: |
       (Optional) un-republish tool.
       StorCLI deb file publish by Broadcom for their RAID devices.
       Download it from https://www.broadcom.com/products/storage/raid-controllers .
-    filename: storecli.deb
+    filename: storcli.deb
+
+  perccli-deb:
+    type: file
+    description: |
+      (Optional) un-republish tool.
+      PercCLI deb file publish by Dell for their RAID devices.
+      Download it from https://www.dell.com/support/home/zh-tw/drivers/driversdetails?driverid=52r3d .
+    filename: perccli.deb
+
+  sas2ircu-bin:
+    type: file
+    description: |
+      (Optional) un-republish tool.
+      SASIRCU binary file publish by Broadcom.
+      Download it from https://docs.broadcom.com/docs/12351730 .
+    filename: sas2ircu
+
+  sas3ircu-bin:
+    type: file
+    description: |
+      (Optional) un-republish tool.
+      SASIRCU binary file publish by Broadcom.
+      Download it from https://docs.broadcom.com/docs/SAS3IRCU_P15.zip .
+    filename: sas3ircu
+
 
 provides:
   cos-agent:
