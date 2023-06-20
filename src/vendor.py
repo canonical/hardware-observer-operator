@@ -9,7 +9,7 @@ from pathlib import Path
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError, Resources
 
-from config import SNAP_COMMON, VENDOR_TOOLS
+from config import SNAP_COMMON, TOOLS_DIR, VENDOR_TOOLS
 
 logger = logging.getLogger(__name__)
 
@@ -20,48 +20,77 @@ def copy_to_snap_common_bin(source: Path, filename: str) -> None:
     shutil.copy(source, f"{SNAP_COMMON}/bin/{filename}")
 
 
-class InstallStrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
+def symlink(src: Path, dst: Path) -> None:
+    """Create softlink."""
+    try:
+        dst.unlink(missing_ok=True)  # Remove file if exists
+        dst.symlink_to(src)
+    except OSError as err:
+        logger.exception(err)
+        raise
+
+
+def install_deb(name: str, path: Path) -> None:
+    """Install local deb package."""
+    _cmd: t.List[str] = ["dpkg", "-i", str(path)]
+    try:
+        result = subprocess.check_output(_cmd, universal_newlines=True)
+        logger.debug(result)
+        logger.info("Install deb package %s from %s success", name, path)
+    except subprocess.CalledProcessError as exc:
+        raise apt.PackageError(f"Fail to install deb {name} from {path}") from exc
+
+
+def remove_deb(pkg: str) -> None:
+    """Remove deb package."""
+    _cmd: t.List[str] = ["dpkg", "--remove", pkg]
+    try:
+        result = subprocess.check_output(_cmd, universal_newlines=True)
+        logger.debug(result)
+        logger.info("Remove deb package %s", pkg)
+    except subprocess.CalledProcessError as exc:
+        raise apt.PackageError(f"Fail to remove deb {pkg}") from exc
+
+
+class VendorStrategyABC(metaclass=ABCMeta):
     """Basic install strategy class."""
 
     @abstractmethod
     def install(self, name: str, path: Path) -> None:
         """Installation details."""
 
-
-class DebInstallStrategy(InstallStrategyABC):  # pylint: disable=R0903
-    """Debain package install strategy."""
-
-    def install(self, name: str, path: Path) -> None:
-        """Install local deb package."""
-        _cmd: t.List[str] = ["dpkg", "-i", str(path)]
-        try:
-            result = subprocess.check_output(_cmd, universal_newlines=True)
-            logger.debug(result)
-            logger.info("Install deb package %s from %s success", name, path)
-        except subprocess.CalledProcessError as exc:
-            raise apt.PackageError(f"Fail to install deb {name} from {path}") from exc
+    @abstractmethod
+    def remove(self) -> None:
+        """Installation details."""
 
 
-class StorCLIInstallStrategy(DebInstallStrategy):  # pylint: disable=R0903
+class StorCLIStrategy(VendorStrategyABC):
     """Strategy to install storcli."""
+
+    name = "storcli"
+    origin_path = Path("/opt/MegaRAID/storcli/storcli64")
+    symlink_bin = TOOLS_DIR / "storcli"
 
     def install(self, name: str, path: Path) -> None:
         """Install storecli."""
-        super().install(name, path)
-        copy_to_snap_common_bin(
-            filename="storcli",
-            source=Path("/opt/MegaRAID/storcli/storcli64"),
-        )
+        install_deb(name, path)
+        symlink(src=self.origin_path, dst=self.symlink_bin)
+
+    def remove(self) -> None:
+        """Remove storecli."""
+        self.symlink_bin.unlink(missing_ok=True)
+        logger.debug("Remove file %s", self.symlink_bin)
+        remove_deb(pkg=self.name)
 
 
 class VendorHelper:
     """Helper to install vendor's tools."""
 
     @property
-    def strategies(self) -> t.Dict[str, InstallStrategyABC]:
+    def strategies(self) -> t.Dict[str, VendorStrategyABC]:
         """Define strategies for every vendor's tools."""
         return {
-            "storecli-deb": StorCLIInstallStrategy(),
+            "storecli-deb": StorCLIStrategy(),
         }
 
     def fetch_tools(self, resources: Resources) -> t.List[str]:
@@ -85,8 +114,19 @@ class VendorHelper:
         fetch_tools = self.fetch_tools(resources)
         for name, path in resources._paths.items():  # pylint: disable=W0212
             if name in fetch_tools:
-                install_strategy = self.strategies.get(name)
-                if install_strategy and path:
-                    install_strategy.install(name, path)
+                strategy = self.strategies.get(name)
+                if strategy and path:
+                    strategy.install(name, path)
                 else:
                     logger.warning("Could not find install strategy for tool %s", name)
+
+    def remove(self, resources: Resources) -> None:
+        """Execute all remove strategies."""
+        for name in resources._paths.keys():  # pylint: disable=W0212
+            if name in VENDOR_TOOLS:
+                strategy = self.strategies.get(name)
+                if strategy:
+                    strategy.remove()
+                    logger.info("Remove resource: %s", name)
+                else:
+                    logger.warning("Could not find remove strategy for tool %s", name)

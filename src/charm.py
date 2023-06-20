@@ -29,6 +29,7 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
         self.framework.observe(self.on.install, self._on_install_or_upgrade)
         self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.remove, self._on_remove)
 
         # Initialise helpers, etc.
         self._snap_path: t.Optional[str] = None
@@ -90,6 +91,12 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
             return
 
         self.model.unit.status = ActiveStatus("Unit is ready")
+
+    def _on_remove(self, _: EventBase) -> None:
+        """Remove everything when charm is being removed."""
+        logger.info("Start to remove.")
+        # Remove binary tool
+        self.vendor_helper.remove(self.model.resources)
 
 
 if __name__ == "__main__":  # pragma: nocover

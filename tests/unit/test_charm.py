@@ -120,3 +120,11 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.snap_path
         self.assertTrue(self.harness.charm._snap_path_set)
         self.assertTrue(self.harness.charm._snap_path is None)
+
+    @mock.patch("charm.VendorHelper", return_value=mock.MagicMock())
+    def test_09_on_remove(self, mock_vendor_helper) -> None:
+        self.harness.begin()
+        self.harness.charm.on.remove.emit()
+        self.harness.charm.vendor_helper.remove.assert_called_with(
+            self.harness.charm.model.resources
+        )
