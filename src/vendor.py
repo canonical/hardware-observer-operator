@@ -11,7 +11,8 @@ from pathlib import Path
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError, Resources
 
-from config import SNAP_COMMON, TOOLS_DIR, VENDOR_TOOLS
+from config import SNAP_COMMON, TOOLS_DIR, TPR_VENDOR_TOOLS, VENDOR_TOOLS
+from keys import HP_KEYS
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,22 @@ def make_executable(src: Path) -> None:
 
 
 class StrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
-    """Base strategy."""
+    """Basic strategy."""
+
+
+class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
+    """Strategy for apt install tool."""
+
+    @abstractmethod
+    def install(self) -> None:
+        """Installation details."""
+
+    @abstractmethod
+    def remove(self) -> None:
+        """Remove details."""
+        # Note: The repo and keys should be remove when removing
+        # hook is triggered. But currently the apt lib don't have
+        # the remove option.
 
 
 class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
@@ -79,7 +95,7 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
 
     @abstractmethod
     def remove(self) -> None:
-        """Installation details."""
+        """Remove details."""
 
 
 class StorCLIStrategy(TPRStrategyABC):
@@ -144,6 +160,40 @@ class SAS3IRCUStrategy(SAS2IRCUStrategy):
     symlink_bin = TOOLS_DIR / "sas3ircu"
 
 
+class SSACLIStrategy(APTStrategyABC):
+    """Strategy for install ssacli."""
+
+    name = "ssacli"
+    pkg = "ssacli"
+    repo_line = "deb http://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
+
+    @property
+    def repo(self) -> apt.DebianRepository:
+        """Third party DebianRepository."""
+        return apt.DebianRepository.from_repo_line(self.repo_line)
+
+    def add_repo(self) -> None:
+        """Add repository."""
+        repositories = apt.RepositoryMapping()
+        print(repositories)
+        repositories.add(self.repo)
+
+    def disable_repo(self) -> None:
+        """Disable the repository."""
+        repositories = apt.RepositoryMapping()
+        repositories.disable(self.repo)
+
+    def install(self) -> None:
+        for key in HP_KEYS:
+            apt.import_key(key)
+        self.add_repo()
+        apt.add_package(self.pkg, update_cache=True)
+
+    def remove(self) -> None:
+        apt.remove_package(self.pkg)
+        self.disable_repo()
+
+
 class VendorHelper:
     """Helper to install vendor's tools."""
 
@@ -155,13 +205,14 @@ class VendorHelper:
             "perccli-deb": PercCLIStrategy(),
             "sas2ircu-bin": SAS2IRCUStrategy(),
             "sas3ircu-bin": SAS3IRCUStrategy(),
+            "ssacli": SSACLIStrategy(),
         }
 
     def fetch_tools(self, resources: Resources) -> t.Dict[str, Path]:
         """Fetch resource from juju if it's VENDOR_TOOLS."""
         fetch_tools: t.Dict[str, Path] = {}
         # Fetch all tools from juju resources
-        for tool in VENDOR_TOOLS:
+        for tool in TPR_VENDOR_TOOLS:
             try:
                 path = resources.fetch(tool)
                 fetch_tools[tool] = path
@@ -173,20 +224,26 @@ class VendorHelper:
     def install(self, resources: Resources) -> None:
         """Install tools."""
         fetch_tools = self.fetch_tools(resources)
-        for name, path in fetch_tools.items():
+        for name in VENDOR_TOOLS:
             strategy = self.strategies.get(name)
-            if isinstance(strategy, TPRStrategyABC) and path:
-                strategy.install(name, path)
-            else:
+            if strategy is None:
                 logger.warning("Could not find install strategy for tool %s", name)
+            # TPRStrategy
+            if name in fetch_tools and isinstance(strategy, TPRStrategyABC):
+                path = resources._paths.get(name)  # pylint: disable=W0212
+                if path:
+                    strategy.install(name, path)
+            # APTStrategy
+            if isinstance(strategy, APTStrategyABC):
+                strategy.install()
 
-    def remove(self, resources: Resources) -> None:
+    def remove(self, resources: Resources) -> None:  # pylint: disable=W0613
         """Execute all remove strategies."""
-        for name in resources._paths.keys():  # pylint: disable=W0212
-            if name in VENDOR_TOOLS:
-                strategy = self.strategies.get(name)
-                if isinstance(strategy, TPRStrategyABC):
-                    strategy.remove()
-                    logger.info("Remove resource: %s", name)
-                else:
-                    logger.warning("Could not find remove strategy for tool %s", name)
+        for name in VENDOR_TOOLS:
+            strategy = self.strategies.get(name)
+            if not strategy:
+                logger.warning("Could not find remove strategy for tool %s", name)
+                continue
+            if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
+                strategy.remove()
+            logger.info("Remove resource: %s", name)

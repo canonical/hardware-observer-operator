@@ -10,11 +10,14 @@ from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError
 
 from charm import PrometheusHardwareExporterCharm
-from config import SNAP_COMMON, TOOLS_DIR, VENDOR_TOOLS
+from config import SNAP_COMMON, TOOLS_DIR, TPR_VENDOR_TOOLS, VENDOR_TOOLS
+from keys import HP_KEYS
 from vendor import (
+    APTStrategyABC,
     PercCLIStrategy,
     SAS2IRCUStrategy,
     SAS3IRCUStrategy,
+    SSACLIStrategy,
     StorCLIStrategy,
     TPRStrategyABC,
     VendorHelper,
@@ -89,10 +92,16 @@ class TestVendorHelper(unittest.TestCase):
         strategies = self.vendor_helper.strategies
         self.assertEqual(
             strategies.keys(),
-            {"storcli-deb", "perccli-deb", "sas2ircu-bin", "sas3ircu-bin"},
+            {
+                "storcli-deb",
+                "perccli-deb",
+                "sas2ircu-bin",
+                "sas3ircu-bin",
+                "ssacli",
+            },
         )
         for _, v in strategies.items():
-            assert isinstance(v, TPRStrategyABC)
+            assert isinstance(v, (TPRStrategyABC, APTStrategyABC))
 
         # Special cases
         assert isinstance(strategies.get("storcli-deb"), StorCLIStrategy)
@@ -106,12 +115,10 @@ class TestVendorHelper(unittest.TestCase):
             mock_resources._paths[vendor_tool] = f"path-{vendor_tool}"
 
         fetch_tools = self.vendor_helper.fetch_tools(mock_resources)
+        for tool in TPR_VENDOR_TOOLS:
+            mock_resources.fetch.assert_any_call(tool)
 
-        print(mock_resources._paths)
-        for vendor_tool in VENDOR_TOOLS:
-            mock_resources.fetch.assert_any_call(vendor_tool)
-
-        self.assertEqual(list(fetch_tools.keys()), VENDOR_TOOLS)
+        self.assertEqual(["ssacli"] + list(fetch_tools.keys()), VENDOR_TOOLS)
 
     def test_03_fetch_tools_error_handling(self):
         """The fetch fail error should be handled."""
@@ -121,8 +128,8 @@ class TestVendorHelper(unittest.TestCase):
 
         fetch_tools = self.vendor_helper.fetch_tools(mock_resources)
 
-        for vendor_tool in VENDOR_TOOLS:
-            mock_resources.fetch.assert_any_call(vendor_tool)
+        for tool in TPR_VENDOR_TOOLS:
+            mock_resources.fetch.assert_any_call(tool)
 
         self.assertEqual(fetch_tools, {})
 
@@ -130,6 +137,7 @@ class TestVendorHelper(unittest.TestCase):
         "vendor.VendorHelper.strategies",
         return_value={
             "storcli-deb": mock.MagicMock(spec=TPRStrategyABC),
+            "ssacli": mock.MagicMock(spec=APTStrategyABC),
         },
         new_callable=mock.PropertyMock,
     )
@@ -141,8 +149,11 @@ class TestVendorHelper(unittest.TestCase):
         self.vendor_helper.install(mock_resources)
 
         for name, value in mock_strategies.return_value.items():
-            path = self.harness.charm.model.resources.fetch(name)
-            value.install.assert_any_call(name, path)
+            if isinstance(value, TPRStrategyABC):
+                path = self.harness.charm.model.resources.fetch(name)
+                value.install.assert_any_call(name, path)
+            elif isinstance(value, APTStrategyABC):
+                value.install.assert_any_call()
 
     @mock.patch(
         "vendor.VendorHelper.strategies",
@@ -159,7 +170,7 @@ class TestVendorHelper(unittest.TestCase):
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         self.vendor_helper.install(mock_resources)
-        mock_logger.warning.assert_called_with(
+        mock_logger.warning.assert_any_call(
             "Could not find install strategy for tool %s", "storcli-deb"
         )
 
@@ -177,6 +188,7 @@ class TestVendorHelper(unittest.TestCase):
         )
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
+        mock_resources.fetch("storcli-deb")
         self.vendor_helper.remove(mock_resources)
         for name, value in mock_strategies.return_value.items():
             value.remove.assert_called()
@@ -239,7 +251,6 @@ class TestDeb(unittest.TestCase):
         """Check the error handling of install."""
         with self.assertRaises(apt.PackageError):
             install_deb(name="name-a", path="path-a")
-
         mock_subprocess_check_outpout.assert_called_with(
             ["dpkg", "-i", "path-a"], universal_newlines=True
         )
@@ -317,3 +328,26 @@ class TestPercCLIStrategy(unittest.TestCase):
             strategy.remove()
             mock_symlink_bin.unlink.assert_called_with(missing_ok=True)
             mock_remove_deb.assert_called_with(pkg=strategy.name)
+
+
+class TestSSACLIStrategy(unittest.TestCase):
+    @mock.patch("vendor.apt")
+    def test_install(self, mock_apt):
+        strategy = SSACLIStrategy()
+        mock_repos = mock.Mock()
+        mock_apt.RepositoryMapping.return_value = mock_repos
+
+        strategy.install()
+        mock_repos.add.assert_called_with(strategy.repo)
+        for key in HP_KEYS:
+            mock_apt.import_key.assert_any_call(key)
+
+    @mock.patch("vendor.apt")
+    def test_remove(self, mock_apt):
+        strategy = SSACLIStrategy()
+        mock_repos = mock.Mock()
+        mock_apt.RepositoryMapping.return_value = mock_repos
+
+        strategy.remove()
+        mock_apt.remove_package.assert_called_with(strategy.pkg)
+        mock_repos.disable.assert_called_with(strategy.repo)
