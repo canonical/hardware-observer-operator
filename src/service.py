@@ -47,7 +47,7 @@ class Template:
         self.config_template = self.environment.get_template(EXPORTER_CONFIG_TEMPLATE)
         self.service_template = self.environment.get_template(EXPORTER_SERVICE_TEMPLATE)
 
-    def _install(self, path: str, content: str) -> bool:
+    def _install(self, path: Path, content: str) -> bool:
         """Install file."""
         success = True
         try:
@@ -55,22 +55,22 @@ class Template:
             with open(path, "w", encoding="utf-8") as file:
                 file.write(content)
         except (NotADirectoryError, PermissionError) as err:
-            logger.error(str(err))
+            logger.error(err)
             logger.info("Writing file to %s - Failed.", path)
             success = False
         else:
             logger.info("Writing file to %s - Done.", path)
         return success
 
-    def _uninstall(self, path: str) -> bool:
+    def _uninstall(self, path: Path) -> bool:
         """Uninstall file."""
         success = True
         try:
             logger.info("Removing file '%s'.", path)
-            if Path(path).exists():
-                Path(path).unlink()
+            if path.exists():
+                path.unlink()
         except PermissionError as err:
-            logger.error(str(err))
+            logger.error(err)
             logger.info("Removing file '%s' - Failed.", path)
             success = False
         else:
@@ -114,7 +114,7 @@ class Exporter(COSAgentProvider):
         """Install the exporter."""
         logger.info("Installing %s.", EXPORTER_NAME)
         success = self._template.render_config(self._stored.config.get("exporter-port", "10000"))
-        success = self._template.render_service(str(self._charm_dir), EXPORTER_CONFIG_PATH)
+        success = self._template.render_service(str(self._charm_dir), str(EXPORTER_CONFIG_PATH))
         if not success:
             logger.error("Failed to installed %s.", EXPORTER_NAME)
             return success
