@@ -1,5 +1,6 @@
 """Helper for vendoer's tools."""
 import logging
+import os
 import shutil
 import subprocess
 import typing as t
@@ -62,7 +63,6 @@ class VendorStrategyABC(metaclass=ABCMeta):
     @abstractmethod
     def remove(self) -> None:
         """Installation details."""
-
 
 class StorCLIStrategy(VendorStrategyABC):
     """Strategy to install storcli."""
