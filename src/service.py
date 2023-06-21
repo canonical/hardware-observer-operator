@@ -166,9 +166,6 @@ class Exporter(COSAgentProvider):
 
     def on_config_changed(self, change_set: Set[str]) -> None:
         """Respond to config change about the exporter."""
-        observe = set(["exporter-log-level"])
-        if len(observe.intersection(change_set)) > 0:
-            logger.info("Exported config changed")
         if "exporter-log-level" in change_set:
             logger.info("Detected changes in 'exporter-log-level'")
             port = self._stored.config.get("exporter-port", "10000")
