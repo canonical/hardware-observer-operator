@@ -38,8 +38,8 @@ def check_installed(func: Callable) -> Callable:
     return wrapper
 
 
-class Template:
-    """Jinja template helper class."""
+class ExporterTemplate:
+    """Jinja template helper class for exporter."""
 
     def __init__(self, search_path: Path):
         """Initialize template class."""
@@ -104,7 +104,7 @@ class Exporter(COSAgentProvider):
         super().__init__(*args, **kwargs)
         self._stored = self._charm._stored
         self._charm_dir = self._charm.charm_dir
-        self._template = Template(self._charm_dir)
+        self._template = ExporterTemplate(self._charm_dir)
 
         events = self._charm.on[self._relation_name]
         self.framework.observe(events.relation_joined, self._on_relation_joined)
