@@ -73,8 +73,8 @@ class TestCharm(unittest.TestCase):
         self.harness.begin()
         self.harness.charm._stored.installed = True
 
-        new_config = {"exporter-port": 80}
-        self.harness.update_config = new_config
+        new_config = {"exporter-port": 80, "exporter-log-level": "DEBUG"}
+        self.harness.update_config(new_config)
         self.harness.charm.on.config_changed.emit()
 
         for k, v in self.harness.charm.model.config.items():

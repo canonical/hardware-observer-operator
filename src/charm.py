@@ -85,6 +85,7 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
             event.defer()
             return
 
+        self.exporter.on_config_changed(change_set)
         self.model.unit.status = ActiveStatus("Unit is ready")
 
     def _on_remove(self, _: EventBase) -> None:

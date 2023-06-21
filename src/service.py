@@ -2,7 +2,7 @@
 from functools import wraps
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, Set, Tuple
 
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v1 import systemd
@@ -77,9 +77,9 @@ class Template:
             logger.info("Removing file '%s' - Done.", path)
         return success
 
-    def render_config(self, port: str) -> bool:
+    def render_config(self, port: str, level: str) -> bool:
         """Render and install exporter config file."""
-        content = self.config_template.render(PORT=port)
+        content = self.config_template.render(PORT=port, LEVEL=level)
         return self._install(EXPORTER_CONFIG_PATH, content)
 
     def render_service(self, charm_dir: str, config_file: str) -> bool:
@@ -113,7 +113,9 @@ class Exporter(COSAgentProvider):
     def install(self) -> bool:
         """Install the exporter."""
         logger.info("Installing %s.", EXPORTER_NAME)
-        success = self._template.render_config(self._stored.config.get("exporter-port", "10000"))
+        port = self._stored.config.get("exporter-port", "10000")
+        level = self._stored.config.get("exporter-log-level", "INFO")
+        success = self._template.render_config(port=port, level=level)
         success = self._template.render_service(str(self._charm_dir), str(EXPORTER_CONFIG_PATH))
         if not success:
             logger.error("Failed to installed %s.", EXPORTER_NAME)
@@ -145,6 +147,11 @@ class Exporter(COSAgentProvider):
         systemd.service_start(EXPORTER_NAME)
 
     @check_installed
+    def restart(self) -> None:
+        """Restart the exporter daemon."""
+        systemd.service_restart(EXPORTER_NAME)
+
+    @check_installed
     def check_health(self) -> bool:
         """Check if the exporter daemon is healthy or not."""
         return not systemd.service_failed(EXPORTER_NAME)
@@ -156,6 +163,19 @@ class Exporter(COSAgentProvider):
         if not relation:
             return False
         return True
+
+    def on_config_changed(self, change_set: Set[str]) -> None:
+        """Respond to config change about the exporter."""
+        observe = set(["exporter-log-level"])
+        if len(observe.intersection(change_set)) > 0:
+            logger.info("Exported config changed")
+        if "exporter-log-level" in change_set:
+            logger.info("Detected changes in 'exporter-log-level'")
+            port = self._stored.config.get("exporter-port", "10000")
+            level = self._stored.config.get("exporter-log-level", "INFO")
+            success = self._template.render_config(port=port, level=level)
+            if success:
+                self.restart()
 
     def _on_relation_joined(self, event: EventBase) -> None:  # pylint: disable=unused-argument
         """Start the exporter when relation joined."""

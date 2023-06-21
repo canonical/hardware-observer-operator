@@ -145,3 +145,16 @@ class TestExporter(unittest.TestCase):
         self.assertEqual(
             self.harness.charm.unit.status, BlockedStatus("Missing relation: [cos-agent]")
         )
+
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_60_config_changed_log_level_okay(self, mock_service_installed):
+        """Test on_config_change function when exporter-log-level is changed."""
+        self.harness.begin()
+
+        with mock.patch("builtins.open", new_callable=mock.mock_open):
+            self.mock_systemd.service_failed.return_value = False
+            self.harness.charm.on.install.emit()
+            self.harness.update_config({"exporter-log-level": "DEBUG"})
+            self.harness.charm.on.config_changed.emit()
+            self.assertEqual(self.harness.charm._stored.config.get("exporter-log-level"), "DEBUG")
+            self.mock_systemd.service_restart.assert_called_once()

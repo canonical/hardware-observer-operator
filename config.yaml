@@ -10,4 +10,11 @@ options:
       Start the prometheus exporter at "exporter-port". By default, it will
       start at port 10000. Note that this configuration can only be set at
       deployment time, changing this config value will take no effects.
-
+  exporter-log-level:
+    type: string
+    default: "INFO"
+    description: |
+      Start the prometheus exporter with log level "exporter-log-level". By
+      default, it will set to INFO. Allowed values are "DEBUG", "INFO",
+      "WARNING", "ERROR", "CRITICAL". Values other than those will result in
+      failure of the exporter.
