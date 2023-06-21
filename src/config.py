@@ -8,7 +8,7 @@ EXPORTER_CONFIG_TEMPLATE = f"{EXPORTER_NAME}-config.yaml.j2"
 EXPORTER_SERVICE_TEMPLATE = f"{EXPORTER_NAME}.service.j2"
 
 
-# Register every vendoer's tool here.
+# Register every vendor's tool here.
 VENDOR_TOOLS = [
     "storecli-deb",
 ]
