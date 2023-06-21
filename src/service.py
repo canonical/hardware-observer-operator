@@ -130,7 +130,7 @@ class Exporter(COSAgentProvider):
         success = self._template.remove_config()
         success = self._template.remove_service()
         if not success:
-            logger.error("Failed to uninstalled %s.", EXPORTER_NAME)
+            logger.error("Failed to uninstall %s.", EXPORTER_NAME)
             return success
         systemd.daemon_reload()
         logger.info("%s uninstalled.", EXPORTER_NAME)
