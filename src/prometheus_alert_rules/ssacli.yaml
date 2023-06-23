@@ -1,0 +1,63 @@
+groups:
+- name: SsaCLI
+  rules:
+
+  - alert: SsaCLICommandFailed
+    expr: ssacli_command_success == 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: Failed to run ssacli. (instance {{ $labels.instance }})
+      description: |
+        Failed to get storage array information using ssacli.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: SsaCLIControllerNotFound
+    expr: ssacli_controllers == 0
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: ssacli controller not found. (instance {{ $labels.instance }})
+      description: |
+        Cannot find ssacli controller on this host machine.
+          NUMBER_OF_CONTROLLERS = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: SsaCLIControllerNotOK
+    expr: ssacli_controller_info{status != "OK"} > 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: ssacli controller status not Ok. (instance {{ $labels.instance }})
+      description: |
+        SSACLI controller status not OK.
+          STATUS = {{ $labels.status }}
+          LABELS = {{ $labels }}
+
+  - alert: SsaCLILogicalDriveNotOK
+    expr: ssacli_ld_info{status != "OK"} > 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: ssacli logical drive status not Ok. (instance {{ $labels.instance }})
+      description: |
+        SSACLI logical drive status not OK.
+          STATUS = {{ $labels.status }}
+          LABELS = {{ $labels }}
+
+  - alert: SsaCLIPhysicalDriveNotOK
+    expr: ssacli_pd_info{status != "OK"} > 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: ssacli physical drive status not Ok. (instance {{ $labels.instance }})
+      description: |
+        SSACLI physical drive status not OK.
+          STATUS = {{ $labels.status }}
+          LABELS = {{ $labels }}

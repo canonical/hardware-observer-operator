@@ -1,0 +1,123 @@
+rule_files:
+  - ../../../src/prometheus_alert_rules/ssacli.yaml
+
+evaluation_interval: 1m
+
+tests:
+
+  - interval: 1m
+    input_series:
+      - series: 'ssacli_command_success{instance="ubuntu-0"}'
+        values: '0x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: SsaCLICommandFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-0
+            exp_annotations:
+              summary: Failed to run ssacli. (instance ubuntu-0)
+              description: |
+                Failed to get storage array information using ssacli.
+                  VALUE = 0
+                  LABELS = map[__name__:ssacli_command_success instance:ubuntu-0]
+
+
+  - interval: 1m
+    input_series:
+      - series: 'ssacli_command_success{instance="ubuntu-1"}'
+        values: '1x15'
+      - series: 'ssacli_controllers{instance="ubuntu-1"}'
+        values: '0x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: SsaCLIControllerNotFound
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-1
+            exp_annotations:
+              summary: ssacli controller not found. (instance ubuntu-1)
+              description: |
+                Cannot find ssacli controller on this host machine.
+                  NUMBER_OF_CONTROLLERS = 0
+                  LABELS = map[__name__:ssacli_controllers instance:ubuntu-1]
+
+
+  - interval: 1m
+    input_series:
+      - series: 'ssacli_command_success{instance="ubuntu-2"}'
+        values: '1x15'
+      - series: 'ssacli_controller_info{instance="ubuntu-2", part="Cache Status", status="DOWN"}'
+        values: '1x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: SsaCLIControllerNotOK
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-2
+              part: Cache Status
+              status: DOWN
+            exp_annotations:
+              summary: ssacli controller status not Ok. (instance ubuntu-2)
+              description: |
+                SSACLI controller status not OK.
+                  STATUS = DOWN
+                  LABELS = map[__name__:ssacli_controller_info instance:ubuntu-2 part:Cache Status status:DOWN]
+
+
+  - interval: 1m
+    input_series:
+      - series: 'ssacli_command_success{instance="ubuntu-3"}'
+        values: '1x15'
+      - series: 'ssacli_ld_info{instance="ubuntu-3", slot="2", status="DOWN"}'
+        values: '1x15'
+      - series: 'ssacli_ld_info{instance="ubuntu-11", slot="2", status="OK"}'
+        values: '1x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: SsaCLILogicalDriveNotOK
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              slot: "2"
+              status: DOWN
+            exp_annotations:
+              summary: ssacli logical drive status not Ok. (instance ubuntu-3)
+              description: |
+                SSACLI logical drive status not OK.
+                  STATUS = DOWN
+                  LABELS = map[__name__:ssacli_ld_info instance:ubuntu-3 slot:2 status:DOWN]
+
+
+  - interval: 1m
+    input_series:
+      - series: 'ssacli_command_success{instance="ubuntu-4"}'
+        values: '1x15'
+      - series: 'ssacli_pd_info{instance="ubuntu-4", slot="2", status="CORRUPT"}'
+        values: '1x15'
+      - series: 'ssacli_pd_info{instance="ubuntu-12", slot="2", status="OK"}'
+        values: '1x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: SsaCLIPhysicalDriveNotOK
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-4
+              slot: "2"
+              status: CORRUPT
+            exp_annotations:
+              summary: ssacli physical drive status not Ok. (instance ubuntu-4)
+              description: |
+                SSACLI physical drive status not OK.
+                  STATUS = CORRUPT
+                  LABELS = map[__name__:ssacli_pd_info instance:ubuntu-4 slot:2 status:CORRUPT]
