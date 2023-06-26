@@ -9,6 +9,7 @@ import ops
 from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
 
+import charm
 import service
 from charm import PrometheusHardwareExporterCharm
 
@@ -28,6 +29,10 @@ class TestExporter(unittest.TestCase):
         systemd_lib_patcher = mock.patch.object(service, "systemd")
         self.mock_systemd = systemd_lib_patcher.start()
         self.addCleanup(systemd_lib_patcher.stop)
+
+        vendor_lib_patcher = mock.patch.object(charm, "VendorHelper")
+        vendor_lib_patcher.start()
+        self.addCleanup(vendor_lib_patcher.stop)
 
     def test_00_install_okay(self):
         """Test exporter service is installed when charm is installed - okay."""
