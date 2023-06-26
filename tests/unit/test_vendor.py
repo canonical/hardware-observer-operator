@@ -1,3 +1,4 @@
+import stat
 import subprocess
 import unittest
 from pathlib import Path
@@ -11,11 +12,15 @@ from ops.model import ModelError
 from charm import PrometheusHardwareExporterCharm
 from config import SNAP_COMMON, TOOLS_DIR, VENDOR_TOOLS
 from vendor import (
+    PercCLIStrategy,
+    SAS2IRCUStrategy,
+    SAS3IRCUStrategy,
     StorCLIStrategy,
+    TPRStrategyABC,
     VendorHelper,
-    VendorStrategyABC,
     copy_to_snap_common_bin,
     install_deb,
+    make_executable,
     remove_deb,
     symlink,
 )
@@ -54,6 +59,24 @@ class TestSymlink(unittest.TestCase):
         mock_dst.symlink_to.assert_called_with(mock_src)
 
 
+class TestMakeExecutable(unittest.TestCase):
+    @mock.patch("vendor.os")
+    def test_make_executable(self, mock_os):
+        mock_src = mock.Mock()
+        make_executable(mock_src)
+        mock_os.chmod.assert_called_with(mock_src, stat.S_IEXEC)
+        mock_os.chown.assert_called_with(mock_src, 0, 0)
+
+    @mock.patch("vendor.os")
+    def test_make_executable_error_handling(self, mock_os):
+        mock_os.chown.side_effect = OSError()
+        mock_src = mock.Mock()
+        with self.assertRaises(OSError):
+            make_executable(mock_src)
+        mock_os.chmod.assert_called_with(mock_src, stat.S_IEXEC)
+        mock_os.chown.assert_called_with(mock_src, 0, 0)
+
+
 class TestVendorHelper(unittest.TestCase):
     def setUp(self):
         self.harness = ops.testing.Harness(PrometheusHardwareExporterCharm)
@@ -64,15 +87,17 @@ class TestVendorHelper(unittest.TestCase):
     def test_01_strategies(self):
         """Check strategies define correctly."""
         strategies = self.vendor_helper.strategies
-        assert strategies.keys() == {"storecli-deb"}
-
+        self.assertEqual(
+            strategies.keys(),
+            {"storcli-deb", "perccli-deb", "sas2ircu-bin", "sas3ircu-bin"},
+        )
         for _, v in strategies.items():
-            assert isinstance(v, VendorStrategyABC)
+            assert isinstance(v, TPRStrategyABC)
 
         # Special cases
-        assert isinstance(strategies.get("storecli-deb"), StorCLIStrategy)
+        assert isinstance(strategies.get("storcli-deb"), StorCLIStrategy)
 
-    def test__02_fetch_tools(self):
+    def test_02_fetch_tools(self):
         """Check each vendor_tool has been fetched."""
         mock_resources = unittest.mock.MagicMock()
         mock_resources._paths = {"resource-a": "path-a", "resource-b": "path-b"}
@@ -82,10 +107,11 @@ class TestVendorHelper(unittest.TestCase):
 
         fetch_tools = self.vendor_helper.fetch_tools(mock_resources)
 
+        print(mock_resources._paths)
         for vendor_tool in VENDOR_TOOLS:
-            mock_resources.fetch.assert_called_with(vendor_tool)
+            mock_resources.fetch.assert_any_call(vendor_tool)
 
-        self.assertEqual(fetch_tools, VENDOR_TOOLS)
+        self.assertEqual(list(fetch_tools.keys()), VENDOR_TOOLS)
 
     def test_03_fetch_tools_error_handling(self):
         """The fetch fail error should be handled."""
@@ -96,27 +122,27 @@ class TestVendorHelper(unittest.TestCase):
         fetch_tools = self.vendor_helper.fetch_tools(mock_resources)
 
         for vendor_tool in VENDOR_TOOLS:
-            mock_resources.fetch.assert_called_with(vendor_tool)
+            mock_resources.fetch.assert_any_call(vendor_tool)
 
-        self.assertEqual(fetch_tools, [])
+        self.assertEqual(fetch_tools, {})
 
     @mock.patch(
         "vendor.VendorHelper.strategies",
         return_value={
-            "storecli-deb": mock.MagicMock(),
+            "storcli-deb": mock.MagicMock(spec=TPRStrategyABC),
         },
         new_callable=mock.PropertyMock,
     )
     def test_04_install(self, mock_strategies):
         """Check strategy is been called."""
-        self.harness.add_resource("storecli-deb", "storcli.deb")
+        self.harness.add_resource("storcli-deb", "storcli.deb")
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         self.vendor_helper.install(mock_resources)
 
         for name, value in mock_strategies.return_value.items():
             path = self.harness.charm.model.resources.fetch(name)
-            value.install.assert_called_with(name, path)
+            value.install.assert_any_call(name, path)
 
     @mock.patch(
         "vendor.VendorHelper.strategies",
@@ -127,26 +153,26 @@ class TestVendorHelper(unittest.TestCase):
     def test_05_install_not_strategies(self, mock_logger, mock_strategies):
         """logger.warning is triggered if strategy has not been defined."""
         self.harness.add_resource(
-            "storecli-deb",
+            "storcli-deb",
             "storcli.deb",
         )
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         self.vendor_helper.install(mock_resources)
         mock_logger.warning.assert_called_with(
-            "Could not find install strategy for tool %s", "storecli-deb"
+            "Could not find install strategy for tool %s", "storcli-deb"
         )
 
     @mock.patch(
         "vendor.VendorHelper.strategies",
         return_value={
-            "storecli-deb": mock.MagicMock(),
+            "storcli-deb": mock.MagicMock(spec=TPRStrategyABC),
         },
         new_callable=mock.PropertyMock,
     )
     def test_06_remove(self, mock_strategies):
         self.harness.add_resource(
-            "storecli-deb",
+            "storcli-deb",
             "storcli.deb",
         )
         self.harness.begin()
@@ -164,14 +190,14 @@ class TestVendorHelper(unittest.TestCase):
     def test_07_remove_not_strategies(self, mock_logger, mock_strategies):
         """logger.warning is triggered if strategy has not been defined."""
         self.harness.add_resource(
-            "storecli-deb",
+            "storcli-deb",
             "storcli.deb",
         )
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         self.vendor_helper.remove(mock_resources)
-        mock_logger.warning.assert_called_with(
-            "Could not find remove strategy for tool %s", "storecli-deb"
+        mock_logger.warning.assert_any_call(
+            "Could not find remove strategy for tool %s", "storcli-deb"
         )
 
 
@@ -237,3 +263,57 @@ class TestDeb(unittest.TestCase):
         mock_subprocess_check_outpout.assert_called_with(
             ["dpkg", "--remove", "pkg-a"], universal_newlines=True
         )
+
+
+class TestSAS2IRCUStrategy(unittest.TestCase):
+    @mock.patch("vendor.symlink")
+    @mock.patch("vendor.make_executable")
+    def test_install(self, mock_make_executable, mock_symlink):
+        strategy = SAS2IRCUStrategy()
+        strategy.install(name="name-a", path="path-a")
+        mock_make_executable.assert_called_with("path-a")
+        mock_symlink.assert_called_with(src="path-a", dst=TOOLS_DIR / "sas2ircu")
+
+    def test_remove(self):
+        strategy = SAS2IRCUStrategy()
+        with mock.patch.object(strategy, "symlink_bin") as mock_symlink_bin:
+            strategy.remove()
+            mock_symlink_bin.unlink.assert_called_with(missing_ok=True)
+
+
+class TestSAS3IRCUStrategy(unittest.TestCase):
+    @mock.patch("vendor.symlink")
+    @mock.patch("vendor.make_executable")
+    def test_install(self, mock_make_executable, mock_symlink):
+        strategy = SAS3IRCUStrategy()
+        strategy.install(name="name-a", path="path-a")
+        mock_make_executable.assert_called_with("path-a")
+        mock_symlink.assert_called_with(src="path-a", dst=TOOLS_DIR / "sas3ircu")
+
+    def test_remove(self):
+        strategy = SAS3IRCUStrategy()
+        with mock.patch.object(strategy, "symlink_bin") as mock_symlink_bin:
+            strategy.remove()
+            mock_symlink_bin.unlink.assert_called_with(missing_ok=True)
+
+
+class TestPercCLIStrategy(unittest.TestCase):
+    @mock.patch("vendor.symlink")
+    @mock.patch("vendor.install_deb")
+    def test_install(self, mock_install_deb, mock_symlink):
+        strategy = PercCLIStrategy()
+        strategy.install(name="name-a", path="path-a")
+        mock_install_deb.assert_called_with("name-a", "path-a")
+        mock_symlink.assert_called_with(
+            src=Path("/opt/MegaRAID/perccli/perccli64"),
+            dst=TOOLS_DIR / "perccli",
+        )
+
+    @mock.patch("vendor.symlink")
+    @mock.patch("vendor.remove_deb")
+    def test_remove(self, mock_remove_deb, mock_symlink):
+        strategy = PercCLIStrategy()
+        with mock.patch.object(strategy, "symlink_bin") as mock_symlink_bin:
+            strategy.remove()
+            mock_symlink_bin.unlink.assert_called_with(missing_ok=True)
+            mock_remove_deb.assert_called_with(pkg=strategy.name)
