@@ -37,28 +37,30 @@ class TestCharm(unittest.TestCase):
         self.assertFalse(self.harness.charm._stored.installed)
         self.assertTrue(isinstance(self.harness.charm._stored.config, ops.framework.StoredDict))
 
+    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.VendorHelper", return_value=mock.MagicMock())
-    def test_02_install(self, mock_vendor_helper) -> None:
+    def test_02_install(self, mock_vendor_helper, mock_exporter) -> None:
         """Test event install."""
         self.harness.begin()
         self.harness.charm.on.install.emit()
 
         self.assertTrue(self.harness.charm._stored.installed)
 
-        print(self.harness.charm.vendor_helper.install)
+        self.harness.charm.exporter.install.assert_called_once()
         self.harness.charm.vendor_helper.install.assert_called_with(
             self.harness.charm.model.resources
         )
 
+    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.VendorHelper", return_value=mock.MagicMock())
-    def test_03_upgrade_charm(self, mock_vendor_helper) -> None:
+    def test_03_upgrade_charm(self, mock_vendor_helper, mock_exporter) -> None:
         """Test event upgrade_charm."""
         self.harness.begin()
         self.harness.charm.on.install.emit()
 
         self.assertTrue(self.harness.charm._stored.installed)
 
-        print(self.harness.charm.vendor_helper.install)
+        self.harness.charm.exporter.install.assert_called_once()
         self.harness.charm.vendor_helper.install.assert_called_with(
             self.harness.charm.model.resources
         )
@@ -66,65 +68,25 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.unit.status = ActiveStatus("Install complete")
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    def test_04_config_changed(self, mock_exporter):
+    def test_10_config_changed(self, mock_exporter):
+        """Test config change event updates the charm's internal store."""
         self.harness.begin()
-        default_dict = {"exporter-channel": "latest/edge", "fake-config": "fake-value"}
-
-        self.harness.charm._stored.config = default_dict
         self.harness.charm._stored.installed = True
 
+        new_config = {"exporter-port": 80, "exporter-log-level": "DEBUG"}
+        self.harness.update_config(new_config)
         self.harness.charm.on.config_changed.emit()
 
         for k, v in self.harness.charm.model.config.items():
-            self.assertTrue(self.harness.charm._stored.config.get(k) == v)
+            self.assertEqual(self.harness.charm._stored.config.get(k), v)
 
-        self.assertTrue(self.harness.charm._stored.config["exporter-snap"] is None)
-
-        self.assertTrue(self.harness.charm._stored.config["fake-config"] == "fake-value")
-        self.harness.charm.exporter.on_config_changed.assert_called_with(
-            set({"exporter-snap", "exporter-channel"})
-        )
-
-        self.assertTrue(self.harness.charm.unit.status == ActiveStatus("Unit is ready"))
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    def test_05_config_changed_before_install_complete(self, mock_exporter):
+    def test_11_config_changed_before_install_complete(self, mock_exporter):
         """Test: config change event is defered if charm not installed."""
         self.harness.begin()
         self.harness.charm._stored.installed = False
 
         self.harness.charm.on.config_changed.emit()
         self.assertEqual(self._get_notice_count("config_changed"), 1)
-
-    @mock.patch("charm.os.path.getsize", return_value=1)
-    def test_06_snap_path_resource_provided(self, mock_getsize):
-        """snap_path is set up correctly if resource is provided."""
-        self.harness.begin()
-        self.harness.add_resource("exporter-snap", "exporter-snap-contont")
-        self.harness.charm.snap_path
-        self.assertTrue(self.harness.charm._snap_path_set)
-        self.assertTrue(self.harness.charm._snap_path is not None)
-
-    @mock.patch("charm.os.path.getsize", return_value=0)
-    def test_07_snap_path_resource_provided(self, mock_getsize):
-        """snap_path is set to None if resource size if zero."""
-        self.harness.begin()
-        self.harness.add_resource("exporter-snap", "exporter-snap-contont")
-        self.harness.charm.snap_path
-        self.assertTrue(self.harness.charm._snap_path_set)
-        self.assertTrue(self.harness.charm._snap_path is None)
-
-    def test_08_snap_path_resource_missing(self):
-        """snap_path is set up correctly if resource is not provided."""
-        self.harness.begin()
-        self.harness.charm.snap_path
-        self.assertTrue(self.harness.charm._snap_path_set)
-        self.assertTrue(self.harness.charm._snap_path is None)
-
-    @mock.patch("charm.VendorHelper", return_value=mock.MagicMock())
-    def test_09_on_remove(self, mock_vendor_helper) -> None:
-        self.harness.begin()
-        self.harness.charm.on.remove.emit()
-        self.harness.charm.vendor_helper.remove.assert_called_with(
-            self.harness.charm.model.resources
-        )

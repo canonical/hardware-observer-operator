@@ -1,0 +1,12 @@
+[Unit]
+Description=HTTP service for prometheus hardware exporter.
+
+[Service]
+User=root
+Environment=PYTHONPATH={{ CHARMDIR }}/venv
+ExecStart=/usr/bin/python3 -m prometheus_hardware_exporter -c {{ CONFIG_FILE }}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+

@@ -21,13 +21,6 @@ subordinate: true
 
 resources:
 
-  exporter-snap:
-    type: file
-    description: |
-      (Optional) Snap that implements actual data conllection and export.
-      If not provided, charm will try to download prometheus-hardware-exporter
-      from snap storecraft.
-    filename: proemtheus-hardware-exporter.snap
   storecli-deb:
     type: file
     description: |
@@ -35,6 +28,10 @@ resources:
       StorCLI deb file publish by Broadcom for their RAID devices.
       Download it from https://www.broadcom.com/products/storage/raid-controllers .
     filename: storecli.deb
+
+provides:
+  cos-agent:
+    interface: cos_agent
 
 requires:
   general-info:

@@ -5,14 +5,13 @@
 """Charm the application."""
 
 import logging
-import os
-import typing as t
+from typing import Any, Dict, Optional
 
 import ops
 from ops.framework import EventBase, StoredState
-from ops.model import ActiveStatus, ModelError
+from ops.model import ActiveStatus, BlockedStatus
 
-from exporter import Exporter
+from service import Exporter
 from vendor import VendorHelper
 
 logger = logging.getLogger(__name__)
@@ -23,48 +22,49 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
 
     _stored = StoredState()
 
-    def __init__(self, *args: t.Any) -> None:
+    def __init__(self, *args: Any) -> None:
         """Init."""
         super().__init__(*args)
+        self.framework.observe(self.on.remove, self._on_remove)
+        self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.install, self._on_install_or_upgrade)
         self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
-        self.framework.observe(self.on.remove, self._on_remove)
 
-        # Initialise helpers, etc.
-        self._snap_path: t.Optional[str] = None
-        self._snap_path_set = False
         self.vendor_helper = VendorHelper()
 
-        self.exporter = Exporter(self, "exporter")
+        self.exporter = Exporter(
+            self,
+            metrics_endpoints=[
+                {"path": "/metrics", "port": int(self.model.config["exporter-port"])}
+            ],
+        )
         self._stored.set_default(installed=False, config={})
 
     def _on_install_or_upgrade(self, _: EventBase) -> None:
         """Install and upgrade."""
+        self.exporter.install()
         self.vendor_helper.install(self.model.resources)
-
         self._stored.installed = True
-
         self.model.unit.status = ActiveStatus("Install complete")
         logger.info("Install complete")
 
-    @property
-    def snap_path(self) -> t.Optional[str]:
-        """Get local path to exporter snap.
+    def _on_remove(self, _: EventBase) -> None:
+        """Remove everything when charm is being removed."""
+        logger.info("Start to remove.")
+        # Remove binary tool
+        self.vendor_helper.remove(self.model.resources)
+        self.exporter.uninstall()
+        logger.info("Remove complete")
 
-        Returns:
-          snap_path: the path to the snap file
-        """
-        if not self._snap_path_set:
-            try:
-                self._snap_path = str(self.model.resources.fetch("exporter-snap").absolute())
-                if not os.path.getsize(self._snap_path) > 0:
-                    self._snap_path = None
-            except ModelError:
-                self._snap_path = None
-            finally:
-                self._snap_path_set = True
-        return self._snap_path
+    def _on_update_status(self, _: EventBase) -> None:
+        if not self.exporter.check_relation():
+            self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
+            return
+        if not self.exporter.check_health():
+            self.model.unit.status = BlockedStatus("Exporter is unhealthy")
+            return
+        self.model.unit.status = ActiveStatus("Unit is ready")
 
     def _on_config_changed(self, event: EventBase) -> None:
         """Reconfigure charm."""
@@ -72,15 +72,12 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
         # information are changed. This can be helpful when we want to respond
         # to the change of a specific config option.
         change_set = set()
-        model_config: t.Dict[str, t.Optional[str]] = dict(self.model.config.items())
-        model_config.update({"exporter-snap": self.snap_path})
+        model_config: Dict[str, Optional[str]] = dict(self.model.config.items())
         for key, value in model_config.items():
             if key not in self._stored.config or self._stored.config[key] != value:  # type: ignore
                 logger.info("Setting %s to: %s", key, value)
                 self._stored.config[key] = value  # type: ignore
                 change_set.add(key)
-
-        self.exporter.on_config_changed(change_set)
 
         if not self._stored.installed:  # type: ignore
             logging.info(  # type: ignore
@@ -90,13 +87,8 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
             event.defer()
             return
 
+        self.exporter.on_config_changed(change_set)
         self.model.unit.status = ActiveStatus("Unit is ready")
-
-    def _on_remove(self, _: EventBase) -> None:
-        """Remove everything when charm is being removed."""
-        logger.info("Start to remove.")
-        # Remove binary tool
-        self.vendor_helper.remove(self.model.resources)
 
 
 if __name__ == "__main__":  # pragma: nocover

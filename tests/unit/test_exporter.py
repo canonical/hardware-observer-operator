@@ -1,159 +1,165 @@
-"""Tests for exporter."""
+# Copyright 2023 Canotical Ltd.
+# See LICENSE file for licensing details.
+
+import pathlib
 import unittest
 from unittest import mock
 
-from charms.operator_libs_linux.v2 import snap
+import ops
+from ops.model import ActiveStatus, BlockedStatus
+from ops.testing import Harness
 
-from config import EXPORTER_NAME
-from exporter import Exporter, check_snap_installed
+import charm
+import service
+from charm import PrometheusHardwareExporterCharm
 
+ops.testing.SIMULATE_CAN_CONNECT = True
 
-class TestCheckSnapInstalled(unittest.TestCase):
-    """Test decroator check_snap_installed."""
-
-    @mock.patch("exporter.snap.SnapCache")
-    def test_01_check_snap_installed(self, mock_snapcache):
-        """If exporter not exists.
-
-        - The exporter should be assigned.
-        - The func should be called.
-        """
-        mock_func = mock.MagicMock()
-        mock_func.__name__ = "mock_func"
-        wrapper = check_snap_installed(mock_func)
-
-        mock_self = mock.MagicMock()
-        mock_self._exporter = None
-        mock_args = [mock.MagicMock(), mock.MagicMock()]
-        mock_kwargs = {"a": mock.MagicMock(), "b": mock.MagicMock()}
-
-        mock_snap_obj = mock.MagicMock()
-        mock_snapcache.return_value = {EXPORTER_NAME: mock_snap_obj}
-        mock_snap_obj.present = True
-
-        wrapper(mock_self, *mock_args, **mock_kwargs)
-
-        mock_func.assert_called_with(mock_self, *mock_args, **mock_kwargs)
-        assert mock_self._exporter == mock_snapcache().get(EXPORTER_NAME)
-
-    @mock.patch("exporter.snap.SnapCache", return_value={})
-    def test_02_check_snap_installed_error_handling(self, mock_snapcache):
-        """Test error handling.
-
-        - The snap.SnapNotFoundError should be handled.
-        """
-        mock_func = mock.MagicMock()
-        mock_func.__name__ = "mock_func"
-        wrapper = check_snap_installed(mock_func)
-
-        mock_self = mock.MagicMock()
-        mock_self._exporter = None
-        mock_args = [mock.MagicMock(), mock.MagicMock()]
-        mock_kwargs = {"a": mock.MagicMock(), "b": mock.MagicMock()}
-
-        mock_snap_obj = mock.MagicMock()
-        mock_snapcache.return_value = {}
-        mock_snap_obj.present = None
-
-        wrapper(mock_self, *mock_args, **mock_kwargs)
-
-        mock_func.assert_not_called()
-
-
-def patch_snap_installed():
-    mock_snap = mock.Mock()
-    mock_snap.present = True
-    mock_snap.services = {EXPORTER_NAME: {"active": True}}
-    return mock.patch(
-        "charms.operator_libs_linux.v2.snap.SnapCache",
-        return_value={EXPORTER_NAME: mock_snap},
-    )
+EXPORTER_RELATION_NAME = "cos-agent"
 
 
 class TestExporter(unittest.TestCase):
+    """Test Exporter's methods."""
+
     def setUp(self):
-        mock_charm = mock.MagicMock()
-        key = "fake-key"
+        """Set up harness for each test case."""
+        self.harness = Harness(PrometheusHardwareExporterCharm)
+        self.addCleanup(self.harness.cleanup)
 
-        self.mock_charm = mock_charm
-        self.key = key
+        systemd_lib_patcher = mock.patch.object(service, "systemd")
+        self.mock_systemd = systemd_lib_patcher.start()
+        self.addCleanup(systemd_lib_patcher.stop)
 
-    def test_01_init(self):
-        exporter = Exporter(self.mock_charm, self.key)
+        vendor_lib_patcher = mock.patch.object(charm, "VendorHelper")
+        vendor_lib_patcher.start()
+        self.addCleanup(vendor_lib_patcher.stop)
 
-        self.assertTrue(exporter._exporter is None)
-        self.assertTrue(exporter._charm == self.mock_charm)
-        self.assertTrue(exporter._stored == self.mock_charm._stored)
+    def test_00_install_okay(self):
+        """Test exporter service is installed when charm is installed - okay."""
+        self.harness.begin()
 
-    @mock.patch("exporter.snap")
-    def test_02_install_or_refresh_install_from_local(self, mock_snap):
-        """Test install_or_refresh.
+        with mock.patch("builtins.open", new_callable=mock.mock_open) as mock_open:
+            self.harness.charm.on.install.emit()
+            mock_open.assert_called()
+            self.mock_systemd.daemon_reload.assert_called_once()
 
-        - If channel provided in charm._stored, the snap should be
-            install locally.
-        """
-        channel = "stable"
-        self.mock_charm._stored.config = {
-            "exporter-channel": channel,
-            "exporter-snap": "exporter-snap-content",
-        }
-        exporter = Exporter(self.mock_charm, self.key)
+    def test_01_install_failed_rendering(self):
+        """Test exporter service is failed to installed - failed to render."""
+        self.harness.begin()
 
-        exporter.install_or_refresh()
+        with mock.patch("builtins.open", new_callable=mock.mock_open) as mock_open:
+            mock_open.side_effect = NotADirectoryError()
+            self.harness.charm.on.install.emit()
+            mock_open.assert_called()
+            self.mock_systemd.daemon_reload.assert_not_called()
 
-        mock_snap.install_local.assert_called_with("exporter-snap-content", dangerous=True)
+        with mock.patch("builtins.open", new_callable=mock.mock_open) as mock_open:
+            mock_open.side_effect = PermissionError()
+            self.harness.charm.on.install.emit()
+            mock_open.assert_called()
+            self.mock_systemd.daemon_reload.assert_not_called()
 
-    @mock.patch("exporter.snap")
-    def test_03_install_or_refresh_install_from_snapcraft(self, mock_snap):
-        """Test install_or_refresh.
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_10_uninstall_okay(self, mock_service_exists):
+        """Test exporter service is uninstalled when charm is removed - okay."""
+        self.harness.begin()
 
-        - If channel provided with argument, the snap should be install
-            from snapcraft.
-        """
-        channel = "stable"
-        self.mock_charm._stored.config = {}
-        exporter = Exporter(self.mock_charm, self.key)
-        mock_snap.SnapError = snap.SnapError
+        with mock.patch.object(pathlib.Path, "unlink") as mock_unlink:
+            self.harness.charm.on.remove.emit()
+            mock_unlink.assert_called()
+            self.mock_systemd.daemon_reload.assert_called_once()
 
-        exporter.install_or_refresh(channel)
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_11_uninstall_failed(self, mock_service_exists):
+        """Test exporter service is not uninstalled - failed to remove."""
+        self.harness.begin()
 
-        mock_snap.add.assert_called_with([EXPORTER_NAME], channel=channel)
+        with mock.patch.object(pathlib.Path, "unlink") as mock_unlink:
+            mock_unlink.side_effect = PermissionError()
+            self.harness.charm.on.remove.emit()
+            mock_unlink.assert_called()
+            self.mock_systemd.daemon_reload.assert_not_called()
 
-    @mock.patch("exporter.snap")
-    def test_04_install_or_refresh_error_handling(self, mock_snap):
-        """The snap.SnapError should be handled."""
-        channel = "stable"
-        self.mock_charm._stored.config = {}
-        exporter = Exporter(self.mock_charm, self.key)
-        mock_snap.SnapError = snap.SnapError
-        mock_snap.add.side_effect = snap.SnapError()
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_20_start_okay(self, mock_service_installed):
+        """Test exporter service started when relation is joined."""
+        rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "cos-agent")
+        self.harness.begin()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
+        self.mock_systemd.service_start.assert_called_once()
 
-        exporter.install_or_refresh(channel)
+    @mock.patch.object(pathlib.Path, "exists", return_value=False)
+    def test_21_start_failed(self, mock_service_not_installed):
+        """Test exporter service failed to started when relation is joined."""
+        rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "cos-agent")
+        self.harness.begin()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
+        self.mock_systemd.service_start.assert_not_called()
 
-        mock_snap.add.assert_called_with([EXPORTER_NAME], channel=channel)
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_30_stop_okay(self, mock_service_installed):
+        """Test exporter service is stopped when service is installed and relation is departed."""
+        rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "cos-agent")
+        self.harness.begin()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
+        self.harness.remove_relation_unit(rid, "grafana-agent/0")
+        self.mock_systemd.service_stop.assert_called_once()
 
-    @mock.patch("exporter.Exporter.install_or_refresh")
-    def test_05_on_config_changed(self, mock_install_or_refresh):
-        """Test on_config_changed."""
-        mock_charm = mock.MagicMock()
-        key = "fake-key"
-        exporter = Exporter(mock_charm, key)
+    @mock.patch.object(pathlib.Path, "exists", return_value=False)
+    def test_31_stop_failed(self, mock_service_not_installed):
+        """Test exporter service failed to stop when service is not installed."""
+        rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "cos-agent")
+        self.harness.begin()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
+        self.harness.remove_relation_unit(rid, "grafana-agent/0")
+        self.mock_systemd.service_stop.assert_not_called()
 
-        for change_set in [
-            set({"exporter-snap"}),
-            set({"exporter-channel"}),
-        ]:
-            exporter.on_config_changed(change_set)
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_40_check_health(self, mock_service_installed):
+        """Test check_health function when service is installed."""
+        rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "cos-agent")
+        self.harness.begin()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
 
-            # 2 should be change to 1 after we remove the testing
-            # self.install_or_refresh line.
-            mock_install_or_refresh.call_count == 2
+        test_cases = [
+            (False, ActiveStatus("Unit is ready")),
+            (True, BlockedStatus("Exporter is unhealthy")),
+        ]
+        for failed, expected_status in test_cases:
+            with self.subTest(service_failed=failed):
+                self.mock_systemd.service_failed.return_value = failed
+                self.harness.charm.on.update_status.emit()
+                self.assertEqual(self.harness.charm.unit.status, expected_status)
 
-    @patch_snap_installed()
-    def test_06_start(self, mock_snap_cache):
-        """Test start."""
-        exporter = Exporter(self.mock_charm, self.key)
-        mock_exporter = mock.MagicMock(spec=snap.Snap)
-        exporter._exporter = mock_exporter
-        exporter.start()
-        mock_exporter.start.assert_called_once()
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_50_check_relation_exists(self, mock_service_installed):
+        """Test check_relation function when relation exists."""
+        rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "cos-agent")
+        self.harness.begin()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
+        self.mock_systemd.service_failed.return_value = False
+        self.harness.charm.on.update_status.emit()
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
+
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_51_check_relation_not_exists(self, mock_service_installed):
+        """Test check_relation function when relation does not exists."""
+        self.harness.begin()
+        self.mock_systemd.service_failed.return_value = False
+        self.harness.charm.on.update_status.emit()
+        self.assertEqual(
+            self.harness.charm.unit.status, BlockedStatus("Missing relation: [cos-agent]")
+        )
+
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_60_config_changed_log_level_okay(self, mock_service_installed):
+        """Test on_config_change function when exporter-log-level is changed."""
+        self.harness.begin()
+
+        with mock.patch("builtins.open", new_callable=mock.mock_open):
+            self.mock_systemd.service_failed.return_value = False
+            self.harness.charm.on.install.emit()
+            self.harness.update_config({"exporter-log-level": "DEBUG"})
+            self.harness.charm.on.config_changed.emit()
+            self.assertEqual(self.harness.charm._stored.config.get("exporter-log-level"), "DEBUG")
+            self.mock_systemd.service_restart.assert_called_once()
