@@ -9,6 +9,7 @@ EXPORTER_NAME = "cocona"
 VENDOR_TOOLS = [
     "storecli-deb",
 ]
+TOOLS_DIR = Path("/usr/sbin")
 
 # SNAP envionment
 

@@ -9,13 +9,15 @@ from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError
 
 from charm import PrometheusHardwareExporterCharm
-from config import SNAP_COMMON, VENDOR_TOOLS
+from config import SNAP_COMMON, TOOLS_DIR, VENDOR_TOOLS
 from vendor import (
-    DebInstallStrategy,
-    InstallStrategyABC,
-    StorCLIInstallStrategy,
+    StorCLIStrategy,
     VendorHelper,
+    VendorStrategyABC,
     copy_to_snap_common_bin,
+    install_deb,
+    remove_deb,
+    symlink,
 )
 
 
@@ -32,6 +34,26 @@ def test_copy_to_snap_common_bin(mock_path, mock_shutil):
     mock_path_obj.mkdir.assert_called()
 
 
+class TestSymlink(unittest.TestCase):
+    def test_symlink(self):
+        mock_src = mock.Mock()
+        mock_dst = mock.Mock()
+        symlink(src=mock_src, dst=mock_dst)
+        mock_dst.unlink.assert_called_with(missing_ok=True)
+        mock_dst.symlink_to.assert_called_with(mock_src)
+
+    def test_symlink_error_handling(self):
+        mock_src = mock.Mock()
+        mock_dst = mock.Mock()
+        mock_dst.symlink_to.side_effect = OSError()
+
+        with self.assertRaises(OSError):
+            symlink(src=mock_src, dst=mock_dst)
+
+        mock_dst.unlink.assert_called_with(missing_ok=True)
+        mock_dst.symlink_to.assert_called_with(mock_src)
+
+
 class TestVendorHelper(unittest.TestCase):
     def setUp(self):
         self.harness = ops.testing.Harness(PrometheusHardwareExporterCharm)
@@ -45,10 +67,10 @@ class TestVendorHelper(unittest.TestCase):
         assert strategies.keys() == {"storecli-deb"}
 
         for _, v in strategies.items():
-            assert isinstance(v, InstallStrategyABC)
+            assert isinstance(v, VendorStrategyABC)
 
         # Special cases
-        assert isinstance(strategies.get("storecli-deb"), StorCLIInstallStrategy)
+        assert isinstance(strategies.get("storecli-deb"), StorCLIStrategy)
 
     def test__02_fetch_tools(self):
         """Check each vendor_tool has been fetched."""
@@ -115,25 +137,70 @@ class TestVendorHelper(unittest.TestCase):
             "Could not find install strategy for tool %s", "storecli-deb"
         )
 
+    @mock.patch(
+        "vendor.VendorHelper.strategies",
+        return_value={
+            "storecli-deb": mock.MagicMock(),
+        },
+        new_callable=mock.PropertyMock,
+    )
+    def test_06_remove(self, mock_strategies):
+        self.harness.add_resource(
+            "storecli-deb",
+            "storcli.deb",
+        )
+        self.harness.begin()
+        mock_resources = self.harness.charm.model.resources
+        self.vendor_helper.remove(mock_resources)
+        for name, value in mock_strategies.return_value.items():
+            value.remove.assert_called()
 
-class TestStorCLIInstrallStrategy(unittest.TestCase):
-    @mock.patch("vendor.copy_to_snap_common_bin")
-    @mock.patch("vendor.DebInstallStrategy.install")
-    def test_install(self, mock_super_install, mock_copy_to_snap_common_bin):
-        strategy = StorCLIInstallStrategy()
-        strategy.install(name="name-a", path="path-a")
-        mock_super_install.assert_called_with("name-a", "path-a")
-        mock_copy_to_snap_common_bin.assert_called_with(
-            filename="storcli",
-            source=Path("/opt/MegaRAID/storcli/storcli64"),
+    @mock.patch(
+        "vendor.VendorHelper.strategies",
+        return_value={},
+        new_callable=mock.PropertyMock,
+    )
+    @mock.patch("vendor.logger")
+    def test_07_remove_not_strategies(self, mock_logger, mock_strategies):
+        """logger.warning is triggered if strategy has not been defined."""
+        self.harness.add_resource(
+            "storecli-deb",
+            "storcli.deb",
+        )
+        self.harness.begin()
+        mock_resources = self.harness.charm.model.resources
+        self.vendor_helper.remove(mock_resources)
+        mock_logger.warning.assert_called_with(
+            "Could not find remove strategy for tool %s", "storecli-deb"
         )
 
 
-class TestDebInstallStrategy(unittest.TestCase):
-    @mock.patch("vendor.subprocess")
-    def test_install(self, mock_subprocess):
-        strategy = DebInstallStrategy()
+class TestStorCLIInstrallStrategy(unittest.TestCase):
+    @mock.patch("vendor.symlink")
+    @mock.patch("vendor.install_deb")
+    def test_install(self, mock_install_deb, mock_symlink):
+        strategy = StorCLIStrategy()
         strategy.install(name="name-a", path="path-a")
+        mock_install_deb.assert_called_with("name-a", "path-a")
+        mock_symlink.assert_called_with(
+            src=Path("/opt/MegaRAID/storcli/storcli64"),
+            dst=TOOLS_DIR / "storcli",
+        )
+
+    @mock.patch("vendor.symlink")
+    @mock.patch("vendor.remove_deb")
+    def test_remove(self, mock_remove_deb, mock_symlink):
+        strategy = StorCLIStrategy()
+        with mock.patch.object(strategy, "symlink_bin") as mock_symlink_bin:
+            strategy.remove()
+            mock_symlink_bin.unlink.assert_called_with(missing_ok=True)
+            mock_remove_deb.assert_called_with(pkg=strategy.name)
+
+
+class TestDeb(unittest.TestCase):
+    @mock.patch("vendor.subprocess")
+    def test_install_deb(self, mock_subprocess):
+        install_deb(name="name-a", path="path-a")
         mock_subprocess.check_output.assert_called_with(
             ["dpkg", "-i", "path-a"], universal_newlines=True
         )
@@ -142,12 +209,31 @@ class TestDebInstallStrategy(unittest.TestCase):
         "vendor.subprocess.check_output",
         side_effect=subprocess.CalledProcessError(-1, "cmd"),
     )
-    def test_install_error_handling(self, mock_subprocess_check_outpout):
+    def test_install_deb_error_handling(self, mock_subprocess_check_outpout):
         """Check the error handling of install."""
-        strategy = DebInstallStrategy()
         with self.assertRaises(apt.PackageError):
-            strategy.install(name="name-a", path="path-a")
+            install_deb(name="name-a", path="path-a")
 
         mock_subprocess_check_outpout.assert_called_with(
             ["dpkg", "-i", "path-a"], universal_newlines=True
+        )
+
+    @mock.patch("vendor.subprocess")
+    def test_remove_deb(self, mock_subprocess):
+        remove_deb(pkg="pkg-a")
+        mock_subprocess.check_output.assert_called_with(
+            ["dpkg", "--remove", "pkg-a"], universal_newlines=True
+        )
+
+    @mock.patch(
+        "vendor.subprocess.check_output",
+        side_effect=subprocess.CalledProcessError(-1, "cmd"),
+    )
+    def test_remove_deb_error_handling(self, mock_subprocess_check_outpout):
+        """Check the error handling of install."""
+        with self.assertRaises(apt.PackageError):
+            remove_deb(pkg="pkg-a")
+
+        mock_subprocess_check_outpout.assert_called_with(
+            ["dpkg", "--remove", "pkg-a"], universal_newlines=True
         )
