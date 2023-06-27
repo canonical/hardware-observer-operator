@@ -39,7 +39,7 @@ groups:
           LABELS = {{ $labels }}
 
   - alert: SsaCLILogicalDriveNotOK
-    expr: ssacli_ld_info{status != "OK"} == 1
+    expr: ssacli_logical_drive_info{status != "OK"} == 1
     for: 0m
     labels:
       severity: critical
@@ -51,7 +51,7 @@ groups:
           LABELS = {{ $labels }}
 
   - alert: SsaCLIPhysicalDriveNotOK
-    expr: ssacli_pd_info{status != "OK"} == 1
+    expr: ssacli_physical_drive_info{status != "OK"} == 1
     for: 0m
     labels:
       severity: critical

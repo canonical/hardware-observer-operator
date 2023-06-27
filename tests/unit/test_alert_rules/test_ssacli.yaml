@@ -75,9 +75,9 @@ tests:
     input_series:
       - series: 'ssacli_command_success{instance="ubuntu-3"}'
         values: '1x15'
-      - series: 'ssacli_ld_info{instance="ubuntu-3", slot="2", status="DOWN"}'
+      - series: 'ssacli_logical_drive_info{instance="ubuntu-3", slot="2", status="DOWN"}'
         values: '1x15'
-      - series: 'ssacli_ld_info{instance="ubuntu-11", slot="2", status="OK"}'
+      - series: 'ssacli_logical_drive_info{instance="ubuntu-11", slot="2", status="OK"}'
         values: '1x15'
 
     alert_rule_test:
@@ -94,16 +94,16 @@ tests:
               description: |
                 SSACLI logical drive status not OK.
                   STATUS = DOWN
-                  LABELS = map[__name__:ssacli_ld_info instance:ubuntu-3 slot:2 status:DOWN]
+                  LABELS = map[__name__:ssacli_logical_drive_info instance:ubuntu-3 slot:2 status:DOWN]
 
 
   - interval: 1m
     input_series:
       - series: 'ssacli_command_success{instance="ubuntu-4"}'
         values: '1x15'
-      - series: 'ssacli_pd_info{instance="ubuntu-4", slot="2", status="CORRUPT"}'
+      - series: 'ssacli_physical_drive_info{instance="ubuntu-4", slot="2", status="CORRUPT"}'
         values: '1x15'
-      - series: 'ssacli_pd_info{instance="ubuntu-12", slot="2", status="OK"}'
+      - series: 'ssacli_physical_drive_info{instance="ubuntu-12", slot="2", status="OK"}'
         values: '1x15'
 
     alert_rule_test:
@@ -120,4 +120,4 @@ tests:
               description: |
                 SSACLI physical drive status not OK.
                   STATUS = CORRUPT
-                  LABELS = map[__name__:ssacli_pd_info instance:ubuntu-4 slot:2 status:CORRUPT]
+                  LABELS = map[__name__:ssacli_physical_drive_info instance:ubuntu-4 slot:2 status:CORRUPT]
