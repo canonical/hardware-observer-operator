@@ -22,7 +22,7 @@ from hw_tools import (
     StorCLIStrategy,
     TPRStrategyABC,
     copy_to_snap_common_bin,
-    get_hw_white_list,
+    get_hw_tool_white_list,
     install_deb,
     make_executable,
     raid_hw_verifier,
@@ -122,7 +122,7 @@ class TestHWToolHelper(unittest.TestCase):
 
         self.assertEqual(fetch_tools, {})
 
-    @mock.patch("hw_tools.get_hw_white_list")
+    @mock.patch("hw_tools.get_hw_tool_white_list")
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[
@@ -152,7 +152,7 @@ class TestHWToolHelper(unittest.TestCase):
             elif isinstance(strategy, APTStrategyABC):
                 strategy.install.assert_any_call()
 
-    @mock.patch("hw_tools.get_hw_white_list", return_value=[HWTool.STORCLI])
+    @mock.patch("hw_tools.get_hw_tool_white_list", return_value=[HWTool.STORCLI])
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[
@@ -168,7 +168,7 @@ class TestHWToolHelper(unittest.TestCase):
         for strategy in mock_strategies.return_value:
             strategy.remove.assert_called()
 
-    @mock.patch("hw_tools.get_hw_white_list")
+    @mock.patch("hw_tools.get_hw_tool_white_list")
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[
@@ -193,7 +193,7 @@ class TestHWToolHelper(unittest.TestCase):
             strategy.install.assert_not_called()
 
     @mock.patch("hw_tools.TPR_RESOURCES", {})
-    @mock.patch("hw_tools.get_hw_white_list")
+    @mock.patch("hw_tools.get_hw_tool_white_list")
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[mock.MagicMock(spec=TPRStrategyABC)],
@@ -216,7 +216,7 @@ class TestHWToolHelper(unittest.TestCase):
         for strategy in mock_strategies.return_value:
             strategy.install.assert_not_called()
 
-    @mock.patch("hw_tools.get_hw_white_list", return_value=[])
+    @mock.patch("hw_tools.get_hw_tool_white_list", return_value=[])
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[
@@ -374,8 +374,8 @@ class TestSSACLIStrategy(unittest.TestCase):
 
 
 @mock.patch("hw_tools.raid_hw_verifier")
-def test_get_hw_white_list(mock_raid_verifier):
-    get_hw_white_list()
+def test_get_hw_tool_white_list(mock_raid_verifier):
+    get_hw_tool_white_list()
     mock_raid_verifier.assert_called()
 
 

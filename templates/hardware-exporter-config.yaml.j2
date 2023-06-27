@@ -1,2 +1,8 @@
 port: {{ PORT }}
 level: {{ LEVEL }}
+{% if COLLECTORS | length > 0 %}
+enable_collectors:
+  {% for collector in COLLECTORS %}
+  - {{collector}}
+  {% endfor %}
+{% endif %}

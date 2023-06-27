@@ -12,6 +12,7 @@ from ops.testing import Harness
 import charm
 import service
 from charm import PrometheusHardwareExporterCharm
+from config import EXPORTER_CONFIG_PATH, HWTool
 
 ops.testing.SIMULATE_CAN_CONNECT = True
 
@@ -33,6 +34,10 @@ class TestExporter(unittest.TestCase):
         hw_tool_lib_patcher = mock.patch.object(charm, "HWToolHelper")
         hw_tool_lib_patcher.start()
         self.addCleanup(hw_tool_lib_patcher.stop)
+
+        get_hw_tool_white_list_patcher = mock.patch.object(service, "get_hw_tool_white_list")
+        get_hw_tool_white_list_patcher.start()
+        self.addCleanup(get_hw_tool_white_list_patcher.stop)
 
     def test_00_install_okay(self):
         """Test exporter service is installed when charm is installed - okay."""
@@ -163,3 +168,27 @@ class TestExporter(unittest.TestCase):
             self.harness.charm.on.config_changed.emit()
             self.assertEqual(self.harness.charm._stored.config.get("exporter-log-level"), "DEBUG")
             self.mock_systemd.service_restart.assert_called_once()
+
+
+class TestExporterTemplate(unittest.TestCase):
+    def setUp(self):
+        """Set up harness for each test case."""
+        search_path = pathlib.Path(f"{__file__}/../../..").resolve()
+        self.template = service.ExporterTemplate(search_path)
+
+    @mock.patch(
+        "service.get_hw_tool_white_list",
+        return_value=[HWTool.STORCLI, HWTool.SSACLI],
+    )
+    def test_render_config(self, mock_get_hw_tool_white_list):
+        # mock_config_template = mock.Mock()
+        # self.template.config_template = mock_config_template
+
+        with mock.patch.object(self.template, "_install") as mock_install:
+            self.template.render_config(port="80", level="info")
+        mock_install.assert_called_with(
+            EXPORTER_CONFIG_PATH,
+            self.template.config_template.render(
+                PORT="80", LEVEL="info", COLLECTORS=["collector.mega_raid", "collector.hpe_ssa"]
+            ),
+        )

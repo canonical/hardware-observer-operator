@@ -205,7 +205,7 @@ class SSACLIStrategy(APTStrategyABC):
 
 
 def raid_hw_verifier() -> t.List[HWTool]:
-    """Verify the RAID card information on machine."""
+    """Verify if the HWTool support RAID card exists on machine."""
     hw_info = lshw()
     system_vendor = hw_info[0].get("vendor")
     storage_info = lshw(class_filter="storage")
@@ -254,8 +254,8 @@ def raid_hw_verifier() -> t.List[HWTool]:
     return list(tools)
 
 
-def get_hw_white_list() -> t.List[HWTool]:
-    """Return Hardware white list."""
+def get_hw_tool_white_list() -> t.List[HWTool]:
+    """Return HWTool white list."""
     raid_white_list = raid_hw_verifier()
     return raid_white_list
 
@@ -290,7 +290,7 @@ class HWToolHelper:
     def install(self, resources: Resources) -> None:
         """Install tools."""
         self.fetch_tools(resources)
-        hw_white_list = get_hw_white_list()
+        hw_white_list = get_hw_tool_white_list()
         logger.info("hw_white_list: %s", hw_white_list)
         for strategy in self.strategies:
             if strategy.name not in hw_white_list:
@@ -309,7 +309,7 @@ class HWToolHelper:
 
     def remove(self, resources: Resources) -> None:  # pylint: disable=W0613
         """Execute all remove strategies."""
-        hw_white_list = get_hw_white_list()
+        hw_white_list = get_hw_tool_white_list()
         for strategy in self.strategies:
             if strategy.name not in hw_white_list:
                 continue
