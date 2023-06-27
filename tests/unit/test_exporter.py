@@ -30,9 +30,9 @@ class TestExporter(unittest.TestCase):
         self.mock_systemd = systemd_lib_patcher.start()
         self.addCleanup(systemd_lib_patcher.stop)
 
-        vendor_lib_patcher = mock.patch.object(charm, "VendorHelper")
-        vendor_lib_patcher.start()
-        self.addCleanup(vendor_lib_patcher.stop)
+        hw_tool_lib_patcher = mock.patch.object(charm, "HWToolHelper")
+        hw_tool_lib_patcher.start()
+        self.addCleanup(hw_tool_lib_patcher.stop)
 
     def test_00_install_okay(self):
         """Test exporter service is installed when charm is installed - okay."""

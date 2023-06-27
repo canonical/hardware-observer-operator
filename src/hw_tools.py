@@ -1,4 +1,7 @@
-"""Helper for vendoer's tools."""
+"""Helper for hardware tools.
+
+Define strategy for install, remove and verifier for different hardwares.
+"""
 import logging
 import os
 import shutil
@@ -11,7 +14,8 @@ from pathlib import Path
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError, Resources
 
-from config import SNAP_COMMON, TOOLS_DIR, TPR_VENDOR_TOOLS, VENDOR_TOOLS
+from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor, SystemVendor
+from hardware import SUPPORTED_STORAGES, lshw
 from keys import HP_KEYS
 
 logger = logging.getLogger(__name__)
@@ -70,6 +74,13 @@ def make_executable(src: Path) -> None:
 class StrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
     """Basic strategy."""
 
+    _name: HWTool
+
+    @property
+    def name(self) -> HWTool:
+        """Name."""
+        return self._name
+
 
 class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
     """Strategy for apt install tool."""
@@ -90,7 +101,7 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     """Third party resource strategy class."""
 
     @abstractmethod
-    def install(self, name: str, path: Path) -> None:
+    def install(self, path: Path) -> None:
         """Installation details."""
 
     @abstractmethod
@@ -101,13 +112,13 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
 class StorCLIStrategy(TPRStrategyABC):
     """Strategy to install storcli."""
 
-    name = "storcli"
+    _name = HWTool.STORCLI
     origin_path = Path("/opt/MegaRAID/storcli/storcli64")
-    symlink_bin = TOOLS_DIR / "storcli"
+    symlink_bin = TOOLS_DIR / HWTool.STORCLI.value
 
-    def install(self, name: str, path: Path) -> None:
+    def install(self, path: Path) -> None:
         """Install storcli."""
-        install_deb(name, path)
+        install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
 
     def remove(self) -> None:
@@ -120,13 +131,13 @@ class StorCLIStrategy(TPRStrategyABC):
 class PercCLIStrategy(TPRStrategyABC):
     """Strategy to install storcli."""
 
-    name = "perccli"
+    _name = HWTool.PERCCLI
     origin_path = Path("/opt/MegaRAID/perccli/perccli64")
-    symlink_bin = TOOLS_DIR / "perccli"
+    symlink_bin = TOOLS_DIR / HWTool.PERCCLI.value
 
-    def install(self, name: str, path: Path) -> None:
+    def install(self, path: Path) -> None:
         """Install perccli."""
-        install_deb(name, path)
+        install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
 
     def remove(self) -> None:
@@ -139,10 +150,10 @@ class PercCLIStrategy(TPRStrategyABC):
 class SAS2IRCUStrategy(TPRStrategyABC):
     """Strategy to install storcli."""
 
-    name = "sas2ircu"
-    symlink_bin = TOOLS_DIR / "sas2ircu"
+    _name = HWTool.SAS2IRCU
+    symlink_bin = TOOLS_DIR / HWTool.SAS2IRCU.value
 
-    def install(self, name: str, path: Path) -> None:
+    def install(self, path: Path) -> None:
         """Install sas2ircu."""
         make_executable(path)
         symlink(src=path, dst=self.symlink_bin)
@@ -156,15 +167,15 @@ class SAS2IRCUStrategy(TPRStrategyABC):
 class SAS3IRCUStrategy(SAS2IRCUStrategy):
     """Strategy to install storcli."""
 
-    name = "sas3ircu"
-    symlink_bin = TOOLS_DIR / "sas3ircu"
+    _name = HWTool.SAS3IRCU
+    symlink_bin = TOOLS_DIR / HWTool.SAS3IRCU.value
 
 
 class SSACLIStrategy(APTStrategyABC):
     """Strategy for install ssacli."""
 
-    name = "ssacli"
-    pkg = "ssacli"
+    _name = HWTool.SSACLI
+    pkg = HWTool.SSACLI
     repo_line = "deb http://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
 
     @property
@@ -175,7 +186,6 @@ class SSACLIStrategy(APTStrategyABC):
     def add_repo(self) -> None:
         """Add repository."""
         repositories = apt.RepositoryMapping()
-        print(repositories)
         repositories.add(self.repo)
 
     def disable_repo(self) -> None:
@@ -194,56 +204,115 @@ class SSACLIStrategy(APTStrategyABC):
         self.disable_repo()
 
 
-class VendorHelper:
-    """Helper to install vendor's tools."""
+def raid_hw_verifier() -> t.List[HWTool]:
+    """Verify the RAID card information on machine."""
+    hw_info = lshw()
+    system_vendor = hw_info[0].get("vendor")
+    storage_info = lshw(class_filter="storage")
+
+    tools = set()
+
+    for info in storage_info:
+        _id = info.get("id")
+        product = info.get("product")
+        vendor = info.get("vendor")
+        driver = info.get("configuration", {}).get("driver")
+        if _id == "sas":
+            # sas3ircu
+            if (
+                any(
+                    _product
+                    for _product in SUPPORTED_STORAGES[HWTool.SAS3IRCU]
+                    if _product in product
+                )
+                and vendor == StorageVendor.BROADCOM
+            ):
+                tools.add(HWTool.SAS3IRCU)
+            # sas2ircu
+            if (
+                any(
+                    _product
+                    for _product in SUPPORTED_STORAGES[HWTool.SAS2IRCU]
+                    if _product in product
+                )
+                and vendor == StorageVendor.BROADCOM
+            ):
+                tools.add(HWTool.SAS2IRCU)
+
+        if _id == "raid":
+            # ssacli
+            if system_vendor == SystemVendor.HP and any(
+                _product for _product in SUPPORTED_STORAGES[HWTool.SSACLI] if _product in product
+            ):
+                tools.add(HWTool.SSACLI)
+            # perccli
+            elif system_vendor == SystemVendor.DELL:
+                tools.add(HWTool.PERCCLI)
+            # storcli
+            elif driver == "megaraid_sas" and vendor == StorageVendor.BROADCOM:
+                tools.add(HWTool.STORCLI)
+    return list(tools)
+
+
+def get_hw_white_list() -> t.List[HWTool]:
+    """Return Hardware white list."""
+    raid_white_list = raid_hw_verifier()
+    return raid_white_list
+
+
+class HWToolHelper:
+    """Helper to install vendor's or hardware related tools."""
 
     @property
-    def strategies(self) -> t.Dict[str, StrategyABC]:
-        """Define strategies for every vendor's tools."""
-        return {
-            "storcli-deb": StorCLIStrategy(),
-            "perccli-deb": PercCLIStrategy(),
-            "sas2ircu-bin": SAS2IRCUStrategy(),
-            "sas3ircu-bin": SAS3IRCUStrategy(),
-            "ssacli": SSACLIStrategy(),
-        }
+    def strategies(self) -> t.List[StrategyABC]:
+        """Define strategies for every tools."""
+        return [
+            StorCLIStrategy(),
+            PercCLIStrategy(),
+            SAS2IRCUStrategy(),
+            SAS3IRCUStrategy(),
+            SSACLIStrategy(),
+        ]
 
     def fetch_tools(self, resources: Resources) -> t.Dict[str, Path]:
         """Fetch resource from juju if it's VENDOR_TOOLS."""
         fetch_tools: t.Dict[str, Path] = {}
         # Fetch all tools from juju resources
-        for tool in TPR_VENDOR_TOOLS:
+        for tool, resource in TPR_RESOURCES.items():
             try:
-                path = resources.fetch(tool)
+                path = resources.fetch(resource)
                 fetch_tools[tool] = path
             except ModelError:
-                logger.warning("Fail to fetch tool: %s", tool)
+                logger.warning("Fail to fetch tool: %s", resource)
 
         return fetch_tools
 
     def install(self, resources: Resources) -> None:
         """Install tools."""
-        fetch_tools = self.fetch_tools(resources)
-        for name in VENDOR_TOOLS:
-            strategy = self.strategies.get(name)
-            if strategy is None:
-                logger.warning("Could not find install strategy for tool %s", name)
+        self.fetch_tools(resources)
+        hw_white_list = get_hw_white_list()
+        logger.info("hw_white_list: %s", hw_white_list)
+        for strategy in self.strategies:
+            if strategy.name not in hw_white_list:
+                continue
             # TPRStrategy
-            if name in fetch_tools and isinstance(strategy, TPRStrategyABC):
-                path = resources._paths.get(name)  # pylint: disable=W0212
+            if isinstance(strategy, TPRStrategyABC):
+                resource = TPR_RESOURCES.get(strategy.name)
+                if not resource:
+                    continue
+                path = resources._paths.get(resource)  # pylint: disable=W0212
                 if path:
-                    strategy.install(name, path)
+                    strategy.install(path)
             # APTStrategy
-            if isinstance(strategy, APTStrategyABC):
-                strategy.install()
+            elif isinstance(strategy, APTStrategyABC):
+                strategy.install()  # pylint: disable=E1120
 
     def remove(self, resources: Resources) -> None:  # pylint: disable=W0613
         """Execute all remove strategies."""
-        for name in VENDOR_TOOLS:
-            strategy = self.strategies.get(name)
-            if not strategy:
-                logger.warning("Could not find remove strategy for tool %s", name)
+        hw_white_list = get_hw_white_list()
+        for strategy in self.strategies:
+            if strategy.name not in hw_white_list:
                 continue
             if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
                 strategy.remove()
-            logger.info("Remove resource: %s", name)
+            logger.info("Remove resource: %s", strategy)
