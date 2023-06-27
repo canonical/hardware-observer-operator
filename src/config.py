@@ -9,12 +9,15 @@ EXPORTER_SERVICE_TEMPLATE = f"{EXPORTER_NAME}.service.j2"
 
 
 # Register every vendor's tool here.
-VENDOR_TOOLS = [
+TPR_VENDOR_TOOLS = [
     "storcli-deb",
     "perccli-deb",
     "sas2ircu-bin",
     "sas3ircu-bin",
 ]
+VENDOR_TOOLS = [
+    "ssacli",
+] + TPR_VENDOR_TOOLS
 TOOLS_DIR = Path("/usr/sbin")
 
 # SNAP envionment

@@ -17,3 +17,8 @@
 - Downlaod from:
     - https://docs.broadcom.com/docs/12351730
     - https://docs.broadcom.com/docs/SAS3IRCU_P15.zip
+
+# SSACLI
+
+- https://downloads.linux.hpe.com/SDR/project/mcp/
+- http://downloads.linux.hpe.com/SDR/repo/mcp/Ubuntu/dists/

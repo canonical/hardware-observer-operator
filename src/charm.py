@@ -25,11 +25,11 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
     def __init__(self, *args: Any) -> None:
         """Init."""
         super().__init__(*args)
-        self.framework.observe(self.on.remove, self._on_remove)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.install, self._on_install_or_upgrade)
         self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.remove, self._on_remove)
 
         self.vendor_helper = VendorHelper()
 
