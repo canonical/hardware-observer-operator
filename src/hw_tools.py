@@ -204,6 +204,21 @@ class SSACLIStrategy(APTStrategyABC):
         self.disable_repo()
 
 
+class IPMIStrategy(APTStrategyABC):
+    """Strategy for install ipmi."""
+
+    _name = HWTool.IPMI
+    pkgs = ["freeipmi-tools"]
+
+    def install(self) -> None:
+        for pkg in self.pkgs:
+            apt.add_package(pkg)
+
+    def remove(self) -> None:
+        for pkg in self.pkgs:
+            apt.remove_package(pkg)
+
+
 def raid_hw_verifier() -> t.List[HWTool]:
     """Verify if the HWTool support RAID card exists on machine."""
     hw_info = lshw()
@@ -254,10 +269,25 @@ def raid_hw_verifier() -> t.List[HWTool]:
     return list(tools)
 
 
+def ipmi_hw_verifier() -> t.List[HWTool]:
+    """Verify if the ipmi is available on the machine.
+
+    Using ipmitool to verify, the package will be removed in removing stage.
+    """
+    apt.add_package("ipmitool", update_cache=True)
+    try:
+        subprocess.check_output("ipmitool lan print".split())
+        return [HWTool.IPMI]
+    except subprocess.CalledProcessError:
+        logger.info("IPMI is not available")
+    return []
+
+
 def get_hw_tool_white_list() -> t.List[HWTool]:
     """Return HWTool white list."""
     raid_white_list = raid_hw_verifier()
-    return raid_white_list
+    ipmi_white_list = ipmi_hw_verifier()
+    return raid_white_list + ipmi_white_list
 
 
 class HWToolHelper:
@@ -272,6 +302,7 @@ class HWToolHelper:
             SAS2IRCUStrategy(),
             SAS3IRCUStrategy(),
             SSACLIStrategy(),
+            IPMIStrategy(),
         ]
 
     def fetch_tools(self, resources: Resources) -> t.Dict[str, Path]:
@@ -291,7 +322,7 @@ class HWToolHelper:
         """Install tools."""
         self.fetch_tools(resources)
         hw_white_list = get_hw_tool_white_list()
-        logger.info("hw_white_list: %s", hw_white_list)
+        logger.info("hw_tool_white_list: %s", hw_white_list)
         for strategy in self.strategies:
             if strategy.name not in hw_white_list:
                 continue

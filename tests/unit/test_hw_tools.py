@@ -15,6 +15,7 @@ from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor,
 from hw_tools import (
     APTStrategyABC,
     HWToolHelper,
+    IPMIStrategy,
     PercCLIStrategy,
     SAS2IRCUStrategy,
     SAS3IRCUStrategy,
@@ -24,6 +25,7 @@ from hw_tools import (
     copy_to_snap_common_bin,
     get_hw_tool_white_list,
     install_deb,
+    ipmi_hw_verifier,
     make_executable,
     raid_hw_verifier,
     remove_deb,
@@ -373,10 +375,28 @@ class TestSSACLIStrategy(unittest.TestCase):
         mock_repos.disable.assert_called_with(strategy.repo)
 
 
+class TestIPMIStrategy(unittest.TestCase):
+    @mock.patch("hw_tools.apt")
+    def test_install(self, mock_apt):
+        strategy = IPMIStrategy()
+        strategy.install()
+
+        mock_apt.add_package.assert_called_with("freeipmi-tools")
+
+    @mock.patch("hw_tools.apt")
+    def test_remove(self, mock_apt):
+        strategy = IPMIStrategy()
+        strategy.remove()
+
+        mock_apt.remove_package.assert_called_with("freeipmi-tools")
+
+
+@mock.patch("hw_tools.ipmi_hw_verifier")
 @mock.patch("hw_tools.raid_hw_verifier")
-def test_get_hw_tool_white_list(mock_raid_verifier):
+def test_get_hw_tool_white_list(mock_raid_verifier, mock_ipmi_hw_verifier):
     get_hw_tool_white_list()
     mock_raid_verifier.assert_called()
+    mock_ipmi_hw_verifier.assert_called()
 
 
 @pytest.mark.parametrize(
@@ -446,3 +466,24 @@ def test_raid_hw_verifier(mock_lshw, lshw_output, lshw_storage_output, expect):
     output = raid_hw_verifier()
     case = unittest.TestCase()
     case.assertCountEqual(output, expect)
+
+
+class TestIPMIHWVerifier(unittest.TestCase):
+    @mock.patch("hw_tools.subprocess")
+    @mock.patch("hw_tools.apt")
+    def test_ipmi_hw_verifier(self, mock_apt, mock_subprocess):
+        output = ipmi_hw_verifier()
+        mock_apt.add_package.assert_called_with("ipmitool", update_cache=True)
+        mock_subprocess.check_output.assert_called_with("ipmitool lan print".split())
+        self.assertCountEqual(output, [HWTool.IPMI])
+
+    @mock.patch(
+        "hw_tools.subprocess.check_output",
+        side_effect=subprocess.CalledProcessError(-1, "cmd"),
+    )
+    @mock.patch("hw_tools.apt")
+    def test_ipmi_hw_verifier_error_handling(self, mock_apt, mock_check_output):
+        output = ipmi_hw_verifier()
+        mock_apt.add_package.assert_called_with("ipmitool", update_cache=True)
+        mock_check_output.assert_called_with("ipmitool lan print".split())
+        self.assertEqual(output, [])
