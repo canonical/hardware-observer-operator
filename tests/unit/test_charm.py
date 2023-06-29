@@ -38,8 +38,8 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(isinstance(self.harness.charm._stored.config, ops.framework.StoredDict))
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.VendorHelper", return_value=mock.MagicMock())
-    def test_02_install(self, mock_vendor_helper, mock_exporter) -> None:
+    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
+    def test_02_install(self, mock_hw_tool_helper, mock_exporter) -> None:
         """Test event install."""
         self.harness.begin()
         self.harness.charm.on.install.emit()
@@ -47,13 +47,13 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(self.harness.charm._stored.installed)
 
         self.harness.charm.exporter.install.assert_called_once()
-        self.harness.charm.vendor_helper.install.assert_called_with(
+        self.harness.charm.hw_tool_helper.install.assert_called_with(
             self.harness.charm.model.resources
         )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.VendorHelper", return_value=mock.MagicMock())
-    def test_03_upgrade_charm(self, mock_vendor_helper, mock_exporter) -> None:
+    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
+    def test_03_upgrade_charm(self, mock_hw_tool_helper, mock_exporter) -> None:
         """Test event upgrade_charm."""
         self.harness.begin()
         self.harness.charm.on.install.emit()
@@ -61,7 +61,7 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(self.harness.charm._stored.installed)
 
         self.harness.charm.exporter.install.assert_called_once()
-        self.harness.charm.vendor_helper.install.assert_called_with(
+        self.harness.charm.hw_tool_helper.install.assert_called_with(
             self.harness.charm.model.resources
         )
 

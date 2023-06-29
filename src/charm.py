@@ -11,8 +11,8 @@ import ops
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus
 
+from hw_tools import HWToolHelper
 from service import Exporter
-from vendor import VendorHelper
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.remove, self._on_remove)
 
-        self.vendor_helper = VendorHelper()
+        self.hw_tool_helper = HWToolHelper()
 
         self.exporter = Exporter(
             self,
@@ -44,7 +44,7 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
     def _on_install_or_upgrade(self, _: EventBase) -> None:
         """Install and upgrade."""
         self.exporter.install()
-        self.vendor_helper.install(self.model.resources)
+        self.hw_tool_helper.install(self.model.resources)
         self._stored.installed = True
         self.model.unit.status = ActiveStatus("Install complete")
         logger.info("Install complete")
@@ -53,7 +53,7 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
         """Remove everything when charm is being removed."""
         logger.info("Start to remove.")
         # Remove binary tool
-        self.vendor_helper.remove(self.model.resources)
+        self.hw_tool_helper.remove(self.model.resources)
         self.exporter.uninstall()
         logger.info("Remove complete")
 
