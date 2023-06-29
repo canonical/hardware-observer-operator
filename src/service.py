@@ -10,12 +10,14 @@ from jinja2 import Environment, FileSystemLoader
 from ops.framework import EventBase
 
 from config import (
+    EXPORTER_COLLECTOR_MAPPING,
     EXPORTER_CONFIG_PATH,
     EXPORTER_CONFIG_TEMPLATE,
     EXPORTER_NAME,
     EXPORTER_SERVICE_PATH,
     EXPORTER_SERVICE_TEMPLATE,
 )
+from hw_tools import get_hw_tool_white_list
 
 logger = getLogger(__name__)
 
@@ -79,7 +81,13 @@ class ExporterTemplate:
 
     def render_config(self, port: str, level: str) -> bool:
         """Render and install exporter config file."""
-        content = self.config_template.render(PORT=port, LEVEL=level)
+        hw_tools = get_hw_tool_white_list()
+        collectors = []
+        for tool in hw_tools:
+            collector = EXPORTER_COLLECTOR_MAPPING.get(tool)
+            if collector is not None:
+                collectors += collector
+        content = self.config_template.render(PORT=port, LEVEL=level, COLLECTORS=collectors)
         return self._install(EXPORTER_CONFIG_PATH, content)
 
     def render_service(self, charm_dir: str, config_file: str) -> bool:

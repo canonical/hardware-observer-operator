@@ -12,7 +12,7 @@ EXPORTER_SERVICE_TEMPLATE = f"{EXPORTER_NAME}.service.j2"
 
 
 class SystemVendor(str, Enum):
-    """Different hardward system vendor."""
+    """Different hardware system vendor."""
 
     DELL = "Dell Inc."
     HP = "HP"
@@ -43,6 +43,13 @@ TPR_RESOURCES: t.Dict[HWTool, str] = {
     HWTool.SAS3IRCU: "sas3ircu-bin",
 }
 
+EXPORTER_COLLECTOR_MAPPING = {
+    HWTool.STORCLI: ["collector.mega_raid"],
+    HWTool.PERCCLI: ["collector.poweredge_raid"],
+    HWTool.SAS2IRCU: ["collector.lsi_sas_2"],
+    HWTool.SAS3IRCU: ["collector.lsi_sas_3"],
+    HWTool.SSACLI: ["collector.hpe_ssa"],
+}
 
 TOOLS_DIR = Path("/usr/sbin")
 
