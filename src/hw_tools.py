@@ -222,7 +222,7 @@ class IPMIStrategy(APTStrategyABC):
 def raid_hw_verifier() -> t.List[HWTool]:
     """Verify if the HWTool support RAID card exists on machine."""
     hw_info = lshw()
-    system_vendor = hw_info[0].get("vendor")
+    system_vendor = hw_info.get("vendor")
     storage_info = lshw(class_filter="storage")
 
     tools = set()
