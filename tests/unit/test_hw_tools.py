@@ -403,12 +403,12 @@ def test_get_hw_tool_white_list(mock_raid_verifier, mock_ipmi_hw_verifier):
     "lshw_output, lshw_storage_output, expect",
     [
         (
-            [{}],
+            {},
             [{"id": "sas", "product": "XXX SAS3004 XXX", "vendor": StorageVendor.BROADCOM}],
             [HWTool.SAS3IRCU],
         ),
         (
-            [{}],
+            {},
             [
                 {"id": "sas", "product": "XXX SAS2004 XXX", "vendor": StorageVendor.BROADCOM},
                 {"id": "sas", "product": "XXX SAS3004 XXX", "vendor": StorageVendor.BROADCOM},
@@ -416,28 +416,28 @@ def test_get_hw_tool_white_list(mock_raid_verifier, mock_ipmi_hw_verifier):
             [HWTool.SAS2IRCU, HWTool.SAS3IRCU],
         ),
         (
-            [{}],
+            {},
             [
                 {"id": "sas", "product": "XXX SAS2004 XXX", "vendor": StorageVendor.BROADCOM},
             ],
             [HWTool.SAS2IRCU],
         ),
         (
-            [{"vendor": SystemVendor.HP}],
+            {"vendor": SystemVendor.HP},
             [
                 {"id": "raid", "product": "Smart Array Gen8 Controllers"},
             ],
             [HWTool.SSACLI],
         ),
         (
-            [{"vendor": SystemVendor.DELL}],
+            {"vendor": SystemVendor.DELL},
             [
                 {"id": "raid"},
             ],
             [HWTool.PERCCLI],
         ),
         (
-            [{}],
+            {},
             [
                 {
                     "id": "raid",
@@ -448,7 +448,7 @@ def test_get_hw_tool_white_list(mock_raid_verifier, mock_ipmi_hw_verifier):
             [HWTool.STORCLI],
         ),
         (
-            [{"vendor": SystemVendor.DELL}],
+            {"vendor": SystemVendor.DELL},
             [
                 {
                     "id": "raid",
