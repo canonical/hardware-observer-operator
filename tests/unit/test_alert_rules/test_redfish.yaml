@@ -1,0 +1,64 @@
+rule_files:
+  - ../../../src/prometheus_alert_rules/redfish.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: redfish_call_success{instance="ubuntu-0"}
+        values: '0x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: RedfishCallFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-0
+            exp_annotations:
+              summary: Call to the Redfish API failed. (instance ubuntu-0)
+              description: |
+                Failure in calling the Redfish API.
+                  VALUE = 0
+                  LABELS = map[__name__:redfish_call_success instance:ubuntu-0]
+
+  - interval: 1m
+    input_series:
+      - series: redfish_service_available{instance="ubuntu-1"}
+        values: '0x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: RedfishServiceUnavailable
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-1
+            exp_annotations:
+              summary: No redfish services available. (instance ubuntu-1)
+              description: |
+                No redfish services available.
+                  VALUE = 0
+                  LABELS = map[__name__:redfish_service_available instance:ubuntu-1]
+
+  - interval: 1m
+    input_series:
+      - series: redfish_sensor_info{instance="ubuntu-2", health="Unhealthy", reading="82%"}
+        values: '1x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: RedfishSensorHealthNotOk
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-2
+              health: Unhealthy
+              reading: 82%
+            exp_annotations:
+              summary: Redfish sensor health not Ok. (instance ubuntu-2)
+              description: |
+                Redfish sensor health not Ok.
+                  SENSOR_READING = 82%
+                  LABELS = map[__name__:redfish_sensor_info health:Unhealthy instance:ubuntu-2 reading:82%]
