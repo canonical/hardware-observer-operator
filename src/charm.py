@@ -52,7 +52,9 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
 
     def _on_install_or_upgrade(self, _: EventBase) -> None:
         """Install and upgrade."""
-        self.exporter.install(dict(self.model.config))
+        port = self.model.config.get("exporter-port", "10000")
+        level = self.model.config.get("exporter-log-level", "INFO")
+        self.exporter.install(port, level)
         self.hw_tool_helper.install(self.model.resources)
         self._stored.installed = True
         self.model.unit.status = ActiveStatus("Install complete")

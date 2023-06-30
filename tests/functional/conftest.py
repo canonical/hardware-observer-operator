@@ -5,8 +5,8 @@ import pytest
 log = logging.getLogger(__name__)
 
 
-class Helper:
-    """Helper class for async functions."""
+class SyncHelper:
+    """Helper class for running juju async function."""
 
     @staticmethod
     async def run_wait(unit, command):
@@ -30,8 +30,8 @@ def series(request):
 
 
 @pytest.fixture(scope="module")
-def helper():
-    return Helper
+def sync_helper():
+    return SyncHelper
 
 
 @pytest.fixture()

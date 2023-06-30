@@ -33,7 +33,7 @@ class AppStatus(str, Enum):
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_build_and_deploy(ops_test: OpsTest, series, helper):
+async def test_build_and_deploy(ops_test: OpsTest, series, sync_helper):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -78,7 +78,7 @@ async def test_build_and_deploy(ops_test: OpsTest, series, helper):
     # Test without cos-agent relation
     for unit in ops_test.model.applications[APP_NAME].units:
         check_active_cmd = "systemctl is-active hardware-exporter"
-        results = await helper.run_wait(unit, check_active_cmd)
+        results = await sync_helper.run_wait(unit, check_active_cmd)
         assert results.get("return-code") == 3
         assert results.get("stdout").strip() == "inactive"
 
@@ -97,7 +97,7 @@ async def test_build_and_deploy(ops_test: OpsTest, series, helper):
     # Test with cos-agent relation
     for unit in ops_test.model.applications[APP_NAME].units:
         check_active_cmd = "systemctl is-active hardware-exporter"
-        results = await helper.run_wait(unit, check_active_cmd)
+        results = await sync_helper.run_wait(unit, check_active_cmd)
         assert results.get("return-code") == 0
         assert results.get("stdout").strip() == "active"
         assert unit.workload_status_message == AppStatus.READY
@@ -106,7 +106,7 @@ async def test_build_and_deploy(ops_test: OpsTest, series, helper):
 class TestCharm:
     """Perform basic functional testing of the charm without having the actual hardware."""
 
-    async def test_00_config_changed_port(self, app, unit, helper, ops_test):
+    async def test_00_config_changed_port(self, app, unit, sync_helper, ops_test):
         """Test changing the config option: exporter-port."""
         new_port = "10001"
         await asyncio.gather(
@@ -115,14 +115,14 @@ class TestCharm:
         )
 
         cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await helper.run_wait(unit, cmd)
+        results = await sync_helper.run_wait(unit, cmd)
         assert results.get("return-code") == 0
         config = yaml.safe_load(results.get("stdout").strip())
         assert config["port"] == int(new_port)
 
         await app.reset_config(["exporter-port"])
 
-    async def test_01_config_changed_log_level(self, app, unit, helper, ops_test):
+    async def test_01_config_changed_log_level(self, app, unit, sync_helper, ops_test):
         """Test changing the config option: exporter-log-level."""
         new_log_level = "DEBUG"
         await asyncio.gather(
@@ -131,14 +131,14 @@ class TestCharm:
         )
 
         cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await helper.run_wait(unit, cmd)
+        results = await sync_helper.run_wait(unit, cmd)
         assert results.get("return-code") == 0
         config = yaml.safe_load(results.get("stdout").strip())
         assert config["level"] == new_log_level
 
         await app.reset_config(["exporter-log-level"])
 
-    async def test_10_start_and_stop_exporter(self, app, unit, helper, ops_test):
+    async def test_10_start_and_stop_exporter(self, app, unit, sync_helper, ops_test):
         """Test starting and stopping the exporter results in correct charm status."""
         # Stop the exporter
         stop_cmd = "systemctl stop hardware-exporter"
@@ -156,7 +156,7 @@ class TestCharm:
         )
         assert unit.workload_status_message == AppStatus.READY
 
-    async def test_11_exporter_failed(self, app, unit, helper, ops_test):
+    async def test_11_exporter_failed(self, app, unit, sync_helper, ops_test):
         """Test failure in the exporter results in correct charm status."""
         # Setting incorrect log level will crash the exporter
         await asyncio.gather(
@@ -171,7 +171,7 @@ class TestCharm:
         )
         assert unit.workload_status_message == AppStatus.READY
 
-    async def test_20_on_remove_event(self, app, helper, ops_test):
+    async def test_20_on_remove_event(self, app, sync_helper, ops_test):
         """Test _on_remove event cleans up the service on the host machine."""
         await asyncio.gather(
             app.remove_relation(f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"),
@@ -182,11 +182,11 @@ class TestCharm:
         principal_unit = ops_test.model.applications[PRINCIPAL_APP_NAME].units[0]
 
         cmd = "ls /etc/hardware-exporter-config.yaml"
-        results = await helper.run_wait(principal_unit, cmd)
+        results = await sync_helper.run_wait(principal_unit, cmd)
         assert results.get("return-code") == 2
 
         cmd = "ls /etc/systemd/system/hardware-exporter.service"
-        results = await helper.run_wait(principal_unit, cmd)
+        results = await sync_helper.run_wait(principal_unit, cmd)
         assert results.get("return-code") == 2
 
         await asyncio.gather(

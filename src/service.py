@@ -110,11 +110,9 @@ class Exporter:
         self.charm_dir = charm_dir
         self.template = ExporterTemplate(charm_dir)
 
-    def install(self, config: Dict[str, Any]) -> bool:
+    def install(self, port: str, level: str) -> bool:
         """Install the exporter."""
         logger.info("Installing %s.", EXPORTER_NAME)
-        port = config.get("exporter-port", "10000")
-        level = config.get("exporter-log-level", "INFO")
         success = self.template.render_config(port=port, level=level)
         success = self.template.render_service(str(self.charm_dir), str(EXPORTER_CONFIG_PATH))
         if not success:
