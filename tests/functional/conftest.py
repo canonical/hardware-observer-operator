@@ -32,3 +32,13 @@ def series(request):
 @pytest.fixture(scope="module")
 def helper():
     return Helper
+
+
+@pytest.fixture()
+def app(ops_test):
+    return ops_test.model.applications["prometheus-hardware-exporter"]
+
+
+@pytest.fixture()
+def unit(app):
+    return app.units[0]

@@ -137,6 +137,24 @@ class TestExporter(unittest.TestCase):
                 self.assertEqual(self.harness.charm.unit.status, expected_status)
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_41_check_active(self, mock_service_installed):
+        """Test check_health function when service is installed."""
+        rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "cos-agent")
+        self.harness.begin()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
+
+        test_cases = [
+            (True, ActiveStatus("Unit is ready")),
+            (False, BlockedStatus("Exporter is not running")),
+        ]
+        self.mock_systemd.service_failed.return_value = False
+        for running, expected_status in test_cases:
+            with self.subTest(service_running=running):
+                self.mock_systemd.service_running.return_value = running
+                self.harness.charm.on.update_status.emit()
+                self.assertEqual(self.harness.charm.unit.status, expected_status)
+
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_50_check_relation_exists(self, mock_service_installed):
         """Test check_relation function when relation exists."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "cos-agent")

@@ -74,6 +74,9 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
         if not self.exporter.check_health():
             self.model.unit.status = BlockedStatus("Exporter is unhealthy")
             return
+        if not self.exporter.check_active():
+            self.model.unit.status = BlockedStatus("Exporter is not running")
+            return
         self.model.unit.status = ActiveStatus("Unit is ready")
 
     def _on_config_changed(self, event: EventBase) -> None:
@@ -103,7 +106,10 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
             port = self.model.config.get("exporter-port", "10000")
             level = self.model.config.get("exporter-log-level", "INFO")
             success = self.exporter.template.render_config(port=port, level=level)
-            if success and self.exporter.check_active():
+            # First condition prevent the exporter from starting at when the
+            # charm just installed; the second condition tries to recover the
+            # exporter from failed status.
+            if success and self.exporter.check_active() or not self.exporter.check_health():
                 self.exporter.restart()
 
         self._on_update_status(event)
