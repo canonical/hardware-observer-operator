@@ -8,7 +8,7 @@ from unittest import mock
 
 import ops
 import ops.testing
-from ops.model import ActiveStatus
+from ops.model import ActiveStatus, BlockedStatus
 
 from charm import PrometheusHardwareExporterCharm
 
@@ -80,7 +80,9 @@ class TestCharm(unittest.TestCase):
         for k, v in self.harness.charm.model.config.items():
             self.assertEqual(self.harness.charm._stored.config.get(k), v)
 
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
+        self.assertEqual(
+            self.harness.charm.unit.status, BlockedStatus("Missing relation: [cos-agent]")
+        )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     def test_11_config_changed_before_install_complete(self, mock_exporter):

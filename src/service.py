@@ -2,12 +2,10 @@
 from functools import wraps
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Callable, Dict, Set, Tuple
+from typing import Any, Callable, Dict, Tuple
 
-from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v1 import systemd
 from jinja2 import Environment, FileSystemLoader
-from ops.framework import EventBase
 
 from config import (
     EXPORTER_COLLECTOR_MAPPING,
@@ -104,27 +102,21 @@ class ExporterTemplate:
         return self._uninstall(EXPORTER_SERVICE_PATH)
 
 
-class Exporter(COSAgentProvider):
+class Exporter:
     """A class representing the exporter and the metric endpoints."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, charm_dir: Path) -> None:
         """Initialize the class."""
-        super().__init__(*args, **kwargs)
-        self._stored = self._charm._stored
-        self._charm_dir = self._charm.charm_dir
-        self._template = ExporterTemplate(self._charm_dir)
+        self.charm_dir = charm_dir
+        self.template = ExporterTemplate(charm_dir)
 
-        events = self._charm.on[self._relation_name]
-        self.framework.observe(events.relation_joined, self._on_relation_joined)
-        self.framework.observe(events.relation_departed, self._on_relation_departed)
-
-    def install(self) -> bool:
+    def install(self, config: Dict[str, Any]) -> bool:
         """Install the exporter."""
         logger.info("Installing %s.", EXPORTER_NAME)
-        port = self._stored.config.get("exporter-port", "10000")
-        level = self._stored.config.get("exporter-log-level", "INFO")
-        success = self._template.render_config(port=port, level=level)
-        success = self._template.render_service(str(self._charm_dir), str(EXPORTER_CONFIG_PATH))
+        port = config.get("exporter-port", "10000")
+        level = config.get("exporter-log-level", "INFO")
+        success = self.template.render_config(port=port, level=level)
+        success = self.template.render_service(str(self.charm_dir), str(EXPORTER_CONFIG_PATH))
         if not success:
             logger.error("Failed to installed %s.", EXPORTER_NAME)
             return success
@@ -135,8 +127,8 @@ class Exporter(COSAgentProvider):
     def uninstall(self) -> bool:
         """Uninstall the exporter."""
         logger.info("Uninstalling %s.", EXPORTER_NAME)
-        success = self._template.remove_config()
-        success = self._template.remove_service()
+        success = self.template.remove_config()
+        success = self.template.remove_service()
         if not success:
             logger.error("Failed to uninstall %s.", EXPORTER_NAME)
             return success
@@ -160,32 +152,11 @@ class Exporter(COSAgentProvider):
         systemd.service_restart(EXPORTER_NAME)
 
     @check_installed
+    def check_active(self) -> bool:
+        """Check if the exporter is active or not."""
+        return systemd.service_running(EXPORTER_NAME)
+
+    @check_installed
     def check_health(self) -> bool:
         """Check if the exporter daemon is healthy or not."""
         return not systemd.service_failed(EXPORTER_NAME)
-
-    @check_installed
-    def check_relation(self) -> bool:
-        """Check if the required relation is joined.."""
-        relation = self.model.get_relation("cos-agent")
-        if not relation:
-            return False
-        return True
-
-    def on_config_changed(self, change_set: Set[str]) -> None:
-        """Respond to config change about the exporter."""
-        if "exporter-log-level" in change_set:
-            logger.info("Detected changes in 'exporter-log-level'")
-            port = self._stored.config.get("exporter-port", "10000")
-            level = self._stored.config.get("exporter-log-level", "INFO")
-            success = self._template.render_config(port=port, level=level)
-            if success and systemd.service_running(EXPORTER_NAME):
-                self.restart()
-
-    def _on_relation_joined(self, event: EventBase) -> None:  # pylint: disable=unused-argument
-        """Start the exporter when relation joined."""
-        self.start()
-
-    def _on_relation_departed(self, event: EventBase) -> None:  # pylint: disable=unused-argument
-        """Remove the exporter when relation departed."""
-        self.stop()
