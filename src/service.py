@@ -179,7 +179,7 @@ class Exporter(COSAgentProvider):
             port = self._stored.config.get("exporter-port", "10000")
             level = self._stored.config.get("exporter-log-level", "INFO")
             success = self._template.render_config(port=port, level=level)
-            if success:
+            if success and systemd.service_running(EXPORTER_NAME):
                 self.restart()
 
     def _on_relation_joined(self, event: EventBase) -> None:  # pylint: disable=unused-argument
