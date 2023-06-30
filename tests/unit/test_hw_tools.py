@@ -21,11 +21,12 @@ from hw_tools import (
     SAS3IRCUStrategy,
     SSACLIStrategy,
     StorCLIStrategy,
+    StrategyABC,
     TPRStrategyABC,
+    bmc_hw_verifier,
     copy_to_snap_common_bin,
     get_hw_tool_white_list,
     install_deb,
-    ipmi_hw_verifier,
     make_executable,
     raid_hw_verifier,
     remove_deb,
@@ -104,7 +105,7 @@ class TestHWToolHelper(unittest.TestCase):
         """Check strategies define correctly."""
         strategies = self.hw_tool_helper.strategies
         for strategy in strategies:
-            assert isinstance(strategy, (TPRStrategyABC, APTStrategyABC))
+            assert isinstance(strategy, (StrategyABC, TPRStrategyABC, APTStrategyABC))
 
     def test_02_fetch_tools(self):
         """Check each hw_tools_tool has been fetched."""
@@ -452,12 +453,13 @@ class TestIPMIStrategy(unittest.TestCase):
         mock_apt.remove_package.assert_called_with("freeipmi-tools")
 
 
-@mock.patch("hw_tools.ipmi_hw_verifier")
-@mock.patch("hw_tools.raid_hw_verifier")
-def test_get_hw_tool_white_list(mock_raid_verifier, mock_ipmi_hw_verifier):
-    get_hw_tool_white_list()
+@mock.patch("hw_tools.bmc_hw_verifier", return_value=[1, 2, 3])
+@mock.patch("hw_tools.raid_hw_verifier", return_value=[4, 5, 6])
+def test_get_hw_tool_white_list(mock_raid_verifier, mock_bmc_hw_verifier):
+    output = get_hw_tool_white_list()
     mock_raid_verifier.assert_called()
-    mock_ipmi_hw_verifier.assert_called()
+    mock_bmc_hw_verifier.assert_called()
+    assert output == [4, 5, 6, 1, 2, 3]
 
 
 @pytest.mark.parametrize(
@@ -530,21 +532,26 @@ def test_raid_hw_verifier(mock_lshw, lshw_output, lshw_storage_output, expect):
 
 
 class TestIPMIHWVerifier(unittest.TestCase):
+    @mock.patch("hw_tools.redfish.discover_ssdp", return_value=[1])
     @mock.patch("hw_tools.subprocess")
     @mock.patch("hw_tools.apt")
-    def test_ipmi_hw_verifier(self, mock_apt, mock_subprocess):
-        output = ipmi_hw_verifier()
+    def test_bmc_hw_verifier(self, mock_apt, mock_subprocess, mock_redfish_discover_ssdp):
+        output = bmc_hw_verifier()
         mock_apt.add_package.assert_called_with("ipmitool", update_cache=True)
         mock_subprocess.check_output.assert_called_with("ipmitool lan print".split())
-        self.assertCountEqual(output, [HWTool.IPMI])
+        self.assertCountEqual(output, [HWTool.IPMI, HWTool.REDFISH])
+        mock_redfish_discover_ssdp.assert_called()
 
+    @mock.patch("hw_tools.redfish.discover_ssdp", return_value=[])
     @mock.patch(
         "hw_tools.subprocess.check_output",
         side_effect=subprocess.CalledProcessError(-1, "cmd"),
     )
     @mock.patch("hw_tools.apt")
-    def test_ipmi_hw_verifier_error_handling(self, mock_apt, mock_check_output):
-        output = ipmi_hw_verifier()
+    def test_bmc_hw_verifier_error_handling(
+        self, mock_apt, mock_check_output, mock_redfish_discover_ssdp
+    ):
+        output = bmc_hw_verifier()
         mock_apt.add_package.assert_called_with("ipmitool", update_cache=True)
         mock_check_output.assert_called_with("ipmitool lan print".split())
         self.assertEqual(output, [])

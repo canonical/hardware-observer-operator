@@ -11,6 +11,7 @@ import typing as t
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 
+import redfish
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError, Resources
 
@@ -239,6 +240,13 @@ class IPMIStrategy(APTStrategyABC):
             apt.remove_package(pkg)
 
 
+class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
+    """Install strategy for redfish.
+
+    Currently we don't do anything here.
+    """
+
+
 def raid_hw_verifier() -> t.List[HWTool]:
     """Verify if the HWTool support RAID card exists on machine."""
     hw_info = lshw()
@@ -289,25 +297,34 @@ def raid_hw_verifier() -> t.List[HWTool]:
     return list(tools)
 
 
-def ipmi_hw_verifier() -> t.List[HWTool]:
+def bmc_hw_verifier() -> t.List[HWTool]:
     """Verify if the ipmi is available on the machine.
 
     Using ipmitool to verify, the package will be removed in removing stage.
     """
+    tools = []
+    # Check IPMI available
     apt.add_package("ipmitool", update_cache=True)
     try:
         subprocess.check_output("ipmitool lan print".split())
-        return [HWTool.IPMI]
+        tools.append(HWTool.IPMI)
     except subprocess.CalledProcessError:
         logger.info("IPMI is not available")
-    return []
+
+    # Check RedFish available
+    services = redfish.discover_ssdp()
+    if len(services):
+        tools.append(HWTool.REDFISH)
+    else:
+        logger.info("Redfish is not available")
+    return tools
 
 
 def get_hw_tool_white_list() -> t.List[HWTool]:
     """Return HWTool white list."""
     raid_white_list = raid_hw_verifier()
-    ipmi_white_list = ipmi_hw_verifier()
-    return raid_white_list + ipmi_white_list
+    bmc_white_list = bmc_hw_verifier()
+    return raid_white_list + bmc_white_list
 
 
 class HWToolHelper:
@@ -323,6 +340,7 @@ class HWToolHelper:
             SAS3IRCUStrategy(),
             SSACLIStrategy(),
             IPMIStrategy(),
+            RedFishStrategy(),
         ]
 
     def fetch_tools(self, resources: Resources) -> t.Dict[str, Path]:

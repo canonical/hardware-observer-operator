@@ -35,6 +35,7 @@ class HWTool(str, Enum):
     SAS3IRCU = "sas3ircu"
     PERCCLI = "perccli"
     IPMI = "ipmi"
+    REDFISH = "redfish"
 
 
 TPR_RESOURCES: t.Dict[HWTool, str] = {
@@ -51,6 +52,7 @@ EXPORTER_COLLECTOR_MAPPING = {
     HWTool.SAS3IRCU: ["collector.lsi_sas_3"],
     HWTool.SSACLI: ["collector.hpe_ssa"],
     HWTool.IPMI: ["collector.ipmi_dcmi", "collector.ipmi_sel", "collector.ipmi_sensor"],
+    HWTool.REDFISH: ["collector.redfish"],
 }
 
 TOOLS_DIR = Path("/usr/sbin")
