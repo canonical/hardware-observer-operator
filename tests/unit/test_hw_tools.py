@@ -34,6 +34,14 @@ from hw_tools import (
 from keys import HP_KEYS
 
 
+def get_mock_path(size: int):
+    mock_path = mock.Mock()
+    mock_path_stat = mock.Mock()
+    mock_path.stat.return_value = mock_path_stat
+    mock_path_stat.st_size = size
+    return mock_path
+
+
 @mock.patch("hw_tools.shutil")
 @mock.patch("hw_tools.Path")
 def test_copy_to_snap_common_bin(mock_path, mock_shutil):
@@ -236,9 +244,10 @@ class TestHWToolHelper(unittest.TestCase):
 
 
 class TestStorCLIStrategy(unittest.TestCase):
+    @mock.patch("hw_tools.TPRStrategyABC.check_file_size", return_value=True)
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.install_deb")
-    def test_install(self, mock_install_deb, mock_symlink):
+    def test_install(self, mock_install_deb, mock_symlink, _):
         strategy = StorCLIStrategy()
         strategy.install(path="path-a")
         mock_install_deb.assert_called_with("storcli", "path-a")
@@ -246,6 +255,15 @@ class TestStorCLIStrategy(unittest.TestCase):
             src=Path("/opt/MegaRAID/storcli/storcli64"),
             dst=TOOLS_DIR / "storcli",
         )
+
+    @mock.patch("hw_tools.symlink")
+    @mock.patch("hw_tools.install_deb")
+    def test_install_empty_resource(self, mock_install_deb, mock_symlink):
+        strategy = StorCLIStrategy()
+        strategy.install(get_mock_path(0))
+
+        mock_install_deb.assert_not_called()
+        mock_symlink.assert_not_called()
 
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.remove_deb")
@@ -298,14 +316,32 @@ class TestDeb(unittest.TestCase):
         )
 
 
+class TestTPRStrategyABC(unittest.TestCase):
+    def test_check_file_size_not_zero(self):
+        self.assertTrue(TPRStrategyABC.check_file_size(get_mock_path(size=100)))
+
+    def test_check_file_size_zero(self):
+        self.assertFalse(TPRStrategyABC.check_file_size(get_mock_path(size=0)))
+
+
 class TestSAS2IRCUStrategy(unittest.TestCase):
+    @mock.patch("hw_tools.TPRStrategyABC.check_file_size", return_value=True)
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.make_executable")
-    def test_install(self, mock_make_executable, mock_symlink):
+    def test_install(self, mock_make_executable, mock_symlink, _):
         strategy = SAS2IRCUStrategy()
         strategy.install(path="path-a")
         mock_make_executable.assert_called_with("path-a")
         mock_symlink.assert_called_with(src="path-a", dst=TOOLS_DIR / "sas2ircu")
+
+    @mock.patch("hw_tools.symlink")
+    @mock.patch("hw_tools.make_executable")
+    def test_install_empty_resource(self, mock_make_executable, mock_symlink):
+        strategy = SAS2IRCUStrategy()
+        strategy.install(get_mock_path(0))
+
+        mock_make_executable.assert_not_called()
+        mock_symlink.assert_not_called()
 
     def test_remove(self):
         strategy = SAS2IRCUStrategy()
@@ -315,13 +351,23 @@ class TestSAS2IRCUStrategy(unittest.TestCase):
 
 
 class TestSAS3IRCUStrategy(unittest.TestCase):
+    @mock.patch("hw_tools.TPRStrategyABC.check_file_size", return_value=True)
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.make_executable")
-    def test_install(self, mock_make_executable, mock_symlink):
+    def test_install(self, mock_make_executable, mock_symlink, _):
         strategy = SAS3IRCUStrategy()
         strategy.install(path="path-a")
         mock_make_executable.assert_called_with("path-a")
         mock_symlink.assert_called_with(src="path-a", dst=TOOLS_DIR / "sas3ircu")
+
+    @mock.patch("hw_tools.symlink")
+    @mock.patch("hw_tools.make_executable")
+    def test_install_empty_resource(self, mock_make_executable, mock_symlink):
+        strategy = SAS3IRCUStrategy()
+        strategy.install(get_mock_path(0))
+
+        mock_make_executable.assert_not_called()
+        mock_symlink.assert_not_called()
 
     def test_remove(self):
         strategy = SAS3IRCUStrategy()
@@ -331,9 +377,10 @@ class TestSAS3IRCUStrategy(unittest.TestCase):
 
 
 class TestPercCLIStrategy(unittest.TestCase):
+    @mock.patch("hw_tools.TPRStrategyABC.check_file_size", return_value=True)
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.install_deb")
-    def test_install(self, mock_install_deb, mock_symlink):
+    def test_install(self, mock_install_deb, mock_symlink, _):
         strategy = PercCLIStrategy()
         strategy.install(path="path-a")
         mock_install_deb.assert_called_with("perccli", "path-a")
@@ -341,6 +388,20 @@ class TestPercCLIStrategy(unittest.TestCase):
             src=Path("/opt/MegaRAID/perccli/perccli64"),
             dst=TOOLS_DIR / "perccli",
         )
+
+    @mock.patch("hw_tools.symlink")
+    @mock.patch("hw_tools.install_deb")
+    def test_install_empty_resource(self, mock_install_deb, mock_symlink):
+        mock_path = mock.Mock()
+        mock_path_stat = mock.Mock()
+        mock_path.stat.return_value = mock_path_stat
+        mock_path_stat.st_size = 0
+
+        strategy = PercCLIStrategy()
+        strategy.install(mock_path)
+
+        mock_install_deb.assert_not_called()
+        mock_symlink.assert_not_called()
 
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.remove_deb")

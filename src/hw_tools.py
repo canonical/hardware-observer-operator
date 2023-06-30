@@ -100,6 +100,20 @@ class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
 class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     """Third party resource strategy class."""
 
+    @staticmethod
+    def check_file_size(path: Path) -> bool:
+        """Verify if the file size > 0.
+
+        Because charm focus us to publish the resources on charmhub,
+        but most of the hardware related tools have the un-republish
+        policy. Currently our solution is publish a empty file which
+        size is 0.
+        """
+        if path.stat().st_size == 0:
+            logger.info("% size is 0, skip install", path)
+            return False
+        return True
+
     @abstractmethod
     def install(self, path: Path) -> None:
         """Installation details."""
@@ -118,6 +132,8 @@ class StorCLIStrategy(TPRStrategyABC):
 
     def install(self, path: Path) -> None:
         """Install storcli."""
+        if not self.check_file_size(path):
+            return
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
 
@@ -137,6 +153,8 @@ class PercCLIStrategy(TPRStrategyABC):
 
     def install(self, path: Path) -> None:
         """Install perccli."""
+        if not self.check_file_size(path):
+            return
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
 
@@ -155,6 +173,8 @@ class SAS2IRCUStrategy(TPRStrategyABC):
 
     def install(self, path: Path) -> None:
         """Install sas2ircu."""
+        if not self.check_file_size(path):
+            return
         make_executable(path)
         symlink(src=path, dst=self.symlink_bin)
 
