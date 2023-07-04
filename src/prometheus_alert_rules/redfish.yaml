@@ -1,0 +1,39 @@
+groups:
+- name: Redfish
+  rules:
+
+  - alert: RedfishCallFailed
+    expr: redfish_call_success == 0
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: Call to the Redfish API failed. (instance {{ $labels.instance }})
+      description: |
+        Failure in calling the Redfish API.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: RedfishServiceUnavailable
+    expr: redfish_service_available == 0
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: No redfish services available. (instance {{ $labels.instance }})
+      description: |
+        No redfish services available.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: RedfishSensorHealthNotOk
+    expr: redfish_sensor_info{health != "OK"}
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: Redfish sensor health not Ok. (instance {{ $labels.instance }})
+      description: |
+        Redfish sensor health not Ok.
+          SENSOR_READING = {{ $labels.reading }}
+          LABELS = {{ $labels }}
