@@ -8,6 +8,7 @@ import logging
 from typing import Any, Dict, Optional
 
 import ops
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus
 
@@ -25,25 +26,35 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
     def __init__(self, *args: Any) -> None:
         """Init."""
         super().__init__(*args)
-        self.framework.observe(self.on.update_status, self._on_update_status)
-        self.framework.observe(self.on.install, self._on_install_or_upgrade)
-        self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
-        self.framework.observe(self.on.remove, self._on_remove)
-
         self.hw_tool_helper = HWToolHelper()
 
-        self.exporter = Exporter(
+        self.cos_agent_provider = COSAgentProvider(
             self,
             metrics_endpoints=[
                 {"path": "/metrics", "port": int(self.model.config["exporter-port"])}
             ],
         )
+        self.exporter = Exporter(self.charm_dir)
+
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.install, self._on_install_or_upgrade)
+        self.framework.observe(self.on.remove, self._on_remove)
+        self.framework.observe(self.on.update_status, self._on_update_status)
+        self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
+        self.framework.observe(
+            self.on.cos_agent_relation_joined, self._on_cos_agent_relation_joined
+        )
+        self.framework.observe(
+            self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
+        )
+
         self._stored.set_default(installed=False, config={})
 
     def _on_install_or_upgrade(self, _: EventBase) -> None:
         """Install and upgrade."""
-        self.exporter.install()
+        port = self.model.config.get("exporter-port", "10000")
+        level = self.model.config.get("exporter-log-level", "INFO")
+        self.exporter.install(port, level)
         self.hw_tool_helper.install(self.model.resources)
         self._stored.installed = True
         self.model.unit.status = ActiveStatus("Install complete")
@@ -58,11 +69,15 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
         logger.info("Remove complete")
 
     def _on_update_status(self, _: EventBase) -> None:
-        if not self.exporter.check_relation():
+        """Update the charm's status."""
+        if not self.model.get_relation("cos-agent"):
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
             return
         if not self.exporter.check_health():
             self.model.unit.status = BlockedStatus("Exporter is unhealthy")
+            return
+        if not self.exporter.check_active():
+            self.model.unit.status = BlockedStatus("Exporter is not running")
             return
         self.model.unit.status = ActiveStatus("Unit is ready")
 
@@ -87,8 +102,29 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
             event.defer()
             return
 
-        self.exporter.on_config_changed(change_set)
-        self.model.unit.status = ActiveStatus("Unit is ready")
+        exporter_configs = {"exporter-port", "exporter-log-level"}
+        if exporter_configs.intersection(change_set):
+            logger.info("Detected changes in exporter config.")
+            port = self.model.config.get("exporter-port", "10000")
+            level = self.model.config.get("exporter-log-level", "INFO")
+            success = self.exporter.template.render_config(port=port, level=level)
+            # First condition prevent the exporter from starting at when the
+            # charm just installed; the second condition tries to recover the
+            # exporter from failed status.
+            if success and self.exporter.check_active() or not self.exporter.check_health():
+                self.exporter.restart()
+
+        self._on_update_status(event)
+
+    def _on_cos_agent_relation_joined(self, event: EventBase) -> None:
+        """Start the exporter when relation joined."""
+        self.exporter.start()
+        self._on_update_status(event)
+
+    def _on_cos_agent_relation_departed(self, event: EventBase) -> None:
+        """Remove the exporter when relation departed."""
+        self.exporter.stop()
+        self._on_update_status(event)
 
 
 if __name__ == "__main__":  # pragma: nocover
