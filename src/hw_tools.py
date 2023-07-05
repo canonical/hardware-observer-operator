@@ -196,7 +196,7 @@ class SSACLIStrategy(APTStrategyABC):
     """Strategy for install ssacli."""
 
     _name = HWTool.SSACLI
-    pkg = HWTool.SSACLI
+    pkg = HWTool.SSACLI.value
     repo_line = "deb http://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
 
     @property

@@ -426,6 +426,8 @@ class TestSSACLIStrategy(unittest.TestCase):
         for key in HP_KEYS:
             mock_apt.import_key.assert_any_call(key)
 
+        mock_apt.add_package.assert_called_with("ssacli", update_cache=True)
+
     @mock.patch("hw_tools.apt")
     def test_remove(self, mock_apt):
         strategy = SSACLIStrategy()
