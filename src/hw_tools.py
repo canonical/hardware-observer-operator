@@ -246,6 +246,8 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
     Currently we don't do anything here.
     """
 
+    _name = HWTool.REDFISH
+
 
 def raid_hw_verifier() -> t.List[HWTool]:
     """Verify if the HWTool support RAID card exists on machine."""

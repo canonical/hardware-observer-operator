@@ -10,7 +10,7 @@ import pytest
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError
 
-from charm import PrometheusHardwareExporterCharm
+from charm import HardwareObserverCharm
 from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor, SystemVendor
 from hw_tools import (
     APTStrategyABC,
@@ -96,7 +96,7 @@ class TestMakeExecutable(unittest.TestCase):
 
 class TestHWToolHelper(unittest.TestCase):
     def setUp(self):
-        self.harness = ops.testing.Harness(PrometheusHardwareExporterCharm)
+        self.harness = ops.testing.Harness(HardwareObserverCharm)
         self.addCleanup(self.harness.cleanup)
 
         self.hw_tool_helper = HWToolHelper()

@@ -2,12 +2,12 @@
 
 # The charm package name, no spaces (required)
 # See https://juju.is/docs/sdk/naming#heading--naming-charms for guidance.
-name: prometheus-hardware-exporter
+name: hardware-observer
 
 # The following metadata are human-readable and will be published prominently on Charmhub.
 
 # (Recommended)
-display-name: prometheus-hardware-exporter
+display-name: hardware observer
 
 summary: subordinate charm for hardware health monitor.
 

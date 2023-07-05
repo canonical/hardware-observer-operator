@@ -8,10 +8,10 @@ Avoid using this README file for information that is maintained or published els
 Use links instead.
 -->
 
-# charm-prometheus-hardware-exporter
+# hardware-observer-operator
 
-Charmhub package name: charm-prometheus-hardware-exporter
-More information: https://charmhub.io/charm-prometheus-hardware-exporter
+Charmhub package name: hardware-observer
+More information: https://charmhub.io/hardware-observer
 
 
 The charm to install the exporter which export hardware metrices for IPMI, RedFish and RAID devices from different vendor.
