@@ -20,4 +20,5 @@ jobs:
       python-version-unit: "['3.8', '3.10']"
       python-version-func: "3.10"
       tox-version: "<4"
+      timeout-minutes: 120
       commands: "['FUNC_ARGS=\"--series jammy\" make functional']"
