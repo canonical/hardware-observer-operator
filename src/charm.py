@@ -54,7 +54,12 @@ class HardwareObserverCharm(ops.CharmBase):
         """Install and upgrade."""
         port = self.model.config.get("exporter-port", "10000")
         level = self.model.config.get("exporter-log-level", "INFO")
-        self.exporter.install(port, level)
+        redfish_creds = {
+            "host": self.model.config.get("redfish-host", "http://127.0.0.1"),
+            "username": self.model.config.get("redfish-username", ""),
+            "password": self.model.config.get("redfish-password", ""),
+        }
+        self.exporter.install(port, level, redfish_creds)
         self.hw_tool_helper.install(self.model.resources)
         self._stored.installed = True
         self.model.unit.status = ActiveStatus("Install complete")
@@ -102,12 +107,25 @@ class HardwareObserverCharm(ops.CharmBase):
             event.defer()
             return
 
-        exporter_configs = {"exporter-port", "exporter-log-level"}
+        exporter_configs = {
+            "exporter-port",
+            "exporter-log-level",
+            "redfish-host",
+            "redfish-username",
+            "redfish-password",
+        }
         if exporter_configs.intersection(change_set):
             logger.info("Detected changes in exporter config.")
             port = self.model.config.get("exporter-port", "10000")
             level = self.model.config.get("exporter-log-level", "INFO")
-            success = self.exporter.template.render_config(port=port, level=level)
+            redfish_creds = {
+                "host": self.model.config.get("redfish-host", "http://127.0.0.1"),
+                "username": self.model.config.get("redfish-username", ""),
+                "password": self.model.config.get("redfish-password", ""),
+            }
+            success = self.exporter.template.render_config(
+                port=port, level=level, redfish_creds=redfish_creds
+            )
             # First condition prevent the exporter from starting at when the
             # charm just installed; the second condition tries to recover the
             # exporter from failed status.

@@ -77,7 +77,7 @@ class ExporterTemplate:
             logger.info("Removing file '%s' - Done.", path)
         return success
 
-    def render_config(self, port: str, level: str) -> bool:
+    def render_config(self, port: str, level: str, redfish_creds: dict) -> bool:
         """Render and install exporter config file."""
         hw_tools = get_hw_tool_white_list()
         collectors = []
@@ -85,7 +85,14 @@ class ExporterTemplate:
             collector = EXPORTER_COLLECTOR_MAPPING.get(tool)
             if collector is not None:
                 collectors += collector
-        content = self.config_template.render(PORT=port, LEVEL=level, COLLECTORS=collectors)
+        content = self.config_template.render(
+            PORT=port,
+            LEVEL=level,
+            COLLECTORS=collectors,
+            REDFISH_HOST=redfish_creds["host"],
+            REDFISH_USERNAME=redfish_creds["username"],
+            REDFISH_PASSWORD=redfish_creds["password"],
+        )
         return self._install(EXPORTER_CONFIG_PATH, content)
 
     def render_service(self, charm_dir: str, config_file: str) -> bool:
@@ -110,13 +117,13 @@ class Exporter:
         self.charm_dir = charm_dir
         self.template = ExporterTemplate(charm_dir)
 
-    def install(self, port: str, level: str) -> bool:
+    def install(self, port: str, level: str, redfish_creds: dict) -> bool:
         """Install the exporter."""
         logger.info("Installing %s.", EXPORTER_NAME)
-        success = self.template.render_config(port=port, level=level)
+        success = self.template.render_config(port=port, level=level, redfish_creds=redfish_creds)
         success = self.template.render_service(str(self.charm_dir), str(EXPORTER_CONFIG_PATH))
         if not success:
-            logger.error("Failed to installed %s.", EXPORTER_NAME)
+            logger.error("Failed to install %s.", EXPORTER_NAME)
             return success
         systemd.daemon_reload()
         logger.info("%s installed.", EXPORTER_NAME)

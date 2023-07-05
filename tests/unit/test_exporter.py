@@ -203,10 +203,17 @@ class TestExporterTemplate(unittest.TestCase):
         # self.template.config_template = mock_config_template
 
         with mock.patch.object(self.template, "_install") as mock_install:
-            self.template.render_config(port="80", level="info")
+            self.template.render_config(
+                port="80",
+                level="info",
+                redfish_creds={"host": "", "username": "", "password": ""},
+            )
         mock_install.assert_called_with(
             EXPORTER_CONFIG_PATH,
             self.template.config_template.render(
-                PORT="80", LEVEL="info", COLLECTORS=["collector.mega_raid", "collector.hpe_ssa"]
+                PORT="80",
+                LEVEL="info",
+                COLLECTORS=["collector.mega_raid", "collector.hpe_ssa"],
+                redfish_creds={"host": "", "username": "", "password": ""},
             ),
         )
