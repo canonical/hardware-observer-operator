@@ -18,7 +18,7 @@ from service import Exporter
 logger = logging.getLogger(__name__)
 
 
-class PrometheusHardwareExporterCharm(ops.CharmBase):
+class HardwareObserverCharm(ops.CharmBase):
     """Charm the application."""
 
     _stored = StoredState()
@@ -128,4 +128,4 @@ class PrometheusHardwareExporterCharm(ops.CharmBase):
 
 
 if __name__ == "__main__":  # pragma: nocover
-    ops.main(PrometheusHardwareExporterCharm)  # type: ignore
+    ops.main(HardwareObserverCharm)  # type: ignore

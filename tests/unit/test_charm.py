@@ -10,12 +10,12 @@ import ops
 import ops.testing
 from ops.model import ActiveStatus, BlockedStatus
 
-from charm import PrometheusHardwareExporterCharm
+from charm import HardwareObserverCharm
 
 
 class TestCharm(unittest.TestCase):
     def setUp(self):
-        self.harness = ops.testing.Harness(PrometheusHardwareExporterCharm)
+        self.harness = ops.testing.Harness(HardwareObserverCharm)
         self.addCleanup(self.harness.cleanup)
 
     @classmethod
@@ -25,7 +25,7 @@ class TestCharm(unittest.TestCase):
     def _get_notice_count(self, hook):
         """Return the notice count for a given charm hook."""
         notice_count = 0
-        handle = f"PrometheusHardwareExporterCharm/on/{hook}"
+        handle = f"HardwareObserverCharm/on/{hook}"
         for event_path, _, _ in self.harness.charm.framework._storage.notices(None):
             if event_path.startswith(handle):
                 notice_count += 1

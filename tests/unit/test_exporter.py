@@ -11,7 +11,7 @@ from ops.testing import Harness
 
 import charm
 import service
-from charm import PrometheusHardwareExporterCharm
+from charm import HardwareObserverCharm
 from config import EXPORTER_CONFIG_PATH, HWTool
 
 ops.testing.SIMULATE_CAN_CONNECT = True
@@ -24,7 +24,7 @@ class TestExporter(unittest.TestCase):
 
     def setUp(self):
         """Set up harness for each test case."""
-        self.harness = Harness(PrometheusHardwareExporterCharm)
+        self.harness = Harness(HardwareObserverCharm)
         self.addCleanup(self.harness.cleanup)
 
         systemd_lib_patcher = mock.patch.object(service, "systemd")

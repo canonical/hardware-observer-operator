@@ -1,7 +1,7 @@
 # Test basic deployment:
 # ubuntu:juju-info <-> grafana-agent:juju-info
-# ubuntu:juju-info <-> prometheus-hardware-exporter:general-info
-# grafana-agent:cos-agent <-> prometheus-hardware-exporter:cos-agent
+# ubuntu:juju-info <-> hardware-observer:general-info
+# grafana-agent:cos-agent <-> hardware-observer:cos-agent
 
 series: {{ series }}
 
@@ -17,12 +17,12 @@ applications:
   grafana-agent:
     charm: grafana-agent
     channel: edge # FIXME: currently no stable release
-  prometheus-hardware-exporter:
+  hardware-observer:
     charm: {{ charm }}
 
 relations:
 - - grafana-agent:juju-info
   - ubuntu:juju-info
-- - prometheus-hardware-exporter:general-info
+- - hardware-observer:general-info
   - ubuntu:juju-info
 

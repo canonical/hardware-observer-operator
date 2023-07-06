@@ -36,7 +36,7 @@ def sync_helper():
 
 @pytest.fixture()
 def app(ops_test):
-    return ops_test.model.applications["prometheus-hardware-exporter"]
+    return ops_test.model.applications["hardware-observer"]
 
 
 @pytest.fixture()
