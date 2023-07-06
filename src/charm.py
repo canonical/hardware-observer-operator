@@ -48,9 +48,9 @@ class HardwareObserverCharm(ops.CharmBase):
             self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
         )
 
-        self._stored.set_default(installed=False, config={})
+        self._stored.set_default(installed=False, config={}, blocked_msg="")
 
-    def _on_install_or_upgrade(self, _: EventBase) -> None:
+    def _on_install_or_upgrade(self, event: ops.InstallEvent) -> None:
         """Install and upgrade."""
         port = self.model.config.get("exporter-port", "10000")
         level = self.model.config.get("exporter-log-level", "INFO")
@@ -59,9 +59,19 @@ class HardwareObserverCharm(ops.CharmBase):
             "username": self.model.config.get("redfish-username", ""),
             "password": self.model.config.get("redfish-password", ""),
         }
+
         self.exporter.install(port, level, redfish_creds)
-        self.hw_tool_helper.install(self.model.resources)
+        installed, msg = self.hw_tool_helper.install(self.model.resources)
+        self._stored.installed = installed
+
+        if not installed:
+            logger.info(msg)
+            self._stored.blocked_msg = msg
+            self._on_update_status(event)
+            return
+
         self._stored.installed = True
+        self._stored.blocked_msg = ""
         self.model.unit.status = ActiveStatus("Install complete")
         logger.info("Install complete")
 
@@ -75,6 +85,9 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_update_status(self, _: EventBase) -> None:
         """Update the charm's status."""
+        if self._stored.installed is not True and self._stored.blocked_msg != "":
+            self.model.unit.status = BlockedStatus(self._stored.blocked_msg)  # type: ignore
+            return
         if not self.model.get_relation("cos-agent"):
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
             return

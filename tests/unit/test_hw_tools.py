@@ -235,13 +235,29 @@ class TestHWToolHelper(unittest.TestCase):
         ],
         new_callable=mock.PropertyMock,
     )
-    def test_05_remove_not_in_white_list(self, mock_strategies, _):
+    def test_08_remove_not_in_white_list(self, mock_strategies, _):
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         mock_strategies.return_value[0].name = HWTool.STORCLI
         self.hw_tool_helper.remove(mock_resources)
         for strategy in mock_strategies.return_value:
             strategy.remove.assert_not_called()
+
+    @mock.patch("hw_tools.get_hw_tool_white_list", return_value=[HWTool.STORCLI, HWTool.PERCCLI])
+    @mock.patch(
+        "hw_tools.HWToolHelper.strategies",
+        return_value=[
+            mock.PropertyMock(spec=TPRStrategyABC),
+        ],
+        new_callable=mock.PropertyMock,
+    )
+    def test_09_install_required_resource_not_uploaded(self, _, mock_hw_white_list):
+        self.harness.begin()
+        mock_resources = self.harness.charm.model.resources
+        ok, msg = self.hw_tool_helper.install(mock_resources)
+        self.assertFalse(ok)
+        self.assertEqual(msg, "Missing resources: ['storcli-deb', 'perccli-deb']")
+        self.assertFalse(self.harness.charm._stored.installed)
 
 
 class TestStorCLIStrategy(unittest.TestCase):
