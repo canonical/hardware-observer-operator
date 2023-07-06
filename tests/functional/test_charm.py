@@ -154,9 +154,13 @@ class TestCharm:
         new_redfish_username = "testuser"
         new_redfish_password = "testpassword"
         await asyncio.gather(
-            app.set_config({"redfish-host": new_redfish_host}),
-            app.set_config({"redfish-username": new_redfish_username}),
-            app.set_config({"redfish-password": new_redfish_password}),
+            app.set_config(
+                {
+                    "redfish-host": new_redfish_host,
+                    "redfish-username": new_redfish_username,
+                    "redfish-password": new_redfish_password,
+                }
+            ),
             ops_test.model.wait_for_idle(apps=[APP_NAME]),
         )
 
