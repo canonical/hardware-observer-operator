@@ -9,9 +9,9 @@ class SyncHelper:
     """Helper class for running juju async function."""
 
     @staticmethod
-    async def run_wait(unit, command):
-        action = await unit.run(command)
-        await action.wait()
+    async def run_wait(unit, command, timeout=20):
+        action = await unit.run(command, timeout=timeout)
+        # await action.wait()  # This is required in juju3
         return action.results
 
 
