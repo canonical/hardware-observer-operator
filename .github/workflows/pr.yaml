@@ -21,3 +21,4 @@ jobs:
       python-version-func: "3.10"
       tox-version: "<4"
       commands: "['FUNC_ARGS=\"--series jammy\" make functional']"
+      juju-channel: "3.1/stable"
