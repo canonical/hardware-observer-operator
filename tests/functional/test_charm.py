@@ -38,6 +38,16 @@ async def test_build_and_deploy(ops_test: OpsTest, series, sync_helper):
 
     Assert on the unit status before any relations/configurations take place.
     """
+    # Fail the test if the version of juju is not 2.9
+    # This maybe remove when we support version 3
+    try:
+        from juju.client.connector import SUPPORTED_JUJU_API_PREFIX
+
+        assert "2.9" in SUPPORTED_JUJU_API_PREFIX
+    except ImportError:
+        logger.error("The juju version is not supported")
+        raise
+
     # Build and deploy charm from local source folder
     charm = await ops_test.build_charm(".")
     assert charm, "Charm was not built successfully."
@@ -79,8 +89,8 @@ async def test_build_and_deploy(ops_test: OpsTest, series, sync_helper):
     for unit in ops_test.model.applications[APP_NAME].units:
         check_active_cmd = "systemctl is-active hardware-exporter"
         results = await sync_helper.run_wait(unit, check_active_cmd)
-        assert results.get("return-code") == 3
-        assert results.get("stdout").strip() == "inactive"
+        assert results.get("Code") == "3"
+        assert results.get("Stdout").strip() == "inactive"
 
     # Add cos-agent relation
     await asyncio.gather(
@@ -98,8 +108,8 @@ async def test_build_and_deploy(ops_test: OpsTest, series, sync_helper):
     for unit in ops_test.model.applications[APP_NAME].units:
         check_active_cmd = "systemctl is-active hardware-exporter"
         results = await sync_helper.run_wait(unit, check_active_cmd)
-        assert results.get("return-code") == 0
-        assert results.get("stdout").strip() == "active"
+        assert results.get("Code") == "0"
+        assert results.get("Stdout").strip() == "active"
         assert unit.workload_status_message == AppStatus.READY
 
 
@@ -116,8 +126,8 @@ class TestCharm:
 
         cmd = "cat /etc/hardware-exporter-config.yaml"
         results = await sync_helper.run_wait(unit, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
+        assert results.get("Code") == "0"
+        config = yaml.safe_load(results.get("Stdout").strip())
         assert config["port"] == int(new_port)
 
         await app.reset_config(["exporter-port"])
@@ -132,8 +142,8 @@ class TestCharm:
 
         cmd = "cat /etc/hardware-exporter-config.yaml"
         results = await sync_helper.run_wait(unit, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
+        assert results.get("Code") == "0"
+        config = yaml.safe_load(results.get("Stdout").strip())
         assert config["level"] == new_log_level
 
         await app.reset_config(["exporter-log-level"])
@@ -183,11 +193,11 @@ class TestCharm:
 
         cmd = "ls /etc/hardware-exporter-config.yaml"
         results = await sync_helper.run_wait(principal_unit, cmd)
-        assert results.get("return-code") == 2
+        assert results.get("Code") == "2"
 
         cmd = "ls /etc/systemd/system/hardware-exporter.service"
         results = await sync_helper.run_wait(principal_unit, cmd)
-        assert results.get("return-code") == 2
+        assert results.get("Code") == "2"
 
         await asyncio.gather(
             ops_test.model.add_relation(
