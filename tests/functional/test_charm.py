@@ -166,8 +166,8 @@ class TestCharm:
 
         cmd = "cat /etc/hardware-exporter-config.yaml"
         results = await sync_helper.run_wait(unit, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
+        assert results.get("Code") == "0"
+        config = yaml.safe_load(results.get("Stdout").strip())
         assert config["redfish-host"] == new_redfish_host
         assert config["redfish-username"] == new_redfish_username
         assert config["redfish-password"] == new_redfish_password
