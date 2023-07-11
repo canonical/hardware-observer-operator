@@ -7,15 +7,15 @@ name: hardware-observer
 # The following metadata are human-readable and will be published prominently on Charmhub.
 
 # (Recommended)
-display-name: hardware observer
+display-name: Hardware Observer
 
-summary: subordinate charm for hardware health monitor.
+summary: Subordinate charm for monitoring hardware resources.
 
-description: |
-  todo
-  todo
-  todo
-  todo
+description: Subordinate charm for monitoring hardware resources.
+
+docs: https://discourse.charmhub.io/t/hardware-observer-docs-index/11112
+
+issues: https://github.com/canonical/hardware-observer-operator/issues
 
 subordinate: true
 
