@@ -29,6 +29,7 @@ class AppStatus(str, Enum):
     MISSING_RELATION = "Missing relation: [cos-agent]"
     UNHEALTHY = "Exporter is unhealthy"
     NOT_RUNNING = "Exporter is not running"
+    MISSING_RESOURCES = "Missing resources:"
 
 
 @pytest.mark.abort_on_fail
@@ -58,6 +59,12 @@ async def test_build_and_deploy(ops_test: OpsTest, series, sync_helper):
                 "tests/functional/bundle.yaml.j2",
                 charm=charm,
                 series=series,
+                resources={
+                    "storcli-deb": "empty-resource",
+                    "perccli-deb": "empty-resource",
+                    "sas2ircu-bin": "empty-resource",
+                    "sas3ircu-bin": "empty-resource",
+                },
             )
         ),
         ops_test.model.wait_for_idle(
@@ -80,7 +87,9 @@ async def test_build_and_deploy(ops_test: OpsTest, series, sync_helper):
 
     # Test initial workload status
     for unit in ops_test.model.applications[APP_NAME].units:
+        assert AppStatus.MISSING_RESOURCES not in unit.workload_status_message
         assert unit.workload_status_message == AppStatus.MISSING_RELATION
+
     for unit in ops_test.model.applications[GRAFANA_AGENT_APP_NAME].units:
         message = "Missing relation: [send-remote-write|grafana-cloud-config]"
         assert unit.workload_status_message == message

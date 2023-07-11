@@ -32,7 +32,8 @@ class TestExporter(unittest.TestCase):
         self.addCleanup(systemd_lib_patcher.stop)
 
         hw_tool_lib_patcher = mock.patch.object(charm, "HWToolHelper")
-        hw_tool_lib_patcher.start()
+        mock_hw_tool_helper = hw_tool_lib_patcher.start()
+        mock_hw_tool_helper.return_value.install.return_value = [True, ""]
         self.addCleanup(hw_tool_lib_patcher.stop)
 
         get_hw_tool_white_list_patcher = mock.patch.object(service, "get_hw_tool_white_list")

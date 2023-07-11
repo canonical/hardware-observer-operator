@@ -358,11 +358,20 @@ class HWToolHelper:
 
         return fetch_tools
 
-    def install(self, resources: Resources) -> None:
+    def install(self, resources: Resources) -> t.Tuple[bool, str]:
         """Install tools."""
-        self.fetch_tools(resources)
+        fetch_tools = self.fetch_tools(resources)
         hw_white_list = get_hw_tool_white_list()
         logger.info("hw_tool_white_list: %s", hw_white_list)
+
+        # Check if required resources are not been uploaded.
+        missing_resources = []
+        for tool in hw_white_list:
+            if tool in TPR_RESOURCES and tool not in fetch_tools:
+                missing_resources.append(TPR_RESOURCES[tool])
+        if len(missing_resources) > 0:
+            return False, f"Missing resources: {missing_resources}"
+
         for strategy in self.strategies:
             if strategy.name not in hw_white_list:
                 continue
@@ -377,6 +386,7 @@ class HWToolHelper:
             # APTStrategy
             elif isinstance(strategy, APTStrategyABC):
                 strategy.install()  # pylint: disable=E1120
+        return True, ""
 
     def remove(self, resources: Resources) -> None:  # pylint: disable=W0613
         """Execute all remove strategies."""

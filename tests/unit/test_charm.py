@@ -41,6 +41,7 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_02_install(self, mock_hw_tool_helper, mock_exporter) -> None:
         """Test event install."""
+        mock_hw_tool_helper.return_value.install.return_value = (True, "")
         self.harness.begin()
         self.harness.charm.on.install.emit()
 
@@ -55,6 +56,7 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_03_upgrade_charm(self, mock_hw_tool_helper, mock_exporter) -> None:
         """Test event upgrade_charm."""
+        mock_hw_tool_helper.return_value.install.return_value = (True, "")
         self.harness.begin()
         self.harness.charm.on.install.emit()
 
@@ -66,6 +68,21 @@ class TestCharm(unittest.TestCase):
         )
 
         self.harness.charm.unit.status = ActiveStatus("Install complete")
+
+    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
+    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
+    def test_04_install_missing_resources(self, mock_hw_tool_helper, mock_exporter) -> None:
+        """Test event install."""
+        mock_hw_tool_helper.return_value.install.return_value = (
+            False,
+            "Missing resources: ['storcli-deb']",
+        )
+        self.harness.begin()
+        self.harness.charm.on.install.emit()
+
+        self.assertEqual(
+            self.harness.charm.unit.status, BlockedStatus("Missing resources: ['storcli-deb']")
+        )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     def test_10_config_changed(self, mock_exporter):
