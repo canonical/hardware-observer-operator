@@ -10,13 +10,25 @@ import ops
 import ops.testing
 from ops.model import ActiveStatus, BlockedStatus
 
+import charm
 from charm import HardwareObserverCharm
+from config import HWTool
 
 
 class TestCharm(unittest.TestCase):
     def setUp(self):
         self.harness = ops.testing.Harness(HardwareObserverCharm)
         self.addCleanup(self.harness.cleanup)
+
+        get_bmc_address_patcher = mock.patch.object(charm, "get_bmc_address")
+        self.mock_get_bmc_address = get_bmc_address_patcher.start()
+        self.mock_get_bmc_address.return_value = "127.0.0.1"
+        self.addCleanup(get_bmc_address_patcher.stop)
+
+        bmc_hw_verifier_patcher = mock.patch.object(charm, "bmc_hw_verifier")
+        self.mock_bmc_hw_verifier = bmc_hw_verifier_patcher.start()
+        self.mock_bmc_hw_verifier.return_value = [HWTool.IPMI, HWTool.REDFISH]
+        self.addCleanup(bmc_hw_verifier_patcher.stop)
 
     @classmethod
     def setUpClass(cls):
@@ -83,6 +95,19 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(
             self.harness.charm.unit.status, BlockedStatus("Missing resources: ['storcli-deb']")
         )
+
+    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
+    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
+    def test_05_install_redfish_unavailable(self, mock_hw_tool_helper, mock_exporter) -> None:
+        """Test event install."""
+        self.mock_bmc_hw_verifier.return_value = [HWTool.IPMI]
+        mock_hw_tool_helper.return_value.install.return_value = (True, "")
+        self.harness.begin()
+        self.harness.charm.on.install.emit()
+
+        self.assertTrue(self.harness.charm._stored.installed)
+
+        self.harness.charm.exporter.install.assert_called_with(10000, "INFO", {})
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     def test_10_config_changed(self, mock_exporter):

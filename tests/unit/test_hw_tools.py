@@ -555,7 +555,7 @@ class TestIPMIHWVerifier(unittest.TestCase):
     @mock.patch("hw_tools.apt")
     def test_bmc_hw_verifier(self, mock_apt, mock_subprocess, mock_redfish_discover_ssdp):
         output = bmc_hw_verifier()
-        mock_apt.add_package.assert_called_with("ipmitool", update_cache=True)
+        mock_apt.add_package.assert_called_with("ipmitool", update_cache=False)
         mock_subprocess.check_output.assert_called_with("ipmitool lan print".split())
         self.assertCountEqual(output, [HWTool.IPMI, HWTool.REDFISH])
         mock_redfish_discover_ssdp.assert_called()
@@ -570,6 +570,6 @@ class TestIPMIHWVerifier(unittest.TestCase):
         self, mock_apt, mock_check_output, mock_redfish_discover_ssdp
     ):
         output = bmc_hw_verifier()
-        mock_apt.add_package.assert_called_with("ipmitool", update_cache=True)
+        mock_apt.add_package.assert_called_with("ipmitool", update_cache=False)
         mock_check_output.assert_called_with("ipmitool lan print".split())
         self.assertEqual(output, [])

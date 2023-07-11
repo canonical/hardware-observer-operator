@@ -17,11 +17,6 @@ options:
       default, it will set to INFO. Allowed values are "DEBUG", "INFO",
       "WARNING", "ERROR", "CRITICAL". Values other than those will result in
       failure of the exporter.
-  redfish-host:
-    type: string
-    default: "http://127.0.0.1"
-    description: |
-      BMC hostname to be used by the redfish collector.
   redfish-username:
     type: string
     default: ""

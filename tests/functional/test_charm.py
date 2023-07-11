@@ -157,34 +157,6 @@ class TestCharm:
 
         await app.reset_config(["exporter-log-level"])
 
-    async def test_02_config_changed_redfish(self, app, unit, sync_helper, ops_test):
-        """Test changing the config options for redfish credentials."""
-        new_redfish_host = "https://1.2.3.4"
-        new_redfish_username = "testuser"
-        new_redfish_password = "testpassword"
-        await asyncio.gather(
-            app.set_config(
-                {
-                    "redfish-host": new_redfish_host,
-                    "redfish-username": new_redfish_username,
-                    "redfish-password": new_redfish_password,
-                }
-            ),
-            ops_test.model.wait_for_idle(apps=[APP_NAME]),
-        )
-
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await sync_helper.run_wait(unit, cmd)
-        assert results.get("Code") == "0"
-        config = yaml.safe_load(results.get("Stdout").strip())
-        assert config["redfish-host"] == new_redfish_host
-        assert config["redfish-username"] == new_redfish_username
-        assert config["redfish-password"] == new_redfish_password
-
-        await app.reset_config(["redfish-host"])
-        await app.reset_config(["redfish-username"])
-        await app.reset_config(["redfish-password"])
-
     async def test_10_start_and_stop_exporter(self, app, unit, sync_helper, ops_test):
         """Test starting and stopping the exporter results in correct charm status."""
         # Stop the exporter
