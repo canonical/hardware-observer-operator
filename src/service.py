@@ -89,9 +89,9 @@ class ExporterTemplate:
             PORT=port,
             LEVEL=level,
             COLLECTORS=collectors,
-            REDFISH_HOST=redfish_creds["host"],
-            REDFISH_USERNAME=redfish_creds["username"],
-            REDFISH_PASSWORD=redfish_creds["password"],
+            REDFISH_HOST=redfish_creds.get("host"),
+            REDFISH_USERNAME=redfish_creds.get("username"),
+            REDFISH_PASSWORD=redfish_creds.get("password"),
         )
         return self._install(EXPORTER_CONFIG_PATH, content)
 

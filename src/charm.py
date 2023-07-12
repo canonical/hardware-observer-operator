@@ -12,7 +12,9 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus
 
-from hw_tools import HWToolHelper
+from config import HWTool
+from hardware import get_bmc_address
+from hw_tools import HWToolHelper, bmc_hw_verifier
 from service import Exporter
 
 logger = logging.getLogger(__name__)
@@ -54,11 +56,8 @@ class HardwareObserverCharm(ops.CharmBase):
         """Install and upgrade."""
         port = self.model.config.get("exporter-port", "10000")
         level = self.model.config.get("exporter-log-level", "INFO")
-        redfish_creds = {
-            "host": self.model.config.get("redfish-host", "http://127.0.0.1"),
-            "username": self.model.config.get("redfish-username", ""),
-            "password": self.model.config.get("redfish-password", ""),
-        }
+
+        redfish_creds = self._get_redfish_creds()
 
         self.exporter.install(port, level, redfish_creds)
         installed, msg = self.hw_tool_helper.install(self.model.resources)
@@ -131,11 +130,8 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.info("Detected changes in exporter config.")
             port = self.model.config.get("exporter-port", "10000")
             level = self.model.config.get("exporter-log-level", "INFO")
-            redfish_creds = {
-                "host": self.model.config.get("redfish-host", "http://127.0.0.1"),
-                "username": self.model.config.get("redfish-username", ""),
-                "password": self.model.config.get("redfish-password", ""),
-            }
+
+            redfish_creds = self._get_redfish_creds()
             success = self.exporter.template.render_config(
                 port=port, level=level, redfish_creds=redfish_creds
             )
@@ -156,6 +152,21 @@ class HardwareObserverCharm(ops.CharmBase):
         """Remove the exporter when relation departed."""
         self.exporter.stop()
         self._on_update_status(event)
+
+    def _get_redfish_creds(self) -> Dict[str, str]:
+        """Provide redfish config if redfish is available, else empty dict."""
+        bmc_tools = bmc_hw_verifier()
+        if HWTool.REDFISH in bmc_tools:
+            bmc_address = get_bmc_address()
+            redfish_creds = {
+                # Force to use https as default protocol
+                "host": f"https://{bmc_address}",
+                "username": self.model.config.get("redfish-username", ""),
+                "password": self.model.config.get("redfish-password", ""),
+            }
+        else:
+            redfish_creds = {}
+        return redfish_creds
 
 
 if __name__ == "__main__":  # pragma: nocover

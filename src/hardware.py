@@ -4,6 +4,8 @@ import logging
 import subprocess
 import typing as t
 
+from charms.operator_libs_linux.v0 import apt
+
 from config import HWTool
 
 logger = logging.getLogger(__name__)
@@ -43,3 +45,18 @@ def lshw(class_filter: t.Optional[str] = None) -> t.Any:
         logger.error(err)
         # Raise error because the cmd should always work.
         raise err
+
+
+def get_bmc_address() -> t.Optional[str]:
+    """Get BMC IP address by ipmitool."""
+    apt.add_package("ipmitool", update_cache=False)
+    cmd = "ipmitool lan print"
+    try:
+        output = subprocess.check_output(cmd.split(), text=True)
+        for line in output.splitlines():
+            values = line.split(":")
+            if values[0].strip() == "IP Address":
+                return values[1].strip()
+    except subprocess.CalledProcessError:
+        logger.debug("IPMI is not available")
+    return None

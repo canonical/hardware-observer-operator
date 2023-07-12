@@ -306,7 +306,7 @@ def bmc_hw_verifier() -> t.List[HWTool]:
     """
     tools = []
     # Check IPMI available
-    apt.add_package("ipmitool", update_cache=True)
+    apt.add_package("ipmitool", update_cache=False)
     try:
         subprocess.check_output("ipmitool lan print".split())
         tools.append(HWTool.IPMI)

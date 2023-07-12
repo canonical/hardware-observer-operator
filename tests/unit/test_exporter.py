@@ -40,7 +40,9 @@ class TestExporter(unittest.TestCase):
         get_hw_tool_white_list_patcher.start()
         self.addCleanup(get_hw_tool_white_list_patcher.stop)
 
-    def test_00_install_okay(self):
+    @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
+    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
+    def test_00_install_okay(self, mock_bmc_hw_verifier, mock_get_bmc_address):
         """Test exporter service is installed when charm is installed - okay."""
         self.harness.begin()
 
@@ -49,7 +51,9 @@ class TestExporter(unittest.TestCase):
             mock_open.assert_called()
             self.mock_systemd.daemon_reload.assert_called_once()
 
-    def test_01_install_failed_rendering(self):
+    @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
+    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
+    def test_01_install_failed_rendering(self, mock_bmc_hw_verifier, mock_get_bmc_address):
         """Test exporter service is failed to installed - failed to render."""
         self.harness.begin()
 
@@ -175,8 +179,12 @@ class TestExporter(unittest.TestCase):
             self.harness.charm.unit.status, BlockedStatus("Missing relation: [cos-agent]")
         )
 
+    @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
+    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_60_config_changed_log_level_okay(self, mock_service_installed):
+    def test_60_config_changed_log_level_okay(
+        self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address
+    ):
         """Test on_config_change function when exporter-log-level is changed."""
         self.harness.begin()
 
