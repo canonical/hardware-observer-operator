@@ -1,5 +1,5 @@
 cosl
 ops >= 2.2.0
 jinja2
-redfish-utilities
+redfish
 git+https://github.com/canonical/prometheus-hardware-exporter.git
