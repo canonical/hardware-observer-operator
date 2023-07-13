@@ -7,6 +7,8 @@ Avoid using this README file for information that is maintained or published els
 
 Use links instead.
 -->
+[![Charmhub Badge](https://charmhub.io/hardware-observer/badge.svg)](https://charmhub.io/hardware-observer)
+[![Release Edge](https://github.com/canonical/hardware-observer-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/hardware-observer-operator/actions/workflows/release.yaml)
 
 # hardware-observer-operator
 
