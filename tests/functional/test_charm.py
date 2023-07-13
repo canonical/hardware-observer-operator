@@ -91,7 +91,7 @@ async def test_build_and_deploy(ops_test: OpsTest, series, sync_helper):
         assert unit.workload_status_message == AppStatus.MISSING_RELATION
 
     for unit in ops_test.model.applications[GRAFANA_AGENT_APP_NAME].units:
-        message = "Missing relation: [send-remote-write|grafana-cloud-config]"
+        message = "grafana-cloud-config: off, logging-consumer: off, send-remote-write: off"
         assert unit.workload_status_message == message
 
     # Test without cos-agent relation
