@@ -34,8 +34,6 @@ groups:
     for: 0m
     labels:
       severity: warning
-      controller_id: 0
-      instance: ubuntu-2
     annotations:
       summary: LSI SAS IR volume not found. (instance {{ $labels.instance }})
       description: |
