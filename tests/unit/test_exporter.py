@@ -208,21 +208,42 @@ class TestExporterTemplate(unittest.TestCase):
         return_value=[HWTool.STORCLI, HWTool.SSACLI],
     )
     def test_render_config(self, mock_get_hw_tool_white_list):
-        # mock_config_template = mock.Mock()
-        # self.template.config_template = mock_config_template
-
         with mock.patch.object(self.template, "_install") as mock_install:
             self.template.render_config(
                 port="80",
                 level="info",
-                redfish_creds={"host": "", "username": "", "password": ""},
+                redfish_creds={},
             )
-        mock_install.assert_called_with(
-            EXPORTER_CONFIG_PATH,
-            self.template.config_template.render(
-                PORT="80",
-                LEVEL="info",
-                COLLECTORS=["collector.mega_raid", "collector.hpe_ssa"],
-                redfish_creds={"host": "", "username": "", "password": ""},
-            ),
-        )
+            mock_install.assert_called_with(
+                EXPORTER_CONFIG_PATH,
+                self.template.config_template.render(
+                    PORT="80",
+                    LEVEL="info",
+                    COLLECTORS=["collector.mega_raid", "collector.hpe_ssa"],
+                    REDFISH_ENABLE=False,
+                ),
+            )
+
+    @mock.patch(
+        "service.get_hw_tool_white_list",
+        return_value=[HWTool.REDFISH],
+    )
+    def test_render_config_redfish(self, mock_get_hw_tool_white_list):
+        with mock.patch.object(self.template, "_install") as mock_install:
+            self.template.render_config(
+                port="80",
+                level="info",
+                redfish_creds={"host": "127.0.0.1", "username": "default_user", "password": "default_pwd"},
+            )
+            mock_install.assert_called_with(
+                EXPORTER_CONFIG_PATH,
+                self.template.config_template.render(
+                    PORT="80",
+                    LEVEL="info",
+                    COLLECTORS=["collector.redfish"],
+                    REDFISH_ENABLE=True,
+                    REDFISH_HOST="127.0.0.1",
+                    REDFISH_PASSWORD="default_pwd",
+                    REDFISH_USERNAME="default_user",
+                ),
+            )
