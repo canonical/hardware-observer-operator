@@ -14,6 +14,7 @@ from config import (
     EXPORTER_NAME,
     EXPORTER_SERVICE_PATH,
     EXPORTER_SERVICE_TEMPLATE,
+    HWTool,
 )
 from hw_tools import get_hw_tool_white_list
 
@@ -89,9 +90,10 @@ class ExporterTemplate:
             PORT=port,
             LEVEL=level,
             COLLECTORS=collectors,
-            REDFISH_HOST=redfish_creds.get("host"),
-            REDFISH_USERNAME=redfish_creds.get("username"),
-            REDFISH_PASSWORD=redfish_creds.get("password"),
+            REDFISH_ENABLE=(HWTool.REDFISH in hw_tools),
+            REDFISH_HOST=redfish_creds.get("host", ""),
+            REDFISH_USERNAME=redfish_creds.get("username", ""),
+            REDFISH_PASSWORD=redfish_creds.get("password", ""),
         )
         return self._install(EXPORTER_CONFIG_PATH, content)
 
