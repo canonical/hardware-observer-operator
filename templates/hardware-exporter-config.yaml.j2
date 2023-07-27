@@ -8,7 +8,7 @@ enable_collectors:
 {% endif %}
 
 {% if REDFISH_ENABLE  %}
-redfish_host: {{ REDFISH_HOST }}
-redfish_username: {{ REDFISH_USERNAME }}
-redfish_password: {{ REDFISH_PASSWORD }}
+redfish_host: "{{ REDFISH_HOST }}"
+redfish_username: "{{ REDFISH_USERNAME }}"
+redfish_password: "{{ REDFISH_PASSWORD }}"
 {% endif %}
