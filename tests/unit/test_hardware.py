@@ -7,20 +7,32 @@ from hardware import get_bmc_address, lshw
 
 class TestLshw(unittest.TestCase):
     @mock.patch("hardware.subprocess.check_output")
-    def test_lshw(self, mock_subprocess):
-        mock_subprocess.return_value = "[{}]"
+    def test_lshw_list_output(self, mock_subprocess):
+        mock_subprocess.return_value = """[{"expected_output": 1}]"""
         for class_filter in [None, "storage"]:
-            lshw(class_filter)
+            output = lshw(class_filter)
             if class_filter is not None:
                 mock_subprocess.assert_called_with(
                     f"lshw -json -c {class_filter}".split(),
                     text=True,
                 )
+                self.assertEqual(output, [{"expected_output": 1}])
             else:
                 mock_subprocess.assert_called_with(
                     "lshw -json".split(),
                     text=True,
                 )
+                self.assertEqual(output, {"expected_output": 1})
+
+    @mock.patch("hardware.subprocess.check_output")
+    def test_lshw_dict_output(self, mock_subprocess):
+        mock_subprocess.return_value = """{"expected_output": 1}"""
+        output = lshw()
+        mock_subprocess.assert_called_with(
+            "lshw -json".split(),
+            text=True,
+        )
+        self.assertEqual(output, {"expected_output": 1})
 
     @mock.patch(
         "hardware.subprocess.check_output",

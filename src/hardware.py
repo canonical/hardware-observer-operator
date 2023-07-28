@@ -40,7 +40,12 @@ def lshw(class_filter: t.Optional[str] = None) -> t.Any:
         cmd = cmd + " -c " + class_filter
     try:
         output = subprocess.check_output(cmd.split(), text=True)
-        return json.loads(output)
+        json_output = json.loads(output)
+        # lshw has different output on different ubuntu series
+        # if class_filter is not provided.
+        if not class_filter and isinstance(json_output, list):
+            json_output = json_output[0]
+        return json_output
     except subprocess.CalledProcessError as err:
         logger.error(err)
         # Raise error because the cmd should always work.
