@@ -10,11 +10,11 @@
 
 # StorCLI
 
-- Download from: https://www.broadcom.com/products/storage/raid-controllers
+- Download StorCLI MR 7.26 from: https://docs.broadcom.com/docs/1232743291
 
 # SAS2IRCU & SAS3IRCU
 
-- Downlaod from:
+- Download from:
     - https://docs.broadcom.com/docs/12351730
     - https://docs.broadcom.com/docs/SAS3IRCU_P15.zip
 

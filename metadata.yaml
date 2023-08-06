@@ -26,7 +26,7 @@ resources:
     description: |
       (Optional) un-republish tool.
       StorCLI deb file publish by Broadcom for their RAID devices.
-      Download it from https://www.broadcom.com/products/storage/raid-controllers .
+      Download StorCLI MR 7.26 from: https://docs.broadcom.com/docs/1232743291 .
     filename: storcli.deb
 
   perccli-deb:
