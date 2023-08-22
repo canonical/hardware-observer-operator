@@ -1,39 +1,105 @@
 groups:
-- name: Redfish
-  rules:
+  - name: Redfish
+    rules:
+      - alert: RedfishCallFailed
+        expr: redfish_call_success == 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Call to the Redfish API failed. (instance {{ $labels.instance }})
+          description: |
+            Failure in calling the Redfish API.
+              VALUE = {{ $value }}
+              LABELS = {{ $labels }}
 
-  - alert: RedfishCallFailed
-    expr: redfish_call_success == 0
-    for: 0m
-    labels:
-      severity: warning
-    annotations:
-      summary: Call to the Redfish API failed. (instance {{ $labels.instance }})
-      description: |
-        Failure in calling the Redfish API.
-          VALUE = {{ $value }}
-          LABELS = {{ $labels }}
+      - alert: RedfishServiceUnavailable
+        expr: redfish_service_available == 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: No redfish services available. (instance {{ $labels.instance }})
+          description: |
+            No redfish services available.
+              VALUE = {{ $value }}
+              LABELS = {{ $labels }}
 
-  - alert: RedfishServiceUnavailable
-    expr: redfish_service_available == 0
-    for: 0m
-    labels:
-      severity: warning
-    annotations:
-      summary: No redfish services available. (instance {{ $labels.instance }})
-      description: |
-        No redfish services available.
-          VALUE = {{ $value }}
-          LABELS = {{ $labels }}
+      - alert: RedfishSensorHealthNotOk
+        expr: redfish_sensor_info{health != "OK"}
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Redfish sensor health not Ok. (instance {{ $labels.instance }})
+          description: |
+            Redfish sensor health not Ok.
+              SENSOR_READING = {{ $labels.reading }}
+              LABELS = {{ $labels }}
 
-  - alert: RedfishSensorHealthNotOk
-    expr: redfish_sensor_info{health != "OK"}
-    for: 0m
-    labels:
-      severity: critical
-    annotations:
-      summary: Redfish sensor health not Ok. (instance {{ $labels.instance }})
-      description: |
-        Redfish sensor health not Ok.
-          SENSOR_READING = {{ $labels.reading }}
-          LABELS = {{ $labels }}
+      - alert: RedfishProcessorHealthNotOk
+        expr: redfish_processor_info{health != "OK"}
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Redfish processor health not OK. (instance {{ $labels.instance }})
+          description: |
+            Redfish processor health not OK.
+              LABELS = {{ $labels }}
+
+      - alert: RedfishStorageControllerHealthNotOk
+        expr: redfish_storage_controller_info{health != "OK"}
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Redfish storage controller health not OK. (instance {{ $labels.instance }})
+          description: |
+            Redfish storage controller health not OK.
+              LABELS = {{ $labels }}
+
+      - alert: RedfishChassisHealthNotOk
+        expr: redfish_chassis_info{health != "OK"}
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Redfish chassis health not OK. (instance {{ $labels.instance }})
+          description: |
+            Redfish chassis health not OK.
+              LABELS = {{ $labels }}
+
+      - alert: RedfishStorageDriveHealthNotOk
+        expr: redfish_storage_drive_info{health != "OK"}
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Redfish storage drive health not OK. (instance {{ $labels.instance }})
+          description: |
+            Redfish storage drive health not OK.
+              LABELS = {{ $labels }}
+
+      - alert: RedfishMemoryDimmHealthNotOk
+        expr: redfish_memory_dimm_info{health != "OK"}
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Redfish memory dimm health not OK. (instance {{ $labels.instance }})
+          description: |
+            Redfish memory dimm health not OK.
+              LABELS = {{ $labels }}
+
+      - alert: RedfishSmartStorageHealthNotOk
+        expr: redfish_smart_storage_health == 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Redfish smart storage health not OK. (instance {{ $labels.instance }})
+          description: |
+            Redfish smart storage health not OK.
+              VALUE = {{ $value }}
+              LABELS = {{ $labels }}
