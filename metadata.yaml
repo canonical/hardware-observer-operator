@@ -13,6 +13,8 @@ summary: Subordinate charm for monitoring hardware resources.
 
 description: Subordinate charm for monitoring hardware resources.
 
+website: https://github.com/canonical/hardware-observer-operator
+
 docs: https://discourse.charmhub.io/t/hardware-observer-docs-index/11112
 
 issues: https://github.com/canonical/hardware-observer-operator/issues
