@@ -162,34 +162,38 @@ class TestCharm:
         """Test starting and stopping the exporter results in correct charm status."""
         # Stop the exporter
         stop_cmd = "systemctl stop hardware-exporter"
-        await asyncio.gather(
-            unit.run(stop_cmd),
-            ops_test.model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=TIMEOUT),
-        )
-        assert unit.workload_status_message == AppStatus.NOT_RUNNING
+        async with ops_test.fast_forward():
+            await asyncio.gather(
+                unit.run(stop_cmd),
+                ops_test.model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=TIMEOUT),
+            )
+            assert unit.workload_status_message == AppStatus.NOT_RUNNING
 
         # Start the exporter
         start_cmd = "systemctl start hardware-exporter"
-        await asyncio.gather(
-            unit.run(start_cmd),
-            ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=TIMEOUT),
-        )
-        assert unit.workload_status_message == AppStatus.READY
+        async with ops_test.fast_forward():
+            await asyncio.gather(
+                unit.run(start_cmd),
+                ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=TIMEOUT),
+            )
+            assert unit.workload_status_message == AppStatus.READY
 
     async def test_11_exporter_failed(self, app, unit, sync_helper, ops_test):
         """Test failure in the exporter results in correct charm status."""
         # Setting incorrect log level will crash the exporter
-        await asyncio.gather(
-            app.set_config({"exporter-log-level": "RANDOM_LEVEL"}),
-            ops_test.model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=TIMEOUT),
-        )
-        assert unit.workload_status_message == AppStatus.UNHEALTHY
+        async with ops_test.fast_forward():
+            await asyncio.gather(
+                app.set_config({"exporter-log-level": "RANDOM_LEVEL"}),
+                ops_test.model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=TIMEOUT),
+            )
+            assert unit.workload_status_message == AppStatus.UNHEALTHY
 
-        await asyncio.gather(
-            app.reset_config(["exporter-log-level"]),
-            ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=TIMEOUT),
-        )
-        assert unit.workload_status_message == AppStatus.READY
+        async with ops_test.fast_forward():
+            await asyncio.gather(
+                app.reset_config(["exporter-log-level"]),
+                ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=TIMEOUT),
+            )
+            assert unit.workload_status_message == AppStatus.READY
 
     async def test_20_on_remove_event(self, app, sync_helper, ops_test):
         """Test _on_remove event cleans up the service on the host machine."""
