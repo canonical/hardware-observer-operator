@@ -1,2 +1,2 @@
-# Make OpsTest works with controller version < 3
-juju < 3
+pytest
+pytest-operator

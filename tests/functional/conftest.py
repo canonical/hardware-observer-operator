@@ -9,10 +9,14 @@ class SyncHelper:
     """Helper class for running juju async function."""
 
     @staticmethod
-    async def run_wait(unit, command, timeout=20):
-        action = await unit.run(command, timeout=timeout)
-        # await action.wait()  # This is required in juju3
-        return action.results
+    async def run_command_on_unit(ops_test, unit_name, command):
+        complete_command = ["exec", "--unit", unit_name, "--", *command.split()]
+        return_code, stdout, _ = await ops_test.juju(*complete_command)
+        results = {
+            "return-code": return_code,
+            "stdout": stdout,
+        }
+        return results
 
 
 def pytest_addoption(parser):

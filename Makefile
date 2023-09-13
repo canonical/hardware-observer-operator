@@ -80,6 +80,10 @@ functional:
 	@echo "Executing functional tests using built charm at ${PROJECTPATH}"
 	@CHARM_LOCATION=${PROJECTPATH} tox -e func -- ${FUNC_ARGS}
 
+functional31: 
+	@echo "Executing functional tests using built charm at ${PROJECTPATH}"
+	@CHARM_LOCATION=${PROJECTPATH} tox -e func31 -- ${FUNC_ARGS}
+
 test: lint unittests functional
 	@echo "Tests completed for charm ${CHARM_NAME}."
 
