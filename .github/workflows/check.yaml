@@ -1,0 +1,41 @@
+name: Check workflow running linter, unit and functional tests
+
+on:
+  workflow_call:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [master, main]
+    paths-ignore:
+      - "**.md"
+      - "**.rst"
+
+jobs:
+  lint-unit:
+    uses: canonical/bootstack-actions/.github/workflows/lint-unit.yaml@v2
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.10"]
+    with:
+      python-version: ${{ matrix.python-version }}
+      tox-version: "<4"
+
+  func:
+    uses: canonical/bootstack-actions/.github/workflows/func.yaml@v2
+    needs: lint-unit
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - juju-channel: "2.9/stable"
+            command: "make functional"
+          - juju-channel: "3.1/stable"
+            command: "make functional31"
+    with:
+      command: ${{ matrix.command }}
+      juju-channel: ${{ matrix.juju-channel }}
+      nested-containers: false
+      provider: "lxd"
+      python-version: "3.10"
+      timeout-minutes: 120
+      tox-version: "<4"

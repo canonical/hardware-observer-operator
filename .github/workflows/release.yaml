@@ -6,16 +6,20 @@ name: Release to Edge
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [master, main]
+
+concurrency:
+  group: release
+  cancel-in-progress: true
 
 jobs:
+  check:
+    uses: ./.github/workflows/check.yaml
+
   release:
-    uses: canonical/bootstack-actions/.github/workflows/charm-release.yaml@main
+    needs: check
+    uses: canonical/bootstack-actions/.github/workflows/charm-release.yaml@v2
     secrets: inherit
     with:
-      python-version-unit: "['3.8', '3.10']"
-      python-version-func: "3.10"
-      tox-version: "<4"
       channel: "latest/edge"
       upload-image: false
-      commands: "['FUNC_ARGS=\"--series jammy\" make functional']"
