@@ -11,12 +11,13 @@ import typing as t
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 
-import redfish
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError, Resources
+from redfish import redfish_client
+from redfish.rest.v1 import InvalidCredentialsError, RetriesExhaustedError, SessionCreationError
 
 from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor, SystemVendor
-from hardware import SUPPORTED_STORAGES, lshw
+from hardware import SUPPORTED_STORAGES, get_bmc_address, lshw
 from keys import HP_KEYS
 
 logger = logging.getLogger(__name__)
@@ -299,6 +300,30 @@ def raid_hw_verifier() -> t.List[HWTool]:
     return list(tools)
 
 
+def redfish_available() -> bool:
+    """Check if redfish service is available."""
+    redfish_obj = None
+    bmc_address = get_bmc_address()
+    host = f"https://{bmc_address}"
+    # credentials can be empty because we're only checking if redfish service is accessible
+    user = ""
+    pwd = ""
+
+    try:
+        redfish_obj = redfish_client(base_url=host, username=user, password=pwd)
+        redfish_obj.login(auth="session")
+    except RetriesExhaustedError:  # redfish not available
+        result = False
+    except (SessionCreationError, InvalidCredentialsError):
+        # redfish available, wrong credentials or not able to create a session
+        result = True
+    else:  # login succeeded with empty credentials
+        result = True
+        redfish_obj.logout()
+
+    return result
+
+
 def bmc_hw_verifier() -> t.List[HWTool]:
     """Verify if the ipmi is available on the machine.
 
@@ -314,8 +339,7 @@ def bmc_hw_verifier() -> t.List[HWTool]:
         logger.info("IPMI is not available")
 
     # Check RedFish available
-    services = redfish.discover_ssdp()
-    if len(services):
+    if redfish_available():
         tools.append(HWTool.REDFISH)
     else:
         logger.info("Redfish is not available")

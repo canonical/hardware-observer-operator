@@ -550,7 +550,7 @@ def test_raid_hw_verifier(mock_lshw, lshw_output, lshw_storage_output, expect):
 
 
 class TestIPMIHWVerifier(unittest.TestCase):
-    @mock.patch("hw_tools.redfish.discover_ssdp", return_value=[1])
+    @mock.patch("hw_tools.redfish_available", return_value=True)
     @mock.patch("hw_tools.subprocess")
     @mock.patch("hw_tools.apt")
     def test_bmc_hw_verifier(self, mock_apt, mock_subprocess, mock_redfish_discover_ssdp):
@@ -560,7 +560,7 @@ class TestIPMIHWVerifier(unittest.TestCase):
         self.assertCountEqual(output, [HWTool.IPMI, HWTool.REDFISH])
         mock_redfish_discover_ssdp.assert_called()
 
-    @mock.patch("hw_tools.redfish.discover_ssdp", return_value=[])
+    @mock.patch("hw_tools.redfish_available", return_value=False)
     @mock.patch(
         "hw_tools.subprocess.check_output",
         side_effect=subprocess.CalledProcessError(-1, "cmd"),
