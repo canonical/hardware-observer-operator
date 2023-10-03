@@ -305,12 +305,9 @@ def redfish_available() -> bool:
     redfish_obj = None
     bmc_address = get_bmc_address()
     host = f"https://{bmc_address}"
-    # credentials can be empty because we're only checking if redfish service is accessible
-    user = ""
-    pwd = ""
-
     try:
-        redfish_obj = redfish_client(base_url=host, username=user, password=pwd)
+        # credentials can be empty because we're only checking if redfish service is accessible
+        redfish_obj = redfish_client(base_url=host, username="", password="")
         redfish_obj.login(auth="session")
     except RetriesExhaustedError:  # redfish not available
         result = False
