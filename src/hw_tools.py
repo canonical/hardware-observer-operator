@@ -302,7 +302,6 @@ def raid_hw_verifier() -> t.List[HWTool]:
 
 def redfish_available() -> bool:
     """Check if redfish service is available."""
-    redfish_obj = None
     bmc_address = get_bmc_address()
     host = f"https://{bmc_address}"
     try:
