@@ -15,10 +15,13 @@ from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor,
 from hw_tools import (
     APTStrategyABC,
     HWToolHelper,
+    InvalidCredentialsError,
     IPMIStrategy,
     PercCLIStrategy,
+    RetriesExhaustedError,
     SAS2IRCUStrategy,
     SAS3IRCUStrategy,
+    SessionCreationError,
     SSACLIStrategy,
     StorCLIStrategy,
     StrategyABC,
@@ -29,6 +32,7 @@ from hw_tools import (
     install_deb,
     make_executable,
     raid_hw_verifier,
+    redfish_available,
     remove_deb,
     symlink,
 )
@@ -550,24 +554,68 @@ def test_raid_hw_verifier(mock_lshw, lshw_output, lshw_storage_output, expect):
 
 
 class TestIPMIHWVerifier(unittest.TestCase):
-    @mock.patch("hw_tools.redfish.discover_ssdp", return_value=[1])
+    @mock.patch("hw_tools.redfish_client")
+    @mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
+    def test_redfish_not_available(self, mock_bmc_address, mock_redfish_client):
+        mock_redfish_obj = mock.Mock()
+        mock_redfish_client.return_value = mock_redfish_obj
+        mock_redfish_obj.login.side_effect = RetriesExhaustedError()
+
+        result = redfish_available()
+
+        self.assertEqual(result, False)
+        mock_bmc_address.assert_called_once()
+        mock_redfish_client.assert_called_once()
+        mock_redfish_obj.login.assert_called_once()
+
+    @mock.patch("hw_tools.redfish_client")
+    @mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
+    def test_redfish_available(self, mock_bmc_address, mock_redfish_client):
+        mock_redfish_obj = mock.Mock()
+        mock_redfish_client.return_value = mock_redfish_obj
+
+        for exc in [SessionCreationError, InvalidCredentialsError]:
+            mock_redfish_obj.login.side_effect = exc
+            result = redfish_available()
+            self.assertEqual(result, True)
+
+        mock_bmc_address.assert_called()
+        mock_redfish_client.assert_called()
+        mock_redfish_obj.login.assert_called()
+
+    @mock.patch("hw_tools.redfish_client")
+    @mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
+    def test_redfish_available_and_login_success(self, mock_bmc_address, mock_redfish_client):
+        mock_redfish_obj = mock.Mock()
+        mock_redfish_client.return_value = mock_redfish_obj
+
+        result = redfish_available()
+
+        self.assertEqual(result, True)
+
+        mock_bmc_address.assert_called_once()
+        mock_redfish_client.assert_called_once()
+        mock_redfish_obj.login.assert_called_once()
+        mock_redfish_obj.logout.assert_called_once()
+
+    @mock.patch("hw_tools.redfish_available", return_value=True)
     @mock.patch("hw_tools.subprocess")
     @mock.patch("hw_tools.apt")
-    def test_bmc_hw_verifier(self, mock_apt, mock_subprocess, mock_redfish_discover_ssdp):
+    def test_bmc_hw_verifier(self, mock_apt, mock_subprocess, mock_redfish_available):
         output = bmc_hw_verifier()
         mock_apt.add_package.assert_called_with("ipmitool", update_cache=False)
         mock_subprocess.check_output.assert_called_with("ipmitool lan print".split())
         self.assertCountEqual(output, [HWTool.IPMI, HWTool.REDFISH])
-        mock_redfish_discover_ssdp.assert_called()
+        mock_redfish_available.assert_called()
 
-    @mock.patch("hw_tools.redfish.discover_ssdp", return_value=[])
+    @mock.patch("hw_tools.redfish_available", return_value=False)
     @mock.patch(
         "hw_tools.subprocess.check_output",
         side_effect=subprocess.CalledProcessError(-1, "cmd"),
     )
     @mock.patch("hw_tools.apt")
     def test_bmc_hw_verifier_error_handling(
-        self, mock_apt, mock_check_output, mock_redfish_discover_ssdp
+        self, mock_apt, mock_check_output, mock_redfish_available
     ):
         output = bmc_hw_verifier()
         mock_apt.add_package.assert_called_with("ipmitool", update_cache=False)

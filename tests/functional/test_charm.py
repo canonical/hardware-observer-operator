@@ -195,6 +195,11 @@ class TestCharm:
         )
         principal_unit = ops_test.model.applications[PRINCIPAL_APP_NAME].units[0]
 
+        # Wait for cleanup activities to finish
+        await ops_test.model.block_until(
+            lambda: ops_test.model.applications[APP_NAME].status == "unknown"
+        )
+
         cmd = "ls /etc/hardware-exporter-config.yaml"
         results = await sync_helper.run_command_on_unit(ops_test, principal_unit.name, cmd)
         assert results.get("return-code") > 0
