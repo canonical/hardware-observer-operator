@@ -3,7 +3,9 @@
 # See LICENSE file for licensing details.
 
 import asyncio
+import inspect
 import logging
+import os
 from enum import Enum
 from pathlib import Path
 
@@ -19,6 +21,12 @@ PRINCIPAL_APP_NAME = "ubuntu"
 GRAFANA_AGENT_APP_NAME = "grafana-agent"
 
 TIMEOUT = 600
+
+
+def get_this_script_dir() -> Path:
+    filename = inspect.getframeinfo(inspect.currentframe()).filename  # type: ignore[arg-type]
+    path = os.path.dirname(os.path.abspath(filename))
+    return Path(path)
 
 
 class AppStatus(str, Enum):
@@ -43,40 +51,50 @@ async def test_build_and_deploy(ops_test: OpsTest, series, sync_helper):
     charm = await ops_test.build_charm(".")
     assert charm, "Charm was not built successfully."
 
-    await asyncio.gather(
-        ops_test.model.deploy(
-            ops_test.render_bundle(
-                "tests/functional/bundle.yaml.j2",
-                charm=charm,
-                series=series,
-                resources={
-                    "storcli-deb": "empty-resource",
-                    "perccli-deb": "empty-resource",
-                    "sas2ircu-bin": "empty-resource",
-                    "sas3ircu-bin": "empty-resource",
-                },
-            )
-        ),
-        ops_test.model.wait_for_idle(
-            apps=[APP_NAME],
-            status="blocked",
-            timeout=TIMEOUT,
-        ),
-        ops_test.model.wait_for_idle(
-            apps=[GRAFANA_AGENT_APP_NAME],
-            status="blocked",
-            timeout=TIMEOUT,
-        ),
-        ops_test.model.wait_for_idle(
-            apps=[PRINCIPAL_APP_NAME],
-            status="active",
-            raise_on_blocked=True,
-            timeout=TIMEOUT,
-        ),
+    bundle_template_path = get_this_script_dir() / "bundle.yaml.j2"
+
+    logger.info("Rendering bundle %s", bundle_template_path)
+    bundle = ops_test.render_bundle(
+        bundle_template_path,
+        charm=charm,
+        series=series,
+        resources={
+            "storcli-deb": "empty-resource",
+            "perccli-deb": "empty-resource",
+            "sas2ircu-bin": "empty-resource",
+            "sas3ircu-bin": "empty-resource",
+        },
     )
+    with open(bundle, "r") as f:
+        print(f.read())
+
+    await ops_test.model.deploy("ubuntu"),
+    await ops_test.model.deploy(bundle),
+    await ops_test.model.wait_for_idle(
+        apps=[PRINCIPAL_APP_NAME],
+        status="active",
+        raise_on_blocked=True,
+        timeout=TIMEOUT,
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[GRAFANA_AGENT_APP_NAME],
+        status="blocked",
+        timeout=TIMEOUT,
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME],
+        status="blocked",
+        timeout=TIMEOUT,
+    )
+
+    for unit in ops_test.model.applications[GRAFANA_AGENT_APP_NAME].units:
+        logger.debug(unit.workload_status_message)
+        logger.debug(unit.workload_status)
 
     # Test initial workload status
     for unit in ops_test.model.applications[APP_NAME].units:
+        logger.debug(unit.workload_status_message)
+        logger.debug(unit.workload_status)
         assert AppStatus.MISSING_RESOURCES not in unit.workload_status_message
         assert unit.workload_status_message == AppStatus.MISSING_RELATION
 

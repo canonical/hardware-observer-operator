@@ -1,28 +1,6 @@
-# Test basic deployment:
-# ubuntu:juju-info <-> grafana-agent:juju-info
-# ubuntu:juju-info <-> hardware-observer:general-info
-# grafana-agent:cos-agent <-> hardware-observer:cos-agent
-
 series: {{ series }}
-
-machines:
-  "0":
 
 applications:
   ubuntu:
     charm: ubuntu
     num_units: 1
-    to:
-      - "0"
-  grafana-agent:
-    charm: grafana-agent
-    channel: edge # FIXME: currently no stable release
-  hardware-observer:
-    charm: {{ charm }}
-
-relations:
-- - grafana-agent:juju-info
-  - ubuntu:juju-info
-- - hardware-observer:general-info
-  - ubuntu:juju-info
-

@@ -21,14 +21,12 @@ jobs:
       tox-version: "<4"
 
   func:
-    uses: canonical/bootstack-actions/.github/workflows/func.yaml@v2
+    uses: jneo8/bootstack-actions/.github/workflows/func.yaml@v3
     needs: lint-unit
     strategy:
       fail-fast: false
       matrix:
         include:
-          - juju-channel: "2.9/stable"
-            command: "make functional"
           - juju-channel: "3.1/stable"
             command: "make functional31"
     with:
