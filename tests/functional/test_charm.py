@@ -3,7 +3,9 @@
 # See LICENSE file for licensing details.
 
 import asyncio
+import inspect
 import logging
+import os
 from enum import Enum
 from pathlib import Path
 
@@ -19,6 +21,12 @@ PRINCIPAL_APP_NAME = "ubuntu"
 GRAFANA_AGENT_APP_NAME = "grafana-agent"
 
 TIMEOUT = 600
+
+
+def get_this_script_dir() -> Path:
+    filename = inspect.getframeinfo(inspect.currentframe()).filename  # type: ignore[arg-type]
+    path = os.path.dirname(os.path.abspath(filename))
+    return Path(path)
 
 
 class AppStatus(str, Enum):
@@ -43,36 +51,40 @@ async def test_build_and_deploy(ops_test: OpsTest, series, sync_helper):
     charm = await ops_test.build_charm(".")
     assert charm, "Charm was not built successfully."
 
-    await asyncio.gather(
-        ops_test.model.deploy(
-            ops_test.render_bundle(
-                "tests/functional/bundle.yaml.j2",
-                charm=charm,
-                series=series,
-                resources={
-                    "storcli-deb": "empty-resource",
-                    "perccli-deb": "empty-resource",
-                    "sas2ircu-bin": "empty-resource",
-                    "sas3ircu-bin": "empty-resource",
-                },
-            )
-        ),
-        ops_test.model.wait_for_idle(
-            apps=[APP_NAME],
-            status="blocked",
-            timeout=TIMEOUT,
-        ),
-        ops_test.model.wait_for_idle(
-            apps=[GRAFANA_AGENT_APP_NAME],
-            status="blocked",
-            timeout=TIMEOUT,
-        ),
-        ops_test.model.wait_for_idle(
-            apps=[PRINCIPAL_APP_NAME],
-            status="active",
-            raise_on_blocked=True,
-            timeout=TIMEOUT,
-        ),
+    bundle_template_path = get_this_script_dir() / "bundle.yaml.j2"
+
+    logger.info("Rendering bundle %s", bundle_template_path)
+    bundle = ops_test.render_bundle(
+        bundle_template_path,
+        charm=charm,
+        series=series,
+        resources={
+            "storcli-deb": "empty-resource",
+            "perccli-deb": "empty-resource",
+            "sas2ircu-bin": "empty-resource",
+            "sas3ircu-bin": "empty-resource",
+        },
+    )
+    juju_cmd = ["deploy", "-m", ops_test.model_full_name, str(bundle)]
+
+    rc, stdout, stderr = await ops_test.juju(*juju_cmd)
+    assert rc == 0, f"Bundle deploy failed: {(stderr or stdout).strip()}"
+
+    await ops_test.model.wait_for_idle(
+        apps=[PRINCIPAL_APP_NAME],
+        status="active",
+        raise_on_blocked=True,
+        timeout=TIMEOUT,
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[GRAFANA_AGENT_APP_NAME],
+        status="blocked",
+        timeout=TIMEOUT,
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME],
+        status="blocked",
+        timeout=TIMEOUT,
     )
 
     # Test initial workload status
