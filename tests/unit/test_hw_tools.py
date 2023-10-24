@@ -18,6 +18,7 @@ from hw_tools import (
     InvalidCredentialsError,
     IPMIStrategy,
     PercCLIStrategy,
+    ResourceFileSizeZeroError,
     RetriesExhaustedError,
     SAS2IRCUStrategy,
     SAS3IRCUStrategy,
@@ -27,6 +28,7 @@ from hw_tools import (
     StrategyABC,
     TPRStrategyABC,
     bmc_hw_verifier,
+    check_file_size,
     copy_to_snap_common_bin,
     get_hw_tool_white_list,
     install_deb,
@@ -119,7 +121,10 @@ class TestHWToolHelper(unittest.TestCase):
         for hw_tools_tool in TPR_RESOURCES.values():
             mock_resources._paths[hw_tools_tool] = f"path-{hw_tools_tool}"
 
-        self.hw_tool_helper.fetch_tools(mock_resources)
+        self.hw_tool_helper.fetch_tools(
+            resources=mock_resources,
+            hw_white_list=[tool for tool in HWTool],
+        )
 
         for tool in TPR_RESOURCES.values():
             mock_resources.fetch.assert_any_call(tool)
@@ -130,7 +135,10 @@ class TestHWToolHelper(unittest.TestCase):
         mock_resources._paths = {}
         mock_resources.fetch.side_effect = ModelError()
 
-        fetch_tools = self.hw_tool_helper.fetch_tools(mock_resources)
+        fetch_tools = self.hw_tool_helper.fetch_tools(
+            mock_resources,
+            hw_white_list=[tool for tool in HWTool],
+        )
 
         for tool in TPR_RESOURCES.values():
             mock_resources.fetch.assert_any_call(tool)
@@ -263,9 +271,54 @@ class TestHWToolHelper(unittest.TestCase):
         self.assertEqual(msg, "Missing resources: ['storcli-deb', 'perccli-deb']")
         self.assertFalse(self.harness.charm._stored.installed)
 
+    @mock.patch(
+        "hw_tools.get_hw_tool_white_list",
+        return_value=[HWTool.STORCLI, HWTool.IPMI, HWTool.REDFISH],
+    )
+    @mock.patch(
+        "hw_tools.HWToolHelper.strategies",
+        return_value=[
+            mock.PropertyMock(spec=TPRStrategyABC),
+            mock.PropertyMock(spec=APTStrategyABC),
+            mock.PropertyMock(spec=APTStrategyABC),
+        ],
+        new_callable=mock.PropertyMock,
+    )
+    def test_10_install_strategy_errors(self, mock_strategies, mock_hw_white_list):
+        """Catch excepted error when execute strategies' install method."""
+        self.harness.add_resource("storcli-deb", "storcli.deb")
+        self.harness.begin()
+        mock_resources = self.harness.charm.model.resources
+        mock_strategies.return_value[0].name = HWTool.STORCLI
+        mock_strategies.return_value[1].name = HWTool.IPMI
+        mock_strategies.return_value[2].name = HWTool.REDFISH
+
+        mock_strategies.return_value[0].install.side_effect = ResourceFileSizeZeroError(
+            HWTool.STORCLI, "fake-path"
+        )
+        mock_strategies.return_value[1].install.side_effect = OSError("Fake os error")
+        mock_strategies.return_value[2].install.side_effect = apt.PackageError(
+            "Fake apt packge error"
+        )
+
+        ok, msg = self.hw_tool_helper.install(mock_resources)
+
+        self.assertFalse(ok)
+        self.assertEqual(f"Fail strategies: {[HWTool.STORCLI, HWTool.IPMI, HWTool.REDFISH]}", msg)
+
+    @mock.patch("hw_tools.check_file_size", return_value=False)
+    def test_11_check_missing_resources_zero_size_resources(self, check_file_size):
+        self.harness.begin()
+        ok, msg = self.hw_tool_helper.check_missing_resources(
+            hw_white_list=[HWTool.STORCLI],
+            fetch_tools={HWTool.STORCLI: "fake-path"},
+        )
+        self.assertFalse(ok)
+        self.assertEqual("Missing resources: ['storcli-deb']", msg)
+
 
 class TestStorCLIStrategy(unittest.TestCase):
-    @mock.patch("hw_tools.TPRStrategyABC.check_file_size", return_value=True)
+    @mock.patch("hw_tools.check_file_size", return_value=True)
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.install_deb")
     def test_install(self, mock_install_deb, mock_symlink, _):
@@ -281,8 +334,9 @@ class TestStorCLIStrategy(unittest.TestCase):
     @mock.patch("hw_tools.install_deb")
     def test_install_empty_resource(self, mock_install_deb, mock_symlink):
         strategy = StorCLIStrategy()
-        strategy.install(get_mock_path(0))
 
+        with pytest.raises(ResourceFileSizeZeroError):
+            strategy.install(get_mock_path(0))
         mock_install_deb.assert_not_called()
         mock_symlink.assert_not_called()
 
@@ -339,14 +393,14 @@ class TestDeb(unittest.TestCase):
 
 class TestTPRStrategyABC(unittest.TestCase):
     def test_check_file_size_not_zero(self):
-        self.assertTrue(TPRStrategyABC.check_file_size(get_mock_path(size=100)))
+        self.assertTrue(check_file_size(get_mock_path(size=100)))
 
     def test_check_file_size_zero(self):
-        self.assertFalse(TPRStrategyABC.check_file_size(get_mock_path(size=0)))
+        self.assertFalse(check_file_size(get_mock_path(size=0)))
 
 
 class TestSAS2IRCUStrategy(unittest.TestCase):
-    @mock.patch("hw_tools.TPRStrategyABC.check_file_size", return_value=True)
+    @mock.patch("hw_tools.check_file_size", return_value=True)
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.make_executable")
     def test_install(self, mock_make_executable, mock_symlink, _):
@@ -359,7 +413,8 @@ class TestSAS2IRCUStrategy(unittest.TestCase):
     @mock.patch("hw_tools.make_executable")
     def test_install_empty_resource(self, mock_make_executable, mock_symlink):
         strategy = SAS2IRCUStrategy()
-        strategy.install(get_mock_path(0))
+        with pytest.raises(ResourceFileSizeZeroError):
+            strategy.install(get_mock_path(0))
 
         mock_make_executable.assert_not_called()
         mock_symlink.assert_not_called()
@@ -372,7 +427,7 @@ class TestSAS2IRCUStrategy(unittest.TestCase):
 
 
 class TestSAS3IRCUStrategy(unittest.TestCase):
-    @mock.patch("hw_tools.TPRStrategyABC.check_file_size", return_value=True)
+    @mock.patch("hw_tools.check_file_size", return_value=True)
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.make_executable")
     def test_install(self, mock_make_executable, mock_symlink, _):
@@ -385,7 +440,8 @@ class TestSAS3IRCUStrategy(unittest.TestCase):
     @mock.patch("hw_tools.make_executable")
     def test_install_empty_resource(self, mock_make_executable, mock_symlink):
         strategy = SAS3IRCUStrategy()
-        strategy.install(get_mock_path(0))
+        with pytest.raises(ResourceFileSizeZeroError):
+            strategy.install(get_mock_path(0))
 
         mock_make_executable.assert_not_called()
         mock_symlink.assert_not_called()
@@ -398,7 +454,7 @@ class TestSAS3IRCUStrategy(unittest.TestCase):
 
 
 class TestPercCLIStrategy(unittest.TestCase):
-    @mock.patch("hw_tools.TPRStrategyABC.check_file_size", return_value=True)
+    @mock.patch("hw_tools.check_file_size", return_value=True)
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.install_deb")
     def test_install(self, mock_install_deb, mock_symlink, _):
@@ -419,7 +475,8 @@ class TestPercCLIStrategy(unittest.TestCase):
         mock_path_stat.st_size = 0
 
         strategy = PercCLIStrategy()
-        strategy.install(mock_path)
+        with pytest.raises(ResourceFileSizeZeroError):
+            strategy.install(mock_path)
 
         mock_install_deb.assert_not_called()
         mock_symlink.assert_not_called()

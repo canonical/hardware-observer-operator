@@ -23,6 +23,14 @@ from keys import HP_KEYS
 logger = logging.getLogger(__name__)
 
 
+class ResourceFileSizeZeroError(Exception):
+    """The expect resource size should not be zero."""
+
+    def __init__(self, tool: HWTool, path: Path):
+        """Init."""
+        self.message = f"Tool: {tool} path: {path} size is zero"
+
+
 def copy_to_snap_common_bin(source: Path, filename: str) -> None:
     """Copy file to $SNAP_COMMON/bin folder."""
     Path(f"{SNAP_COMMON}/bin").mkdir(parents=False, exist_ok=True)
@@ -37,6 +45,20 @@ def symlink(src: Path, dst: Path) -> None:
     except OSError as err:
         logger.exception(err)
         raise
+
+
+def check_file_size(path: Path) -> bool:
+    """Verify if the file size > 0.
+
+    Because charm focus us to publish the resources on charmhub,
+    but most of the hardware related tools have the un-republish
+    policy. Currently our solution is publish a empty file which
+    size is 0.
+    """
+    if path.stat().st_size == 0:
+        logger.info("% size is 0, skip install", path)
+        return False
+    return True
 
 
 def install_deb(name: str, path: Path) -> None:
@@ -102,20 +124,6 @@ class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
 class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     """Third party resource strategy class."""
 
-    @staticmethod
-    def check_file_size(path: Path) -> bool:
-        """Verify if the file size > 0.
-
-        Because charm focus us to publish the resources on charmhub,
-        but most of the hardware related tools have the un-republish
-        policy. Currently our solution is publish a empty file which
-        size is 0.
-        """
-        if path.stat().st_size == 0:
-            logger.info("% size is 0, skip install", path)
-            return False
-        return True
-
     @abstractmethod
     def install(self, path: Path) -> None:
         """Installation details."""
@@ -134,8 +142,8 @@ class StorCLIStrategy(TPRStrategyABC):
 
     def install(self, path: Path) -> None:
         """Install storcli."""
-        if not self.check_file_size(path):
-            return
+        if not check_file_size(path):
+            raise ResourceFileSizeZeroError(tool=self._name, path=path)
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
 
@@ -155,8 +163,8 @@ class PercCLIStrategy(TPRStrategyABC):
 
     def install(self, path: Path) -> None:
         """Install perccli."""
-        if not self.check_file_size(path):
-            return
+        if not check_file_size(path):
+            raise ResourceFileSizeZeroError(tool=self._name, path=path)
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
 
@@ -175,8 +183,8 @@ class SAS2IRCUStrategy(TPRStrategyABC):
 
     def install(self, path: Path) -> None:
         """Install sas2ircu."""
-        if not self.check_file_size(path):
-            return
+        if not check_file_size(path):
+            raise ResourceFileSizeZeroError(tool=self._name, path=path)
         make_executable(path)
         symlink(src=path, dst=self.symlink_bin)
 
@@ -365,11 +373,18 @@ class HWToolHelper:
             RedFishStrategy(),
         ]
 
-    def fetch_tools(self, resources: Resources) -> t.Dict[str, Path]:
+    def fetch_tools(  # pylint: disable=W0102
+        self,
+        resources: Resources,
+        hw_white_list: t.List[HWTool] = [],
+    ) -> t.Dict[HWTool, Path]:
         """Fetch resource from juju if it's VENDOR_TOOLS."""
-        fetch_tools: t.Dict[str, Path] = {}
+        fetch_tools: t.Dict[HWTool, Path] = {}
         # Fetch all tools from juju resources
         for tool, resource in TPR_RESOURCES.items():
+            if tool not in hw_white_list:
+                logger.info("Skip fetch tool: %s", tool)
+                continue
             try:
                 path = resources.fetch(resource)
                 fetch_tools[tool] = path
@@ -378,34 +393,64 @@ class HWToolHelper:
 
         return fetch_tools
 
+    def check_missing_resources(
+        self, hw_white_list: t.List[HWTool], fetch_tools: t.Dict[HWTool, Path]
+    ) -> t.Tuple[bool, str]:
+        """Check if required resources are not been uploaded."""
+        missing_resources = []
+        for tool in hw_white_list:
+            if tool in TPR_RESOURCES:
+                # Resource hasn't been uploaded
+                if tool not in fetch_tools:
+                    missing_resources.append(TPR_RESOURCES[tool])
+                # Uploaded but file size is zero
+                path = fetch_tools.get(tool)
+                if path and not check_file_size(path):
+                    logger.warning("Tool: %s path: %s size is zero", tool, path)
+                    missing_resources.append(TPR_RESOURCES[tool])
+        if len(missing_resources) > 0:
+            return False, f"Missing resources: {missing_resources}"
+        return True, ""
+
     def install(self, resources: Resources) -> t.Tuple[bool, str]:
         """Install tools."""
-        fetch_tools = self.fetch_tools(resources)
         hw_white_list = get_hw_tool_white_list()
         logger.info("hw_tool_white_list: %s", hw_white_list)
 
-        # Check if required resources are not been uploaded.
-        missing_resources = []
-        for tool in hw_white_list:
-            if tool in TPR_RESOURCES and tool not in fetch_tools:
-                missing_resources.append(TPR_RESOURCES[tool])
-        if len(missing_resources) > 0:
-            return False, f"Missing resources: {missing_resources}"
+        fetch_tools = self.fetch_tools(resources, hw_white_list)
 
+        ok, msg = self.check_missing_resources(hw_white_list, fetch_tools)
+        if not ok:
+            return ok, msg
+
+        fail_strategies = []
+        strategy_errors = []
+
+        # Iterate over each strategy and execute.
         for strategy in self.strategies:
             if strategy.name not in hw_white_list:
                 continue
             # TPRStrategy
-            if isinstance(strategy, TPRStrategyABC):
-                resource = TPR_RESOURCES.get(strategy.name)
-                if not resource:
-                    continue
-                path = resources._paths.get(resource)  # pylint: disable=W0212
-                if path:
-                    strategy.install(path)
-            # APTStrategy
-            elif isinstance(strategy, APTStrategyABC):
-                strategy.install()  # pylint: disable=E1120
+            try:
+                if isinstance(strategy, TPRStrategyABC):
+                    path = fetch_tools.get(strategy.name)  # pylint: disable=W0212
+                    if path:
+                        strategy.install(path)
+                # APTStrategy
+                elif isinstance(strategy, APTStrategyABC):
+                    strategy.install()  # pylint: disable=E1120
+                logger.info("Strategy %s install success", strategy)
+            except (
+                ResourceFileSizeZeroError,
+                OSError,
+                apt.PackageError,
+            ) as e:
+                logger.warning("Strategy %s install fail: %s", strategy, e)
+                fail_strategies.append(strategy.name)
+                strategy_errors.append(e)
+
+        if len(strategy_errors) > 0:
+            return False, f"Fail strategies: {fail_strategies}"
         return True, ""
 
     def remove(self, resources: Resources) -> None:  # pylint: disable=W0613
@@ -416,4 +461,4 @@ class HWToolHelper:
                 continue
             if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
                 strategy.remove()
-            logger.info("Remove resource: %s", strategy)
+            logger.info("Strategy %s remove success", strategy)
