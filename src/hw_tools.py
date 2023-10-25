@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class ResourceFileSizeZeroError(Exception):
-    """The expect resource size should not be zero."""
+    """Empty resource error."""
 
     def __init__(self, tool: HWTool, path: Path):
         """Init."""
