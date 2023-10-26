@@ -22,12 +22,11 @@ issues: https://github.com/canonical/hardware-observer-operator/issues
 subordinate: true
 
 resources:
-
   storcli-deb:
     type: file
     description: |
       (Optional) un-republish tool.
-      StorCLI deb file publish by Broadcom for their RAID devices.
+      StorCLI deb file published by Broadcom for their RAID devices.
       Download StorCLI MR 7.26 from: https://docs.broadcom.com/docs/1232743291 .
     filename: storcli.deb
 
@@ -35,15 +34,15 @@ resources:
     type: file
     description: |
       (Optional) un-republish tool.
-      PercCLI deb file publish by Dell for their RAID devices.
-      Download it from https://www.dell.com/support/home/zh-tw/drivers/driversdetails?driverid=52r3d .
+      PercCLI deb file published by Dell for their RAID devices.
+      Download it from https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=36g6n .
     filename: perccli.deb
 
   sas2ircu-bin:
     type: file
     description: |
       (Optional) un-republish tool.
-      SASIRCU binary file publish by Broadcom.
+      SASIRCU binary file published by Broadcom.
       Download it from https://docs.broadcom.com/docs/12351730 .
     filename: sas2ircu
 
@@ -51,10 +50,9 @@ resources:
     type: file
     description: |
       (Optional) un-republish tool.
-      SASIRCU binary file publish by Broadcom.
+      SASIRCU binary file published by Broadcom.
       Download it from https://docs.broadcom.com/docs/SAS3IRCU_P15.zip .
     filename: sas3ircu
-
 
 provides:
   cos-agent:

@@ -1,12 +1,7 @@
 # PercCLI
 
-- Download from: https://www.dell.com/support/home/zh-tw/drivers/driversdetails?driverid=52r3d
-- unzip
-
-- Use `alien` to transform `rpm` to `.deb`.
-    ```sh
-    sudo alien -c ./perccli-007.0318.0000.0000-1.noarch.rpm
-    ```
+- Download from: https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=36g6n
+- Unzip and extract the contents of the tarball file. Use the deb package.
 
 # StorCLI
 
