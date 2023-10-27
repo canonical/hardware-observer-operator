@@ -16,6 +16,14 @@ from ops.model import ModelError, Resources
 from redfish import redfish_client
 from redfish.rest.v1 import InvalidCredentialsError, RetriesExhaustedError, SessionCreationError
 
+from check_sum import (
+    PERCCLI_SUPPORT_INFOS,
+    SAS2IRCU_SUPPORT_INFOS,
+    SAS3IRCU_SUPPORT_INFOS,
+    STORCLI_SUPPORT_INFOS,
+    ResourceCheckSumError,
+    check_file_sum,
+)
 from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor, SystemVendor
 from hardware import SUPPORTED_STORAGES, get_bmc_address, lshw
 from keys import HP_KEYS
@@ -144,6 +152,8 @@ class StorCLIStrategy(TPRStrategyABC):
         """Install storcli."""
         if not check_file_size(path):
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
+        if not check_file_sum(STORCLI_SUPPORT_INFOS, path):
+            raise ResourceCheckSumError
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
 
@@ -165,6 +175,8 @@ class PercCLIStrategy(TPRStrategyABC):
         """Install perccli."""
         if not check_file_size(path):
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
+        if not check_file_sum(PERCCLI_SUPPORT_INFOS, path):
+            raise ResourceCheckSumError
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
 
@@ -185,6 +197,8 @@ class SAS2IRCUStrategy(TPRStrategyABC):
         """Install sas2ircu."""
         if not check_file_size(path):
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
+        if not check_file_sum(SAS2IRCU_SUPPORT_INFOS, path):
+            raise ResourceCheckSumError
         make_executable(path)
         symlink(src=path, dst=self.symlink_bin)
 
@@ -199,6 +213,15 @@ class SAS3IRCUStrategy(SAS2IRCUStrategy):
 
     _name = HWTool.SAS3IRCU
     symlink_bin = TOOLS_DIR / HWTool.SAS3IRCU.value
+
+    def install(self, path: Path) -> None:
+        """Install sas3ircu."""
+        if not check_file_size(path):
+            raise ResourceFileSizeZeroError(tool=self._name, path=path)
+        if not check_file_sum(SAS3IRCU_SUPPORT_INFOS, path):
+            raise ResourceCheckSumError
+        make_executable(path)
+        symlink(src=path, dst=self.symlink_bin)
 
 
 class SSACLIStrategy(APTStrategyABC):
@@ -444,6 +467,7 @@ class HWToolHelper:
                 ResourceFileSizeZeroError,
                 OSError,
                 apt.PackageError,
+                ResourceCheckSumError,
             ) as e:
                 logger.warning("Strategy %s install fail: %s", strategy, e)
                 fail_strategies.append(strategy.name)

@@ -1,4 +1,5 @@
 cosl
+distro
 ops >= 2.2.0
 jinja2
 redfish
