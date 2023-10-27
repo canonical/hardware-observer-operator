@@ -1,6 +1,6 @@
 # PercCLI
 
-- Download from: https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=36g6n
+- Download from: https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=tdghn
 - Unzip and extract the contents of the tarball file. Use the deb package.
 
 # StorCLI
