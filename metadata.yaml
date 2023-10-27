@@ -43,7 +43,7 @@ resources:
     description: |
       (Optional) un-republish tool.
       SASIRCU binary file published by Broadcom.
-      Download it from https://docs.broadcom.com/docs/12351730 .
+      Download it from https://docs.broadcom.com/docs/12351735 .
     filename: sas2ircu
 
   sas3ircu-bin:
@@ -51,7 +51,7 @@ resources:
     description: |
       (Optional) un-republish tool.
       SASIRCU binary file published by Broadcom.
-      Download it from https://docs.broadcom.com/docs/SAS3IRCU_P15.zip .
+      Download it from https://docs.broadcom.com/docs/SAS3IRCU_P16.zip .
     filename: sas3ircu
 
 provides:
