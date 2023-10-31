@@ -128,7 +128,7 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     def test_11_config_changed_before_install_complete(self, mock_exporter):
-        """Test: config change event is defered if charm not installed."""
+        """Test: config change event is deferred if charm not installed."""
         self.harness.begin()
         self.harness.charm._stored.installed = False
 

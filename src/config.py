@@ -57,5 +57,5 @@ EXPORTER_COLLECTOR_MAPPING = {
 
 TOOLS_DIR = Path("/usr/sbin")
 
-# SNAP envionment
+# SNAP environment
 SNAP_COMMON = Path(f"/var/snap/{EXPORTER_NAME}/common")

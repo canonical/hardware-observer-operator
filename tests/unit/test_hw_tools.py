@@ -305,7 +305,7 @@ class TestHWToolHelper(unittest.TestCase):
         )
         mock_strategies.return_value[1].install.side_effect = OSError("Fake os error")
         mock_strategies.return_value[2].install.side_effect = apt.PackageError(
-            "Fake apt packge error"
+            "Fake apt package error"
         )
 
         ok, msg = self.hw_tool_helper.install(mock_resources)
