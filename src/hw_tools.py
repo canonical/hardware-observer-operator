@@ -16,13 +16,13 @@ from ops.model import ModelError, Resources
 from redfish import redfish_client
 from redfish.rest.v1 import InvalidCredentialsError, RetriesExhaustedError, SessionCreationError
 
-from check_sum import (
-    PERCCLI_SUPPORT_INFOS,
-    SAS2IRCU_SUPPORT_INFOS,
-    SAS3IRCU_SUPPORT_INFOS,
-    STORCLI_SUPPORT_INFOS,
-    ResourceCheckSumError,
-    check_file_sum,
+from checksum import (
+    PERCCLI_VERSION_INFOS,
+    SAS2IRCU_VERSION_INFOS,
+    SAS3IRCU_VERSION_INFOS,
+    STORCLI_VERSION_INFOS,
+    ResourceChecksumError,
+    validate_checksum,
 )
 from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor, SystemVendor
 from hardware import SUPPORTED_STORAGES, get_bmc_address, lshw
@@ -152,8 +152,8 @@ class StorCLIStrategy(TPRStrategyABC):
         """Install storcli."""
         if not check_file_size(path):
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
-        if not check_file_sum(STORCLI_SUPPORT_INFOS, path):
-            raise ResourceCheckSumError
+        if not validate_checksum(STORCLI_VERSION_INFOS, path):
+            raise ResourceChecksumError
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
 
@@ -175,8 +175,8 @@ class PercCLIStrategy(TPRStrategyABC):
         """Install perccli."""
         if not check_file_size(path):
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
-        if not check_file_sum(PERCCLI_SUPPORT_INFOS, path):
-            raise ResourceCheckSumError
+        if not validate_checksum(PERCCLI_VERSION_INFOS, path):
+            raise ResourceChecksumError
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
 
@@ -197,8 +197,8 @@ class SAS2IRCUStrategy(TPRStrategyABC):
         """Install sas2ircu."""
         if not check_file_size(path):
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
-        if not check_file_sum(SAS2IRCU_SUPPORT_INFOS, path):
-            raise ResourceCheckSumError
+        if not validate_checksum(SAS2IRCU_VERSION_INFOS, path):
+            raise ResourceChecksumError
         make_executable(path)
         symlink(src=path, dst=self.symlink_bin)
 
@@ -218,8 +218,8 @@ class SAS3IRCUStrategy(SAS2IRCUStrategy):
         """Install sas3ircu."""
         if not check_file_size(path):
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
-        if not check_file_sum(SAS3IRCU_SUPPORT_INFOS, path):
-            raise ResourceCheckSumError
+        if not validate_checksum(SAS3IRCU_VERSION_INFOS, path):
+            raise ResourceChecksumError
         make_executable(path)
         symlink(src=path, dst=self.symlink_bin)
 
@@ -467,7 +467,7 @@ class HWToolHelper:
                 ResourceFileSizeZeroError,
                 OSError,
                 apt.PackageError,
-                ResourceCheckSumError,
+                ResourceChecksumError,
             ) as e:
                 logger.warning("Strategy %s install fail: %s", strategy, e)
                 fail_strategies.append(strategy.name)
