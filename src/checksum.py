@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 # For further info, check https://github.com/canonical/charmcraft
-"""Check sum definition, check functions and related utils."""
+"""Checksum definition, check functions and related utils."""
 import hashlib
 import logging
 import typing as t
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class ResourceChecksumError(Exception):
-    """Rais if check sum does not match."""
+    """Raise if checksum does not match."""
 
 
 @dataclass
@@ -283,5 +283,5 @@ def validate_checksum(support_version_infos: t.List[ToolVersionInfo], path: Path
 
     if sha256_hash in supported_checksums:
         return True
-    logger.warning("Check sum fail, path: %s hash: %s", path, sha256_hash)
+    logger.warning("Checksum validation fail, path: %s hash: %s", path, sha256_hash)
     return False
