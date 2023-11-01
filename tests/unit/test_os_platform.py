@@ -25,17 +25,6 @@ def test_get_os_platform_non_linux(system, release, machine):
     assert result == OSPlatform(system=system, release=release, machine=machine)
 
 
-@patch("os_platform.distro")
-def test_get_os_platform_non_linux_distro_info(mock_distro):
-    mock_distro.info.return_value = {"like": "ubuntu abc def", "version": "22.04"}
-    with patch("platform.system", return_value="Linux"):
-        with patch("platform.release", return_value="22.04"):
-            with patch("platform.machine", return_value="x86_86"):
-                result = get_os_platform()
-    assert result == OSPlatform(system="ubuntu", release="22.04", machine="x86_86")
-    assert result.series == UbuntuSeries.JAMMY
-
-
 @pytest.mark.parametrize("system", ["ubuntu"])
 @pytest.mark.parametrize(
     "release,series",

@@ -25,10 +25,17 @@ import distro
 class UbuntuSeries(str, Enum):
     """Ubuntu Series."""
 
+    NOBLE = "24.04"
     JAMMY = "22.04"
     FOCAL = "20.04"
     BIONIC = "18.04"
     XENIAL = "16.04"
+
+
+class Architecture(str, Enum):
+    """Host architecture."""
+
+    X86_64 = "x86_64"
 
 
 @dataclasses.dataclass
@@ -58,9 +65,6 @@ def get_os_platform() -> OSPlatform:
     if system == "Linux":
         info = distro.info()
         system = info.get("id", system)
-        # Treat Ubuntu derivatives as Ubuntu, as they should be compatible.
-        if system != "ubuntu" and "ubuntu" in info.get("like", "").split():
-            system = "ubuntu"
         release = info.get("version", release)
 
     return OSPlatform(system=system, release=release, machine=machine)
