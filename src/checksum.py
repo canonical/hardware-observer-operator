@@ -129,7 +129,6 @@ PERCCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ToolVersionInfo(
         version="007.1420.0000.0000",
         supported_series=[
-            UbuntuSeries.JAMMY,
             UbuntuSeries.FOCAL,
             UbuntuSeries.BIONIC,
             UbuntuSeries.XENIAL,
