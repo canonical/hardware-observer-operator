@@ -1,6 +1,6 @@
 from unittest import mock
 
-from checksum import PERCCLI_VERSION_INFOS, validate_checksum
+from checksum import PERCCLI_VERSION_INFOS, STORCLI_VERSION_INFOS, validate_checksum
 from os_platform import OSPlatform
 
 
@@ -8,7 +8,6 @@ class TestCheckFileSum:
     @mock.patch(
         "checksum.get_os_platform",
         return_value=OSPlatform(
-            system="ubuntu",
             release="20.04",
             machine="x86_64",
         ),
@@ -26,6 +25,31 @@ class TestCheckFileSum:
         ok = validate_checksum(PERCCLI_VERSION_INFOS, target)
         assert ok
 
+    @mock.patch(
+        "checksum.get_os_platform",
+        return_value=OSPlatform(
+            release="14.04",  # old version which should be cover by field support_all_series
+            machine="x86_64",
+        ),
+    )
+    @mock.patch("checksum.hashlib.sha256")
+    def test_validate_checksum_support_all_series(
+        self,
+        mock_sha256,
+        mock_get_os_platform,
+        tmp_path,
+    ):
+        mock_sha256.return_value = mock.Mock()
+        mock_sha256.return_value.hexdigest.return_value = (
+            "45ff0d3c7fc8b77f64de7de7b3698307971546a6be00982934a19ee44f5d91bb"
+        )
+
+        target = tmp_path / "storcli"
+        target.write_text("fake file")
+
+        ok = validate_checksum(STORCLI_VERSION_INFOS, target)
+        assert ok
+
     def test_validate_checksum_fail(self, tmp_path):
         target = tmp_path / "perccli"
         target.write_text("fake file")
@@ -36,7 +60,6 @@ class TestCheckFileSum:
     @mock.patch(
         "checksum.get_os_platform",
         return_value=OSPlatform(
-            system="ubuntu",
             release="20.04",
             machine="fake machine architecture",
         ),

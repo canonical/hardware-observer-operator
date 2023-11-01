@@ -17,7 +17,7 @@
 import hashlib
 import logging
 import typing as t
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from os_platform import Architecture, UbuntuSeries, get_os_platform
@@ -34,22 +34,18 @@ class ToolVersionInfo:
     """Tool version information for checksum comparison."""
 
     version: str
-    supported_series: t.List[UbuntuSeries]
     supported_architectures: t.List[Architecture]
     sha256_checksum: str
     link: t.Optional[str] = None
     desc: str = ""
+    support_all_series: bool = False
+    supported_series: t.List[UbuntuSeries] = field(default_factory=lambda: [])
 
 
 STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ToolVersionInfo(
         version="007.2705.0000.0000",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/1232743397",
         desc="MR 7.27",
@@ -57,12 +53,7 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="007.2612.0000.0000",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/1232743291",
         desc="MR 7.26",
@@ -70,12 +61,7 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="007.2508.0000.0000",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/1232743203",
         desc="MR 7.25",
@@ -83,12 +69,7 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="007.2408.0000.0000",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/1232743081",
         desc="MR 7.24",
@@ -96,12 +77,7 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="007.2310.0000.0000",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/Unified_storcli_all_os_7.2309.0000.0000.zip",
         desc="MR 7.23",
@@ -151,12 +127,7 @@ PERCCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
 SAS2IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ToolVersionInfo(
         version="20.00.00.00",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/12351735",
         desc="P20, linux_x86",
@@ -164,12 +135,7 @@ SAS2IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="19.00.00.00",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/12351734",
         desc="P19, linux_x86",
@@ -177,12 +143,7 @@ SAS2IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="18.00.00.00",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/12351733",
         desc="P18, linux_x86",
@@ -190,12 +151,7 @@ SAS2IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="17.00.00.00",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/12351732",
         desc="P17, linux_x86",
@@ -203,12 +159,7 @@ SAS2IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="16.00.00.00",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/12351731",
         desc="P16, linux_x86",
@@ -219,12 +170,7 @@ SAS2IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
 SAS3IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ToolVersionInfo(
         version="16.00.00.00",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/SAS3IRCU_P15.zip",
         desc="P15, linux_x86",
@@ -232,12 +178,7 @@ SAS3IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="15.00.00.00",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/SAS3IRCU_P14.zip",
         desc="P14, linux_x86",
@@ -245,12 +186,7 @@ SAS3IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="14.00.00.00",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/SAS3IRCU_P13.zip",
         desc="P13, linux_x86",
@@ -258,12 +194,7 @@ SAS3IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="13.00.00.00",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/SAS3IRCU_P12.zip",
         desc="P12, linux_x86",
@@ -271,12 +202,7 @@ SAS3IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="12.00.00.00",
-        supported_series=[
-            UbuntuSeries.JAMMY,
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/SAS3IRCU_P11.zip",
         desc="P11, linux_x86",
@@ -295,9 +221,8 @@ def validate_checksum(support_version_infos: t.List[ToolVersionInfo], path: Path
 
     supported_checksums = []
     for info in support_version_infos:
-        if (
-            os_platform.series in info.supported_series
-            and os_platform.machine in info.supported_architectures
+        if os_platform.machine in info.supported_architectures and (
+            info.support_all_series or os_platform.series in info.supported_series
         ):
             supported_checksums.append(info.sha256_checksum)
 

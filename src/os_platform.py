@@ -42,29 +42,22 @@ class Architecture(str, Enum):
 class OSPlatform:
     """Description of an operating system platform."""
 
-    system: str
     release: str
     machine: str
 
     @property
     def series(self) -> t.Optional[UbuntuSeries]:
         """Return series base on system and release."""
-        if self.system == "ubuntu":
-            for series in UbuntuSeries:
-                if series == self.release:
-                    return series
+        for series in UbuntuSeries:
+            if series == self.release:
+                return series
         return None
 
 
 def get_os_platform() -> OSPlatform:
     """Determine a system/release combo for an OS using /etc/os-release if available."""
-    system = platform.system()
-    release = platform.release()
     machine = platform.machine()
+    info = distro.info()
+    release = info.get("version", "")
 
-    if system == "Linux":
-        info = distro.info()
-        system = info.get("id", system)
-        release = info.get("version", release)
-
-    return OSPlatform(system=system, release=release, machine=machine)
+    return OSPlatform(release=release, machine=machine)
