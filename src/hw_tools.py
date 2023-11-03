@@ -24,7 +24,16 @@ from checksum import (
     ResourceChecksumError,
     validate_checksum,
 )
-from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor, SystemVendor
+from config import (
+    REDFISH_MAX_RETRY,
+    REDFISH_TIMEOUT,
+    SNAP_COMMON,
+    TOOLS_DIR,
+    TPR_RESOURCES,
+    HWTool,
+    StorageVendor,
+    SystemVendor,
+)
 from hardware import SUPPORTED_STORAGES, get_bmc_address, lshw
 from keys import HP_KEYS
 
@@ -337,7 +346,13 @@ def redfish_available() -> bool:
     host = f"https://{bmc_address}"
     try:
         # credentials can be empty because we're only checking if redfish service is accessible
-        redfish_obj = redfish_client(base_url=host, username="", password="")
+        redfish_obj = redfish_client(
+            base_url=host,
+            username="",
+            password="",
+            timeout=REDFISH_TIMEOUT,
+            max_retry=REDFISH_MAX_RETRY,
+        )
         redfish_obj.login(auth="session")
     except RetriesExhaustedError:  # redfish not available
         result = False

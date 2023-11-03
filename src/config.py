@@ -10,6 +10,10 @@ EXPORTER_SERVICE_PATH = Path(f"/etc/systemd/system/{EXPORTER_NAME}.service")
 EXPORTER_CONFIG_TEMPLATE = f"{EXPORTER_NAME}-config.yaml.j2"
 EXPORTER_SERVICE_TEMPLATE = f"{EXPORTER_NAME}.service.j2"
 
+# Redfish
+REDFISH_TIMEOUT = 3
+REDFISH_MAX_RETRY = 2
+
 
 class SystemVendor(str, Enum):
     """Different hardware system vendor."""
