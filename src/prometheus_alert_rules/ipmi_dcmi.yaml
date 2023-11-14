@@ -15,7 +15,7 @@ groups:
             LABELS = {{ $labels }}
 
     - alert: IPMIDCMIPowerConsumptionOutstanding
-      expr: ipmi_dcmi_power_cosumption_watts >= 200
+      expr: ipmi_dcmi_power_cosumption_watts >= 300
       for: 5m
       labels:
         severity: warning
