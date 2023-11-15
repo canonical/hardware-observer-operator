@@ -24,7 +24,3 @@ bases:
         channel: "20.04"
         architectures:
           - amd64
-      - name: ubuntu
-        channel: "18.04"
-        architectures:
-          - amd64
