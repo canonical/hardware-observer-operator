@@ -28,9 +28,9 @@ jobs:
       matrix:
         include:
           - juju-channel: "2.9/stable"
-            command: "make functional"
+            command: "FUNC_ARGS='--series focal' make functional"
           - juju-channel: "3.1/stable"
-            command: "make functional31"
+            command: "FUNC_ARGS='--series jammy' make functional31"
     with:
       command: ${{ matrix.command }}
       juju-channel: ${{ matrix.juju-channel }}
