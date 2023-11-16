@@ -22,8 +22,9 @@ class SyncHelper:
 def pytest_addoption(parser):
     parser.addoption(
         "--series",
-        type=str,
+        type=str.lower,
         default="jammy",
+        choices=["focal", "jammy"],
         help="Set series for the machine units",
     )
 
