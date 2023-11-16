@@ -228,7 +228,7 @@ tests:
             exp_annotations:
               summary: IPMI sensor value in warning state. (instance ubuntu-11)
               description: |
-                A sensor value, recorded by ipmi sensor, in warning state and ignore type Entity Presence.
+                A sensor value, recorded by ipmi sensor, in warning state. Entity Presence sensors are ignored.
                   VALUE = 20
                   LABELS = map[__name__:ipmi_generic_sensor_value instance:ubuntu-11 state:Warning]
           - exp_labels:
@@ -238,6 +238,6 @@ tests:
             exp_annotations:
               summary: IPMI sensor value in critical state. (instance ubuntu-12)
               description: |
-                A sensor value, recorded by ipmi sensor, in critical state and ignore type Entity Presence.
+                A sensor value, recorded by ipmi sensor, in critical state. Entity Presence sensors are ignored.
                   VALUE = 50
                   LABELS = map[__name__:ipmi_generic_sensor_value instance:ubuntu-12 state:Critical]

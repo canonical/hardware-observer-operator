@@ -82,6 +82,6 @@ groups:
       annotations:
         summary: IPMI sensor value in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
         description: |
-          A sensor value, recorded by ipmi sensor, in {{ toLower $labels.state }} state and ignore type Entity Presence.
+          A sensor value, recorded by ipmi sensor, in {{ toLower $labels.state }} state. Entity Presence sensors are ignored.
             VALUE = {{ $value }}
             LABELS = {{ $labels }}
