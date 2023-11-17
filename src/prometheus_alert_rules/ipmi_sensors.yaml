@@ -75,13 +75,13 @@ groups:
             LABELS = {{ $labels }}
 
     - alert: IPMISensorStateNotOk
-      expr: ipmi_generic_sensor_value{state=~"Warning|Critical", type!="Entity Presence"}
+      expr: ipmi_generic_sensor_value{state=~"Warning|Critical", type!="Entity Presence", type!="Slot/Connector"}
       for: 0m
-      labels: 
+      labels:
         severity: "{{ toLower $labels.state }}"
       annotations:
         summary: IPMI sensor value in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
         description: |
-          A sensor value, recorded by ipmi sensor, in {{ toLower $labels.state }} state. Entity Presence sensors are ignored.
+          A sensor value, recorded by ipmi sensor, in {{ toLower $labels.state }} state. Entity Presence and Slot Connector sensors are ignored.
             VALUE = {{ $value }}
             LABELS = {{ $labels }}
