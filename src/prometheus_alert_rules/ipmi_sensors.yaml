@@ -75,7 +75,7 @@ groups:
             LABELS = {{ $labels }}
 
     - alert: IPMISensorStateNotOk
-      expr: ipmi_generic_sensor_value{state=~"Warning|Critical", type!="Entity Presence", type!="Slot/Connector"}
+      expr: ipmi_generic_sensor_value{state=~"Warning|Critical", type!~"Entity\\sPresence|Slot/Connector"}
       for: 0m
       labels:
         severity: "{{ toLower $labels.state }}"

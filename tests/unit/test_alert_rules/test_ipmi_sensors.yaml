@@ -216,6 +216,8 @@ tests:
         values: '50x15'
       - series: ipmi_generic_sensor_value{state="Critical", instance="ubuntu-12", type="Entity Presence"}
         values: '50x15'
+      - series: ipmi_generic_sensor_value{state="Critical", instance="ubuntu-12", type="Slot/Connector"}
+        values: '50x15'
 
     alert_rule_test:
       - eval_time: 0m
