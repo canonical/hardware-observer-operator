@@ -74,6 +74,8 @@ groups:
             FAN_SPEED_RPM = {{ $value }}
             LABELS = {{ $labels }}
 
+    # Entity Presence sensors are ignored since the state doesn't correspond to a real alert
+    # Slot Connector sensors are ignored since they raise a high number of false positive alerts
     - alert: IPMISensorStateNotOk
       expr: ipmi_generic_sensor_value{state=~"Warning|Critical", type!~"Entity\\sPresence|Slot/Connector"}
       for: 0m
