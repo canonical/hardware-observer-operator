@@ -365,6 +365,10 @@ def redfish_available() -> bool:
     except (SessionCreationError, InvalidCredentialsError):
         # redfish available, wrong credentials or not able to create a session
         result = True
+    except Exception as e:  # pylint: disable=W0718
+        # mark redfish unavailable for any generic exception
+        result = False
+        logger.error("cannot connect to redfish: %s", str(e))
     else:  # login succeeded with empty credentials
         result = True
         redfish_obj.logout()
