@@ -216,6 +216,8 @@ tests:
         values: '50x15'
       - series: ipmi_generic_sensor_value{state="Critical", instance="ubuntu-12", type="Entity Presence"}
         values: '50x15'
+      - series: ipmi_generic_sensor_value{state="Critical", instance="ubuntu-12", type="Slot/Connector"}
+        values: '50x15'
 
     alert_rule_test:
       - eval_time: 0m
@@ -228,7 +230,7 @@ tests:
             exp_annotations:
               summary: IPMI sensor value in warning state. (instance ubuntu-11)
               description: |
-                A sensor value, recorded by ipmi sensor, in warning state. Entity Presence sensors are ignored.
+                A sensor value, recorded by ipmi sensor, in warning state. Entity Presence and Slot Connector sensors are ignored.
                   VALUE = 20
                   LABELS = map[__name__:ipmi_generic_sensor_value instance:ubuntu-11 state:Warning]
           - exp_labels:
@@ -238,6 +240,6 @@ tests:
             exp_annotations:
               summary: IPMI sensor value in critical state. (instance ubuntu-12)
               description: |
-                A sensor value, recorded by ipmi sensor, in critical state. Entity Presence sensors are ignored.
+                A sensor value, recorded by ipmi sensor, in critical state. Entity Presence and Slot Connector sensors are ignored.
                   VALUE = 50
                   LABELS = map[__name__:ipmi_generic_sensor_value instance:ubuntu-12 state:Critical]
