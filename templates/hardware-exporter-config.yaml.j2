@@ -1,14 +1,14 @@
 port: {{ PORT }}
 level: {{ LEVEL }}
-{% if COLLECTORS | length > 0 %}
+{% if COLLECTORS | length > 0 -%}
 enable_collectors:
-  {% for collector in COLLECTORS %}
+  {% for collector in COLLECTORS -%}
   - {{collector}}
-  {% endfor %}
-{% endif %}
+  {% endfor -%}
+{% endif -%}
 
-{% if REDFISH_ENABLE  %}
-redfish_host: "{{ REDFISH_HOST }}"
-redfish_username: "{{ REDFISH_USERNAME }}"
-redfish_password: "{{ REDFISH_PASSWORD }}"
+{% if REDFISH_OPTIONS.get('enable', False)  %}
+redfish_host: "{{ REDFISH_OPTIONS.get('host', '') }}"
+redfish_username: "{{ REDFISH_OPTIONS.get('username', '') }}"
+redfish_password: "{{ REDFISH_OPTIONS.get('password', '') }}"
 {% endif %}

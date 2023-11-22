@@ -5,16 +5,16 @@
 """Charm the application."""
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus
 
-from config import HWTool
+from config import EXPORTER_COLLECTOR_MAPPING
 from hardware import get_bmc_address
-from hw_tools import HWToolHelper, bmc_hw_verifier
+from hw_tools import HWToolHelper, get_hw_tool_white_list, redfish_available
 from service import Exporter
 
 logger = logging.getLogger(__name__)
@@ -56,10 +56,15 @@ class HardwareObserverCharm(ops.CharmBase):
         """Install and upgrade."""
         port = self.model.config.get("exporter-port", "10000")
         level = self.model.config.get("exporter-log-level", "INFO")
+        collectors = self._discover_collectors()
+        redfish_options = self._get_redfish_options()
+        self.exporter.install(
+            port=port,
+            level=level,
+            collectors=collectors,
+            redfish_options=redfish_options,
+        )
 
-        redfish_creds = self._get_redfish_creds()
-
-        self.exporter.install(port, level, redfish_creds)
         installed, msg = self.hw_tool_helper.install(self.model.resources)
         self._stored.installed = installed
 
@@ -128,13 +133,18 @@ class HardwareObserverCharm(ops.CharmBase):
         }
         if exporter_configs.intersection(change_set):
             logger.info("Detected changes in exporter config.")
+
             port = self.model.config.get("exporter-port", "10000")
             level = self.model.config.get("exporter-log-level", "INFO")
-
-            redfish_creds = self._get_redfish_creds()
+            collectors = self._discover_collectors()
+            redfish_options = self._get_redfish_options()
             success = self.exporter.template.render_config(
-                port=port, level=level, redfish_creds=redfish_creds
+                port=port,
+                level=level,
+                collectors=collectors,
+                redfish_options=redfish_options,
             )
+
             # First condition prevent the exporter from starting at when the
             # charm just installed; the second condition tries to recover the
             # exporter from failed status.
@@ -153,20 +163,26 @@ class HardwareObserverCharm(ops.CharmBase):
         self.exporter.stop()
         self._on_update_status(event)
 
-    def _get_redfish_creds(self) -> Dict[str, str]:
-        """Provide redfish config if redfish is available, else empty dict."""
-        bmc_tools = bmc_hw_verifier()
-        if HWTool.REDFISH in bmc_tools:
-            bmc_address = get_bmc_address()
-            redfish_creds = {
-                # Force to use https as default protocol
-                "host": f"https://{bmc_address}",
-                "username": self.model.config.get("redfish-username", ""),
-                "password": self.model.config.get("redfish-password", ""),
-            }
-        else:
-            redfish_creds = {}
-        return redfish_creds
+    def _discover_collectors(self) -> List[str]:
+        hw_tools = get_hw_tool_white_list()
+        collectors = []
+        for tool in hw_tools:
+            collector = EXPORTER_COLLECTOR_MAPPING.get(tool)
+            if collector is not None:
+                collectors += collector
+        return collectors
+
+    def _get_redfish_options(self) -> Dict[str, Any]:
+        """Get redfish config options."""
+        bmc_address = get_bmc_address()
+        redfish_options = {
+            "enable": redfish_available(),
+            # Force to use https as default protocol
+            "host": f"https://{bmc_address}",
+            "username": self.model.config.get("redfish-username", ""),
+            "password": self.model.config.get("redfish-password", ""),
+        }
+        return redfish_options
 
 
 if __name__ == "__main__":  # pragma: nocover
