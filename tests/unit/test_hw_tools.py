@@ -718,6 +718,20 @@ class TestIPMIHWVerifier(unittest.TestCase):
 
     @mock.patch("hw_tools.redfish_client")
     @mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
+    def test_redfish_not_available_generic(self, mock_bmc_address, mock_redfish_client):
+        mock_redfish_obj = mock.Mock()
+        mock_redfish_client.return_value = mock_redfish_obj
+        mock_redfish_obj.login.side_effect = Exception()
+
+        result = redfish_available()
+
+        self.assertEqual(result, False)
+        mock_bmc_address.assert_called_once()
+        mock_redfish_client.assert_called_once()
+        mock_redfish_obj.login.assert_called_once()
+
+    @mock.patch("hw_tools.redfish_client")
+    @mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
     def test_redfish_available(self, mock_bmc_address, mock_redfish_client):
         mock_redfish_obj = mock.Mock()
         mock_redfish_client.return_value = mock_redfish_obj

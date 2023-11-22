@@ -14,7 +14,12 @@ from pathlib import Path
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError, Resources
 from redfish import redfish_client
-from redfish.rest.v1 import InvalidCredentialsError, RetriesExhaustedError, SessionCreationError
+from redfish.rest.v1 import (
+    InvalidCredentialsError,
+    RetriesExhaustedError,
+    ServerDownOrUnreachableError,
+    SessionCreationError,
+)
 
 from checksum import (
     PERCCLI_VERSION_INFOS,
@@ -354,11 +359,16 @@ def redfish_available() -> bool:
             max_retry=REDFISH_MAX_RETRY,
         )
         redfish_obj.login(auth="session")
-    except RetriesExhaustedError:  # redfish not available
+    except (RetriesExhaustedError, ServerDownOrUnreachableError):
+        # redfish not available
         result = False
     except (SessionCreationError, InvalidCredentialsError):
         # redfish available, wrong credentials or not able to create a session
         result = True
+    except Exception as e:  # pylint: disable=W0718
+        # mark redfish unavailable for any generic exception
+        result = False
+        logger.error("cannot connect to redfish: %s", str(e))
     else:  # login succeeded with empty credentials
         result = True
         redfish_obj.logout()
