@@ -9,6 +9,7 @@ EXPORTER_CONFIG_PATH = Path(f"/etc/{EXPORTER_NAME}-config.yaml")
 EXPORTER_SERVICE_PATH = Path(f"/etc/systemd/system/{EXPORTER_NAME}.service")
 EXPORTER_CONFIG_TEMPLATE = f"{EXPORTER_NAME}-config.yaml.j2"
 EXPORTER_SERVICE_TEMPLATE = f"{EXPORTER_NAME}.service.j2"
+EXPORTER_RELATION_NAME = "cos-agent"
 
 # Redfish
 REDFISH_TIMEOUT = 3

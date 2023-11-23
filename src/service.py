@@ -2,6 +2,7 @@
 from functools import wraps
 from logging import getLogger
 from pathlib import Path
+from time import sleep
 from typing import Any, Callable, Dict, List, Tuple
 
 from charms.operator_libs_linux.v1 import systemd
@@ -16,6 +17,10 @@ from config import (
 )
 
 logger = getLogger(__name__)
+
+
+NUM_RETRIES = 3
+RETRY_TIMEOUT = 3
 
 
 def check_installed(func: Callable) -> Callable:
@@ -173,5 +178,26 @@ class Exporter:
 
     @check_installed
     def check_health(self) -> bool:
-        """Check if the exporter daemon is healthy or not."""
-        return not systemd.service_failed(EXPORTER_NAME)
+        """Check the health of the exporter daemon and try to recover it if needed.
+
+        This function perform health check on exporter daemon if the exporter
+        is already installed. If it is somehow stopped, we should try to
+        restart it, if not possible we will set the charm to BlockedStatus to
+        alert the users.
+        """
+        try:
+            if self.check_active():
+                logger.info("Exporter health check - healthy.")
+                return True
+            logger.warning("Exporter health check - unhealthy.")
+            for i in range(1, NUM_RETRIES + 1):
+                logger.warning("Restarting exporter - %d retry", i)
+                self.restart()
+                sleep(RETRY_TIMEOUT)
+                if self.check_active():
+                    logger.info("Exporter restarted.")
+                    return True
+            logger.error("Failed to restart the exporter.")
+        except Exception as e:  # pylint: disable=W0718
+            logger.error("Unknown error when trying to check exporter health: %s", str(e))
+        return False

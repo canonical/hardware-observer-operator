@@ -8,14 +8,13 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import ops
-from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
-from ops.model import ActiveStatus, BlockedStatus
+from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus
 
+import exporter
 from config import EXPORTER_COLLECTOR_MAPPING
 from hardware import get_bmc_address
 from hw_tools import HWToolHelper, get_hw_tool_white_list, redfish_available
-from service import Exporter
 
 logger = logging.getLogger(__name__)
 
@@ -29,141 +28,81 @@ class HardwareObserverCharm(ops.CharmBase):
         """Init."""
         super().__init__(*args)
         self.hw_tool_helper = HWToolHelper()
-
-        self.cos_agent_provider = COSAgentProvider(
-            self,
-            metrics_endpoints=[
-                {"path": "/metrics", "port": int(self.model.config["exporter-port"])}
-            ],
-        )
-        self.exporter = Exporter(self.charm_dir)
+        self.exporter_observer = exporter.Observer(self)
 
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.install, self._on_install_or_upgrade)
         self.framework.observe(self.on.remove, self._on_remove)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
-        self.framework.observe(
-            self.on.cos_agent_relation_joined, self._on_cos_agent_relation_joined
-        )
-        self.framework.observe(
-            self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
-        )
 
-        self._stored.set_default(installed=False, config={}, blocked_msg="")
+        self._stored.set_default(
+            agent_installed=False,
+            resource_installed=False,
+            config={},
+            blocked_msg="",
+        )
 
     def _on_install_or_upgrade(self, event: ops.InstallEvent) -> None:
-        """Install and upgrade."""
-        port = self.model.config.get("exporter-port", "10000")
-        level = self.model.config.get("exporter-log-level", "INFO")
-        collectors = self._discover_collectors()
-        redfish_options = self._get_redfish_options()
-        self.exporter.install(
-            port=port,
-            level=level,
-            collectors=collectors,
-            redfish_options=redfish_options,
-        )
-
-        installed, msg = self.hw_tool_helper.install(self.model.resources)
-        self._stored.installed = installed
-
-        if not installed:
-            logger.info(msg)
+        """Install or upgrade charm."""
+        self.model.unit.status = MaintenanceStatus("Installing resources...")
+        resource_installed, msg = self.hw_tool_helper.install(self.model.resources)
+        if not resource_installed:
+            logger.error(msg)
             self._stored.blocked_msg = msg
-            self._on_update_status(event)
+            self.model.unit.status = ErrorStatus(f"Failed to install resources: {msg}")
             return
 
-        self._stored.installed = True
+        self.model.unit.status = MaintenanceStatus("Installing exporter...")
+        agent_installed = self.exporter_observer.install_agent()
+        if not agent_installed:
+            msg = "Failed to installed exporter, please refer to `juju debug-log`"
+            logger.error(msg)
+            self._stored.blocked_msg = msg
+            self.model.unit.status = ErrorStatus(f"Failed to install resources: {msg}")
+            return
+
+        logger.info("Installation completed.")
+        self._stored.agent_installed = True
+        self._stored.resource_installed = True
         self._stored.blocked_msg = ""
-        self.model.unit.status = ActiveStatus("Install complete")
-        logger.info("Install complete")
+        self._on_update_status(event)
 
     def _on_remove(self, _: EventBase) -> None:
         """Remove everything when charm is being removed."""
         logger.info("Start to remove.")
         # Remove binary tool
         self.hw_tool_helper.remove(self.model.resources)
-        self.exporter.uninstall()
+        self.exporter_observer.uninstall_agent()
+        self._stored.agent_installed = False
         logger.info("Remove complete")
 
-    def _on_update_status(self, _: EventBase) -> None:
+    def _on_update_status(self, event: EventBase) -> None:
         """Update the charm's status."""
-        if self._stored.installed is not True and self._stored.blocked_msg != "":
-            self.model.unit.status = BlockedStatus(self._stored.blocked_msg)  # type: ignore
-            return
-        if not self.model.get_relation("cos-agent"):
-            self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
-            return
-        if not self.exporter.check_health():
-            self.model.unit.status = BlockedStatus("Exporter is unhealthy")
-            return
-        if not self.exporter.check_active():
-            self.model.unit.status = BlockedStatus("Exporter is not running")
-            return
-        self.model.unit.status = ActiveStatus("Unit is ready")
+        self.update_status(event)
 
     def _on_config_changed(self, event: EventBase) -> None:
         """Reconfigure charm."""
-        # Keep track of what model config options + some extra config related
-        # information are changed. This can be helpful when we want to respond
-        # to the change of a specific config option.
-        change_set = set()
-        model_config: Dict[str, Optional[str]] = dict(self.model.config.items())
-        for key, value in model_config.items():
-            if key not in self._stored.config or self._stored.config[key] != value:  # type: ignore
-                logger.info("Setting %s to: %s", key, value)
-                self._stored.config[key] = value  # type: ignore
-                change_set.add(key)
+        change_set = self.update_config_store()
 
-        if not self._stored.installed:  # type: ignore
-            logging.info(  # type: ignore
-                "Config changed called before install complete, deferring event: %s",
-                event.handle,
-            )
-            event.defer()
-            return
+        if self.exporter_observer.agent_enabled:
+            options = self.get_exporter_configs()
+            success, message = self.exporter_observer.validate_agent_configs(options)
+            if not success:
+                self.model.unit.status = BlockedStatus(message)
+                return
 
-        exporter_configs = {
-            "exporter-port",
-            "exporter-log-level",
-            "redfish-host",
-            "redfish-username",
-            "redfish-password",
-        }
-        if exporter_configs.intersection(change_set):
-            logger.info("Detected changes in exporter config.")
+            success = self.exporter_observer.configure_agent(options, change_set)
+            if not success:
+                self.model.unit.status = BlockedStatus(
+                    "Failed to configure exporter, please check if the server is healthy..."
+                )
+                return
 
-            port = self.model.config.get("exporter-port", "10000")
-            level = self.model.config.get("exporter-log-level", "INFO")
-            collectors = self._discover_collectors()
-            redfish_options = self._get_redfish_options()
-            success = self.exporter.template.render_config(
-                port=port,
-                level=level,
-                collectors=collectors,
-                redfish_options=redfish_options,
-            )
+        self.update_status(event)
 
-            # First condition prevent the exporter from starting at when the
-            # charm just installed; the second condition tries to recover the
-            # exporter from failed status.
-            if success and self.exporter.check_active() or not self.exporter.check_health():
-                self.exporter.restart()
-
-        self._on_update_status(event)
-
-    def _on_cos_agent_relation_joined(self, event: EventBase) -> None:
-        """Start the exporter when relation joined."""
-        self.exporter.start()
-        self._on_update_status(event)
-
-    def _on_cos_agent_relation_departed(self, event: EventBase) -> None:
-        """Remove the exporter when relation departed."""
-        self.exporter.stop()
-        self._on_update_status(event)
-
-    def _discover_collectors(self) -> List[str]:
+    def discover_collectors(self) -> List[str]:
+        """Discover the list of collectors to be enabled."""
         hw_tools = get_hw_tool_white_list()
         collectors = []
         for tool in hw_tools:
@@ -172,7 +111,7 @@ class HardwareObserverCharm(ops.CharmBase):
                 collectors += collector
         return collectors
 
-    def _get_redfish_options(self) -> Dict[str, Any]:
+    def get_redfish_options(self) -> Dict[str, Any]:
         """Get redfish config options."""
         bmc_address = get_bmc_address()
         redfish_options = {
@@ -183,6 +122,48 @@ class HardwareObserverCharm(ops.CharmBase):
             "password": self.model.config.get("redfish-password", ""),
         }
         return redfish_options
+
+    def update_status(self, _: EventBase) -> None:
+        """Update the charm's status."""
+        if not self.exporter_observer.agent_enabled:
+            self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
+            return
+
+        if self.exporter_observer.too_many_relations:
+            self.model.unit.status = BlockedStatus("Cannot relate to more than one grafan-agent")
+            return
+
+        if self.exporter_observer.agent_enabled and not self.exporter_observer.agent_online:
+            self.model.unit.status = ErrorStatus(
+                "Exporter crashes unexpectedly, please refer to systemd logs..."
+            )
+            return
+
+        self.model.unit.status = ActiveStatus("Unit is ready")
+
+    def update_config_store(self) -> set:
+        """Update the config store, and return a set of config options that are changed."""
+        change_set = set()
+        model_config: Dict[str, Optional[str]] = dict(self.model.config.items())
+        for key, value in model_config.items():
+            if key not in self._stored.config or self._stored.config[key] != value:  # type: ignore
+                logger.info("Setting %s to: %s", key, value)
+                self._stored.config[key] = value  # type: ignore
+                change_set.add(key)
+        return change_set
+
+    def get_exporter_configs(self) -> Dict[str, Any]:
+        """Get the exporter related config options."""
+        port = self.model.config.get("exporter-port", "10000")
+        level = self.model.config.get("exporter-log-level", "INFO")
+        collectors = self.discover_collectors()
+        redfish_options = self.get_redfish_options()
+        return {
+            "port": port,
+            "level": level,
+            "collectors": collectors,
+            "redfish_options": redfish_options,
+        }
 
 
 if __name__ == "__main__":  # pragma: nocover
