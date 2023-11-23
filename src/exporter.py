@@ -6,6 +6,7 @@ import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 
 from config import EXPORTER_RELATION_NAME
+from hardware import validate_redfish_credential
 from service import Exporter
 
 logger = getLogger(__name__)
@@ -119,5 +120,18 @@ class Observer(ops.Object):
                 allowed_choices,
             )
             return False, "Invalid config: 'exporter-log-level'"
+
+        valid = True
+        redfish_options = options.get("redfish_options")
+        if redfish_options and redfish_options.get("enable"):
+            valid = validate_redfish_credential(
+                redfish_options.get("host", ""),
+                username=redfish_options.get("username", ""),
+                password=redfish_options.get("password", ""),
+            )
+        if not valid:
+            logger.error("Invalid redfish-username or redfish-password")
+            logger.error("Please also check if redfish is available on the server.")
+            return False, "Invalid redfish credential or redfish is not available."
 
         return True, "Exporter config is valid."

@@ -13,13 +13,6 @@ from pathlib import Path
 
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError, Resources
-from redfish import redfish_client
-from redfish.rest.v1 import (
-    InvalidCredentialsError,
-    RetriesExhaustedError,
-    ServerDownOrUnreachableError,
-    SessionCreationError,
-)
 
 from checksum import (
     PERCCLI_VERSION_INFOS,
@@ -29,17 +22,8 @@ from checksum import (
     ResourceChecksumError,
     validate_checksum,
 )
-from config import (
-    REDFISH_MAX_RETRY,
-    REDFISH_TIMEOUT,
-    SNAP_COMMON,
-    TOOLS_DIR,
-    TPR_RESOURCES,
-    HWTool,
-    StorageVendor,
-    SystemVendor,
-)
-from hardware import SUPPORTED_STORAGES, get_bmc_address, lshw
+from config import EXPORTER_COLLECTOR_MAPPING, SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool
+from hardware import get_hw_tool_white_list
 from keys import HP_KEYS
 
 logger = logging.getLogger(__name__)
@@ -346,118 +330,11 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
         return True
 
 
-def raid_hw_verifier() -> t.List[HWTool]:
-    """Verify if the HWTool support RAID card exists on machine."""
-    hw_info = lshw()
-    system_vendor = hw_info.get("vendor")
-    storage_info = lshw(class_filter="storage")
-
-    tools = set()
-
-    for info in storage_info:
-        _id = info.get("id")
-        product = info.get("product")
-        vendor = info.get("vendor")
-        driver = info.get("configuration", {}).get("driver")
-        if _id == "sas":
-            # sas3ircu
-            if (
-                any(
-                    _product
-                    for _product in SUPPORTED_STORAGES[HWTool.SAS3IRCU]
-                    if _product in product
-                )
-                and vendor == StorageVendor.BROADCOM
-            ):
-                tools.add(HWTool.SAS3IRCU)
-            # sas2ircu
-            if (
-                any(
-                    _product
-                    for _product in SUPPORTED_STORAGES[HWTool.SAS2IRCU]
-                    if _product in product
-                )
-                and vendor == StorageVendor.BROADCOM
-            ):
-                tools.add(HWTool.SAS2IRCU)
-
-        if _id == "raid":
-            # ssacli
-            if system_vendor == SystemVendor.HP and any(
-                _product for _product in SUPPORTED_STORAGES[HWTool.SSACLI] if _product in product
-            ):
-                tools.add(HWTool.SSACLI)
-            # perccli
-            elif system_vendor == SystemVendor.DELL:
-                tools.add(HWTool.PERCCLI)
-            # storcli
-            elif driver == "megaraid_sas" and vendor == StorageVendor.BROADCOM:
-                tools.add(HWTool.STORCLI)
-    return list(tools)
-
-
-def redfish_available() -> bool:
-    """Check if redfish service is available."""
-    bmc_address = get_bmc_address()
-    host = f"https://{bmc_address}"
-    try:
-        # credentials can be empty because we're only checking if redfish service is accessible
-        redfish_obj = redfish_client(
-            base_url=host,
-            username="",
-            password="",
-            timeout=REDFISH_TIMEOUT,
-            max_retry=REDFISH_MAX_RETRY,
-        )
-        redfish_obj.login(auth="session")
-    except (RetriesExhaustedError, ServerDownOrUnreachableError):
-        # redfish not available
-        result = False
-    except (SessionCreationError, InvalidCredentialsError):
-        # redfish available, wrong credentials or not able to create a session
-        result = True
-    except Exception as e:  # pylint: disable=W0718
-        # mark redfish unavailable for any generic exception
-        result = False
-        logger.error("cannot connect to redfish: %s", str(e))
-    else:  # login succeeded with empty credentials
-        result = True
-        redfish_obj.logout()
-
-    return result
-
-
-def bmc_hw_verifier() -> t.List[HWTool]:
-    """Verify if the ipmi is available on the machine.
-
-    Using ipmitool to verify, the package will be removed in removing stage.
-    """
-    tools = []
-    # Check IPMI available
-    apt.add_package("ipmitool", update_cache=False)
-    try:
-        subprocess.check_output("ipmitool lan print".split())
-        tools.append(HWTool.IPMI)
-    except subprocess.CalledProcessError:
-        logger.info("IPMI is not available")
-
-    # Check RedFish available
-    if redfish_available():
-        tools.append(HWTool.REDFISH)
-    else:
-        logger.info("Redfish is not available")
-    return tools
-
-
-def get_hw_tool_white_list() -> t.List[HWTool]:
-    """Return HWTool white list."""
-    raid_white_list = raid_hw_verifier()
-    bmc_white_list = bmc_hw_verifier()
-    return raid_white_list + bmc_white_list
-
-
 class HWToolHelper:
     """Helper to install vendor's or hardware related tools."""
+
+    _hw_tool_white_list: t.Optional[t.List[HWTool]] = None
+    _hw_collector_white_list: t.Optional[t.List[str]] = None
 
     @property
     def strategies(self) -> t.List[StrategyABC]:
@@ -472,16 +349,33 @@ class HWToolHelper:
             RedFishStrategy(),
         ]
 
-    def fetch_tools(  # pylint: disable=W0102
-        self,
-        resources: Resources,
-        hw_white_list: t.List[HWTool] = [],
-    ) -> t.Dict[HWTool, Path]:
+    @property
+    def hw_tool_white_list(self) -> t.List[HWTool]:
+        """Define hardware tool white list."""
+        # cache the white list because it might be expensive to get
+        if self._hw_tool_white_list is None:
+            self._hw_tool_white_list = get_hw_tool_white_list()
+        return self._hw_tool_white_list
+
+    @property
+    def hw_collector_white_list(self) -> t.List[str]:
+        """Define hardware colletor white list."""
+        # cache the white list because it might be expensive to get
+        if self._hw_collector_white_list is None:
+            collectors = []
+            for tool in self.hw_tool_white_list:
+                collector = EXPORTER_COLLECTOR_MAPPING.get(tool)
+                if collector is not None:
+                    collectors += collector
+            self._hw_collector_white_list = collectors
+        return self._hw_collector_white_list
+
+    def fetch_tools(self, resources: Resources) -> t.Dict[HWTool, Path]:
         """Fetch resource from juju if it's VENDOR_TOOLS."""
         fetch_tools: t.Dict[HWTool, Path] = {}
         # Fetch all tools from juju resources
         for tool, resource in TPR_RESOURCES.items():
-            if tool not in hw_white_list:
+            if tool not in self.hw_tool_white_list:
                 logger.info("Skip fetch tool: %s", tool)
                 continue
             try:
@@ -492,12 +386,10 @@ class HWToolHelper:
 
         return fetch_tools
 
-    def check_missing_resources(
-        self, hw_white_list: t.List[HWTool], fetch_tools: t.Dict[HWTool, Path]
-    ) -> t.Tuple[bool, str]:
+    def check_missing_resources(self, fetch_tools: t.Dict[HWTool, Path]) -> t.Tuple[bool, str]:
         """Check if required resources are not been uploaded."""
         missing_resources = []
-        for tool in hw_white_list:
+        for tool in self.hw_tool_white_list:
             if tool in TPR_RESOURCES:
                 # Resource hasn't been uploaded
                 if tool not in fetch_tools:
@@ -513,12 +405,11 @@ class HWToolHelper:
 
     def install(self, resources: Resources) -> t.Tuple[bool, str]:
         """Install tools."""
-        hw_white_list = get_hw_tool_white_list()
-        logger.info("hw_tool_white_list: %s", hw_white_list)
+        logger.info("hw_tool_white_list: %s", self.hw_tool_white_list)
 
-        fetch_tools = self.fetch_tools(resources, hw_white_list)
+        fetch_tools = self.fetch_tools(resources)
 
-        ok, msg = self.check_missing_resources(hw_white_list, fetch_tools)
+        ok, msg = self.check_missing_resources(fetch_tools)
         if not ok:
             return ok, msg
 
@@ -527,7 +418,7 @@ class HWToolHelper:
 
         # Iterate over each strategy and execute.
         for strategy in self.strategies:
-            if strategy.name not in hw_white_list:
+            if strategy.name not in self.hw_tool_white_list:
                 continue
             # TPRStrategy
             try:
@@ -555,9 +446,8 @@ class HWToolHelper:
 
     def remove(self, resources: Resources) -> None:  # pylint: disable=W0613
         """Execute all remove strategies."""
-        hw_white_list = get_hw_tool_white_list()
         for strategy in self.strategies:
-            if strategy.name not in hw_white_list:
+            if strategy.name not in self.hw_tool_white_list:
                 continue
             if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
                 strategy.remove()
@@ -565,11 +455,10 @@ class HWToolHelper:
 
     def check(self) -> t.Tuple[bool, str]:
         """Check tool status."""
-        hw_white_list = get_hw_tool_white_list()
         failed_checks = []
 
         for strategy in self.strategies:
-            if strategy.name not in hw_white_list:
+            if strategy.name not in self.hw_tool_white_list:
                 continue
             ok = strategy.check()
             if not ok:

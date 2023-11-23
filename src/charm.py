@@ -5,16 +5,16 @@
 """Charm the application."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import ops
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus
 
 import exporter
-from config import EXPORTER_COLLECTOR_MAPPING
+from config import HWTool
 from hardware import get_bmc_address
-from hw_tools import HWToolHelper, get_hw_tool_white_list, redfish_available
+from hw_tools import HWToolHelper
 
 logger = logging.getLogger(__name__)
 
@@ -101,28 +101,6 @@ class HardwareObserverCharm(ops.CharmBase):
 
         self.update_status(event)
 
-    def discover_collectors(self) -> List[str]:
-        """Discover the list of collectors to be enabled."""
-        hw_tools = get_hw_tool_white_list()
-        collectors = []
-        for tool in hw_tools:
-            collector = EXPORTER_COLLECTOR_MAPPING.get(tool)
-            if collector is not None:
-                collectors += collector
-        return collectors
-
-    def get_redfish_options(self) -> Dict[str, Any]:
-        """Get redfish config options."""
-        bmc_address = get_bmc_address()
-        redfish_options = {
-            "enable": redfish_available(),
-            # Force to use https as default protocol
-            "host": f"https://{bmc_address}",
-            "username": self.model.config.get("redfish-username", ""),
-            "password": self.model.config.get("redfish-password", ""),
-        }
-        return redfish_options
-
     def update_status(self, _: EventBase) -> None:
         """Update the charm's status."""
         if not self.exporter_observer.agent_enabled:
@@ -152,12 +130,30 @@ class HardwareObserverCharm(ops.CharmBase):
                 change_set.add(key)
         return change_set
 
+    def get_redfish_options(self) -> Dict[str, Any]:
+        """Get redfish config options."""
+        redfish_options = {
+            "enable": False,
+            "host": "",
+            "username": self.model.config.get("redfish-username", ""),
+            "password": self.model.config.get("redfish-password", ""),
+        }
+
+        bmc_address = get_bmc_address()
+        if bmc_address:
+            redfish_options["enable"] = True
+            redfish_options["host"] = f"https://{bmc_address}"
+
+        return redfish_options
+
     def get_exporter_configs(self) -> Dict[str, Any]:
         """Get the exporter related config options."""
         port = self.model.config.get("exporter-port", "10000")
         level = self.model.config.get("exporter-log-level", "INFO")
-        collectors = self.discover_collectors()
-        redfish_options = self.get_redfish_options()
+        collectors = self.hw_tool_helper.hw_collector_white_list
+        redfish_options = {"enable": False}
+        if HWTool.REDFISH in collectors:
+            redfish_options = self.get_redfish_options()
         return {
             "port": port,
             "level": level,
