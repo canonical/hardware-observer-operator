@@ -1,0 +1,13 @@
+groups:
+- name: HardwareObserver
+  rules:
+    - alert: CollectorFailed
+      expr: '{__name__=~"(.*)_collector_failed"} == 1'
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: Controller fetch failed. (instance {{ $labels.instance }})
+        description: |
+          Collrector fetch failed. Please reach out to hardware-observer maintainers.
+            LABELS = {{ $labels }}
