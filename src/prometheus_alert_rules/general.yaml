@@ -7,7 +7,7 @@ groups:
       labels:
         severity: warning
       annotations:
-        summary: Controller fetch failed. (instance {{ $labels.instance }})
+        summary: Collector failed. (instance {{ $labels.instance }})
         description: |
-          Collrector fetch failed. Please reach out to hardware-observer maintainers.
+          A collector failed to fetch the metrics. Please reach out to hardware-observer maintainers.
             LABELS = {{ $labels }}

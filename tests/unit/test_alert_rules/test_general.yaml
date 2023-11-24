@@ -20,16 +20,16 @@ tests:
               instance: ubuntu-99
               collector: IPMIDCMICollector
             exp_annotations:
-              summary: Controller fetch failed. (instance ubuntu-99)
+              summary: Collector failed. (instance ubuntu-99)
               description: |
-                Collrector fetch failed. Please reach out to hardware-observer maintainers.
+                A collector failed to fetch the metrics. Please reach out to hardware-observer maintainers.
                   LABELS = map[__name__:ipmidcmicollector_collector_failed collector:IPMIDCMICollector instance:ubuntu-99]
           - exp_labels:
               severity: warning
               instance: ubuntu-99
               collector: IPMISELCollector
             exp_annotations:
-              summary: Controller fetch failed. (instance ubuntu-99)
+              summary: Collector failed. (instance ubuntu-99)
               description: |
-                Collrector fetch failed. Please reach out to hardware-observer maintainers.
+                A collector failed to fetch the metrics. Please reach out to hardware-observer maintainers.
                   LABELS = map[__name__:ipmiselcollector_collector_failed collector:IPMISELCollector instance:ubuntu-99]
