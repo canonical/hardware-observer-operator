@@ -13,20 +13,14 @@
 # limitations under the License.
 #
 # For further info, check https://github.com/canonical/charmcraft
-"""Checksum definition, check functions and related utils."""
-import hashlib
+"""Checksum definition."""
 import logging
 import typing as t
 from dataclasses import dataclass, field
-from pathlib import Path
 
-from os_platform import Architecture, UbuntuSeries, get_os_platform
+from os_platform import Architecture, UbuntuSeries
 
 logger = logging.getLogger(__name__)
-
-
-class ResourceChecksumError(Exception):
-    """Raise if checksum does not match."""
 
 
 @dataclass
@@ -209,27 +203,3 @@ SAS3IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
         sha256_checksum="458d51b030468901fc8a207088070e6ce82db34b181d9190c8f849605f1b9b6d",
     ),
 ]
-
-
-def validate_checksum(support_version_infos: t.List[ToolVersionInfo], path: Path) -> bool:
-    """Validate checksum of resource file by checking with supported versions.
-
-    Returns True if resource is supported by the charm, architecture, and
-    checksum validation is successful.
-    """
-    os_platform = get_os_platform()
-
-    supported_checksums = []
-    for info in support_version_infos:
-        if os_platform.machine in info.supported_architectures and (
-            info.support_all_series or os_platform.series in info.supported_series
-        ):
-            supported_checksums.append(info.sha256_checksum)
-
-    with open(path, "rb") as f:
-        sha256_hash = hashlib.sha256(f.read()).hexdigest()
-
-    if sha256_hash in supported_checksums:
-        return True
-    logger.warning("Checksum validation fail, path: %s hash: %s", path, sha256_hash)
-    return False

@@ -14,27 +14,19 @@ from pathlib import Path
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError, Resources
 
+import hw_resources
 from checksum import (
     PERCCLI_VERSION_INFOS,
     SAS2IRCU_VERSION_INFOS,
     SAS3IRCU_VERSION_INFOS,
     STORCLI_VERSION_INFOS,
-    ResourceChecksumError,
-    validate_checksum,
+    ToolVersionInfo,
 )
 from config import EXPORTER_COLLECTOR_MAPPING, SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool
 from hardware import get_hw_tool_white_list
 from keys import HP_KEYS
 
 logger = logging.getLogger(__name__)
-
-
-class ResourceFileSizeZeroError(Exception):
-    """Empty resource error."""
-
-    def __init__(self, tool: HWTool, path: Path):
-        """Init."""
-        self.message = f"Tool: {tool} path: {path} size is zero"
 
 
 def copy_to_snap_common_bin(source: Path, filename: str) -> None:
@@ -51,20 +43,6 @@ def symlink(src: Path, dst: Path) -> None:
     except OSError as err:
         logger.exception(err)
         raise
-
-
-def check_file_size(path: Path) -> bool:
-    """Verify if the file size > 0.
-
-    Because charm focus us to publish the resources on charmhub,
-    but most of the hardware related tools have the un-republish
-    policy. Currently our solution is publish a empty file which
-    size is 0.
-    """
-    if path.stat().st_size == 0:
-        logger.info("% size is 0, skip install", path)
-        return False
-    return True
 
 
 def install_deb(name: str, path: Path) -> None:
@@ -101,16 +79,6 @@ def make_executable(src: Path) -> None:
         raise err
 
 
-def check_executable(src: Path) -> bool:
-    """Check if resource executable."""
-    return os.access(src, os.X_OK)
-
-
-def check_file_exists(src: Path) -> bool:
-    """Check if resource exists."""
-    return src.exists()
-
-
 def check_deb_pkg_installed(pkg: str) -> bool:
     """Check if debian package is installed."""
     try:
@@ -132,12 +100,19 @@ class StrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
         return self._name
 
     @abstractmethod
-    def check(self) -> bool:
-        """Check details."""
+    def check_status(self) -> bool:
+        """Check installation status of the tool."""
+
+    @abstractmethod
+    def validate_tool(self, path: Path) -> bool:
+        """Check if the tool is valid or not."""
 
 
 class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
-    """Strategy for apt install tool."""
+    """Abstract strategy for apt install tool."""
+
+    apt_keys: t.List
+    package_source_mapping = t.Dict[str, str]
 
     @abstractmethod
     def install(self) -> None:
@@ -151,8 +126,65 @@ class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
         # the remove option.
 
 
+class APTStrategy(APTStrategyABC):
+    """Strategy for apt install tool."""
+
+    apt_keys = []
+    package_source_mapping: t.Dict[str, str] = {}
+
+    @property
+    def repos(self) -> t.List[apt.DebianRepository]:
+        """Third party DebianRepositories."""
+        repos = []
+        for repo_line in self.package_source_mapping.values():
+            if not repo_line:
+                repos.append(apt.DebianRepository.from_repo_line(repo_line))
+        return repos
+
+    def add_repos(self) -> None:
+        """Add apt repositories."""
+        repositories = apt.RepositoryMapping()
+        for repo in self.repos:
+            repositories.add(repo)
+
+    def disable_repos(self) -> None:
+        """Disable the repository."""
+        repositories = apt.RepositoryMapping()
+        for repo in self.repos:
+            repositories.disable(repo)
+
+    def install(self) -> None:
+        for key in self.apt_keys:
+            apt.import_key(key)
+        self.add_repos()
+        for package in self.package_source_mapping:
+            apt.add_package(package, update_cache=True)
+
+    def remove(self) -> None:
+        for package in self.package_source_mapping:
+            apt.remove_package(package)
+        self.disable_repos()
+
+    def check_status(self) -> bool:
+        """Check package status."""
+        success = True
+        for package in self.package_source_mapping:
+            success &= check_deb_pkg_installed(package)
+        return success
+
+    def validate_tool(self, path: Path) -> bool:
+        """Check package status."""
+        # Needs implementation
+        return True
+
+
 class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
-    """Third party resource strategy class."""
+    """Third party resource strategy abstract class."""
+
+    origin_path: Path
+    symlink_bin: Path
+    is_debian_package: bool
+    version_infos: t.List[ToolVersionInfo]
 
     @abstractmethod
     def install(self, path: Path) -> None:
@@ -163,158 +195,116 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
         """Remove details."""
 
 
-class StorCLIStrategy(TPRStrategyABC):
+class TPRStrategy(TPRStrategyABC):
+    """Third party resource strategy base class."""
+
+    origin_path = Path("")
+    symlink_bin = Path("")
+    is_debian_package = False
+    version_infos = []
+
+    def install(self, path: Path) -> None:
+        """Install third party tool."""
+        if not self.validate_tool(path):
+            return
+
+        if self.is_debian_package:
+            install_deb(self.name, path)
+            if self.origin_path != Path(""):
+                symlink(src=self.origin_path, dst=self.symlink_bin)
+        else:
+            make_executable(path)
+            symlink(src=path, dst=self.symlink_bin)
+
+    def remove(self) -> None:
+        """Remove third party tool."""
+        logger.debug("Remove file %s", self.symlink_bin)
+        self.symlink_bin.unlink(missing_ok=True)
+        if self.is_debian_package:
+            remove_deb(pkg=self.name)
+
+    def check_status(self) -> bool:
+        """Check installation status of third party tool."""
+        try:
+            path = self.symlink_bin
+            exists = hw_resources.check_file_exists(path)
+            executable = hw_resources.check_file_executable(path)
+        except hw_resources.ResourceIsDirectoryError as err:
+            raise err
+
+        if not exists:
+            raise hw_resources.ResourceNotFoundError(tool=self.name, path=path)
+        if not executable:
+            raise hw_resources.ResourceNotExecutableError(tool=self.name, path=path)
+        return True
+
+    def validate_tool(self, path: Path) -> bool:
+        """Check if third party tool is valid."""
+        if not hw_resources.validate_size(path):
+            raise hw_resources.ResourceFileSizeZeroError(tool=self.name, path=path)
+        if not hw_resources.validate_checksum(self.version_infos, path):
+            raise hw_resources.ResourceChecksumError(tool=self.name, path=path)
+        return True
+
+
+class StorCLIStrategy(TPRStrategy):
     """Strategy to install storcli."""
 
     _name = HWTool.STORCLI
     origin_path = Path("/opt/MegaRAID/storcli/storcli64")
     symlink_bin = TOOLS_DIR / HWTool.STORCLI.value
-
-    def install(self, path: Path) -> None:
-        """Install storcli."""
-        if not check_file_size(path):
-            raise ResourceFileSizeZeroError(tool=self._name, path=path)
-        if not validate_checksum(STORCLI_VERSION_INFOS, path):
-            raise ResourceChecksumError
-        install_deb(self.name, path)
-        symlink(src=self.origin_path, dst=self.symlink_bin)
-
-    def remove(self) -> None:
-        """Remove storcli."""
-        self.symlink_bin.unlink(missing_ok=True)
-        logger.debug("Remove file %s", self.symlink_bin)
-        remove_deb(pkg=self.name)
-
-    def check(self) -> bool:
-        """Check resource status."""
-        return self.symlink_bin.exists() and os.access(self.symlink_bin, os.X_OK)
+    is_debian_package = True
+    version_infos = STORCLI_VERSION_INFOS
 
 
-class PercCLIStrategy(TPRStrategyABC):
+class PercCLIStrategy(TPRStrategy):
     """Strategy to install storcli."""
 
     _name = HWTool.PERCCLI
     origin_path = Path("/opt/MegaRAID/perccli/perccli64")
     symlink_bin = TOOLS_DIR / HWTool.PERCCLI.value
-
-    def install(self, path: Path) -> None:
-        """Install perccli."""
-        if not check_file_size(path):
-            raise ResourceFileSizeZeroError(tool=self._name, path=path)
-        if not validate_checksum(PERCCLI_VERSION_INFOS, path):
-            raise ResourceChecksumError
-        install_deb(self.name, path)
-        symlink(src=self.origin_path, dst=self.symlink_bin)
-
-    def remove(self) -> None:
-        """Remove perccli."""
-        self.symlink_bin.unlink(missing_ok=True)
-        logger.debug("Remove file %s", self.symlink_bin)
-        remove_deb(pkg=self.name)
-
-    def check(self) -> bool:
-        """Check resource status."""
-        return self.symlink_bin.exists() and os.access(self.symlink_bin, os.X_OK)
+    is_debian_package = True
+    version_infos = PERCCLI_VERSION_INFOS
 
 
-class SAS2IRCUStrategy(TPRStrategyABC):
+class SAS2IRCUStrategy(TPRStrategy):
     """Strategy to install storcli."""
 
     _name = HWTool.SAS2IRCU
+    origin_path = Path("")
     symlink_bin = TOOLS_DIR / HWTool.SAS2IRCU.value
-
-    def install(self, path: Path) -> None:
-        """Install sas2ircu."""
-        if not check_file_size(path):
-            raise ResourceFileSizeZeroError(tool=self._name, path=path)
-        if not validate_checksum(SAS2IRCU_VERSION_INFOS, path):
-            raise ResourceChecksumError
-        make_executable(path)
-        symlink(src=path, dst=self.symlink_bin)
-
-    def remove(self) -> None:
-        """Remove sas2ircu."""
-        self.symlink_bin.unlink(missing_ok=True)
-        logger.debug("Remove file %s", self.symlink_bin)
-
-    def check(self) -> bool:
-        """Check resource status."""
-        return self.symlink_bin.exists() and os.access(self.symlink_bin, os.X_OK)
+    is_debian_package = False
+    version_infos = SAS2IRCU_VERSION_INFOS
 
 
-class SAS3IRCUStrategy(SAS2IRCUStrategy):
+class SAS3IRCUStrategy(TPRStrategy):
     """Strategy to install storcli."""
 
     _name = HWTool.SAS3IRCU
+    origin_path = Path("")
     symlink_bin = TOOLS_DIR / HWTool.SAS3IRCU.value
-
-    def install(self, path: Path) -> None:
-        """Install sas3ircu."""
-        if not check_file_size(path):
-            raise ResourceFileSizeZeroError(tool=self._name, path=path)
-        if not validate_checksum(SAS3IRCU_VERSION_INFOS, path):
-            raise ResourceChecksumError
-        make_executable(path)
-        symlink(src=path, dst=self.symlink_bin)
+    is_debian_package = False
+    version_infos = SAS3IRCU_VERSION_INFOS
 
 
-class SSACLIStrategy(APTStrategyABC):
+class SSACLIStrategy(APTStrategy):
     """Strategy for install ssacli."""
 
     _name = HWTool.SSACLI
-    pkg = HWTool.SSACLI.value
-    repo_line = "deb http://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
-
-    @property
-    def repo(self) -> apt.DebianRepository:
-        """Third party DebianRepository."""
-        return apt.DebianRepository.from_repo_line(self.repo_line)
-
-    def add_repo(self) -> None:
-        """Add repository."""
-        repositories = apt.RepositoryMapping()
-        repositories.add(self.repo)
-
-    def disable_repo(self) -> None:
-        """Disable the repository."""
-        repositories = apt.RepositoryMapping()
-        repositories.disable(self.repo)
-
-    def install(self) -> None:
-        for key in HP_KEYS:
-            apt.import_key(key)
-        self.add_repo()
-        apt.add_package(self.pkg, update_cache=True)
-
-    def remove(self) -> None:
-        apt.remove_package(self.pkg)
-        self.disable_repo()
-
-    def check(self) -> bool:
-        """Check package status."""
-        return check_deb_pkg_installed(self.pkg)
+    apt_keys = HP_KEYS
+    package_source_mapping = {
+        HWTool.SSACLI.value: (
+            "deb http://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
+        )
+    }
 
 
-class IPMIStrategy(APTStrategyABC):
+class IPMIStrategy(APTStrategy):
     """Strategy for install ipmi."""
 
     _name = HWTool.IPMI
-    pkgs = ["freeipmi-tools"]
-
-    def install(self) -> None:
-        for pkg in self.pkgs:
-            apt.add_package(pkg)
-
-    def remove(self) -> None:
-        for pkg in self.pkgs:
-            apt.remove_package(pkg)
-
-    def check(self) -> bool:
-        """Check package status."""
-        success = True
-        for pkg in self.pkgs:
-            success &= check_deb_pkg_installed(pkg)
-        return success
+    apt_keys = []
+    package_source_mapping = {"freeipmi-tools": ""}
 
 
 class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
@@ -325,8 +315,12 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
 
     _name = HWTool.REDFISH
 
-    def check(self) -> bool:
+    def check_status(self) -> bool:
         """Check redfish status."""
+        return True
+
+    def validate_tool(self, path: Path) -> bool:
+        """Validate if redfish tool is valid or not."""
         return True
 
 
@@ -396,7 +390,7 @@ class HWToolHelper:
                     missing_resources.append(TPR_RESOURCES[tool])
                 # Uploaded but file size is zero
                 path = fetch_tools.get(tool)
-                if path and not check_file_size(path):
+                if path and not hw_resources.validate_size(path):
                     logger.warning("Tool: %s path: %s size is zero", tool, path)
                     missing_resources.append(TPR_RESOURCES[tool])
         if len(missing_resources) > 0:
@@ -431,10 +425,10 @@ class HWToolHelper:
                     strategy.install()  # pylint: disable=E1120
                 logger.info("Strategy %s install success", strategy)
             except (
-                ResourceFileSizeZeroError,
                 OSError,
                 apt.PackageError,
-                ResourceChecksumError,
+                hw_resources.ResourceChecksumError,
+                hw_resources.ResourceFileSizeZeroError,
             ) as e:
                 logger.warning("Strategy %s install fail: %s", strategy, e)
                 fail_strategies.append(strategy.name)
@@ -460,7 +454,7 @@ class HWToolHelper:
         for strategy in self.strategies:
             if strategy.name not in self.hw_tool_white_list:
                 continue
-            ok = strategy.check()
+            ok = strategy.check_status()
             if not ok:
                 failed_checks.append(strategy.name)
 
