@@ -38,16 +38,20 @@ class HardwareObserverCharm(ops.CharmBase):
 
         self._stored.set_default(
             agent_installed=False,
-            resource_installed=False,
+            resource_install_status={},
             config={},
             blocked_msg="",
         )
 
-    def _on_install_or_upgrade(self, event: ops.InstallEvent) -> None:
+    def _on_install_or_upgrade(self, _: ops.InstallEvent) -> None:
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
         resource_white_list = self.hw_tool_helper.get_resource_white_list(self.model.resources)
-        resource_install_status = self.hw_tool_helper.install(resource_white_list)
+        resource_install_status = self.hw_tool_helper.install(
+            resource_white_list,
+            resource_black_list=self._stored.resource_install_status,  # type: ignore[arg-type]
+        )
+        self._stored.resource_install_status = resource_install_status
         if not all(resource_install_status.values()):
             failed_resources = [r for r, s in resource_install_status.items() if not s]
             msg = f"Failed to install resources: {', '.join(failed_resources)}"
@@ -56,33 +60,31 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = ErrorStatus(msg)
             return
 
-        self.model.unit.status = MaintenanceStatus("Installing exporter...")
-        agent_installed = self.exporter_observer.install_agent()
-        if not agent_installed:
-            msg = "Failed to installed exporter, please refer to `juju debug-log`"
-            logger.error(msg)
-            self._stored.blocked_msg = msg
-            self.model.unit.status = ErrorStatus(f"Failed to install resources: {msg}")
-            return
+        if self._stored.agent_installed is not True:
+            self.model.unit.status = MaintenanceStatus("Installing exporter...")
+            success = self.exporter_observer.install_agent()
+            self._stored.agent_installed = success
+            if not success:
+                msg = "Failed to installed exporter, please refer to `juju debug-log`"
+                logger.error(msg)
+                self._stored.blocked_msg = msg
+                self.model.unit.status = ErrorStatus(msg)
+                return
 
-        logger.info("Installation completed.")
-        self._stored.agent_installed = True
-        self._stored.resource_installed = True
-        self._stored.blocked_msg = ""
-        self._on_update_status(event)
+        self.update_status()
 
     def _on_remove(self, _: EventBase) -> None:
         """Remove everything when charm is being removed."""
         logger.info("Start to remove.")
-        # Remove binary tool
-        self.hw_tool_helper.remove(self.model.resources)
         self.exporter_observer.uninstall_agent()
+        self.hw_tool_helper.remove(self.model.resources)
         self._stored.agent_installed = False
+        self._stored.resource_install_status = {}
         logger.info("Remove complete")
 
-    def _on_update_status(self, event: EventBase) -> None:
+    def _on_update_status(self, _: EventBase) -> None:
         """Update the charm's status."""
-        self.update_status(event)
+        self.update_status()
 
     def _on_config_changed(self, event: EventBase) -> None:
         """Reconfigure charm."""
@@ -93,6 +95,7 @@ class HardwareObserverCharm(ops.CharmBase):
             success, message = self.exporter_observer.validate_agent_configs(options)
             if not success:
                 self.model.unit.status = BlockedStatus(message)
+                event.defer()
                 return
 
             success = self.exporter_observer.configure_agent(options, change_set)
@@ -100,11 +103,12 @@ class HardwareObserverCharm(ops.CharmBase):
                 self.model.unit.status = BlockedStatus(
                     "Failed to configure exporter, please check if the server is healthy..."
                 )
+                event.defer()
                 return
 
-        self.update_status(event)
+        self.update_status()
 
-    def update_status(self, _: EventBase) -> None:
+    def update_status(self) -> None:
         """Update the charm's status."""
         if not self.exporter_observer.agent_enabled:
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
@@ -120,6 +124,7 @@ class HardwareObserverCharm(ops.CharmBase):
             )
             return
 
+        self._stored.blocked_msg = ""
         self.model.unit.status = ActiveStatus("Unit is ready")
 
     def update_config_store(self) -> set:

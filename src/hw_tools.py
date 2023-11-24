@@ -421,7 +421,9 @@ class HWToolHelper:
         return resource_white_list
 
     def install(
-        self, resource_white_list: t.Dict[HWTool, t.Optional[Path]]
+        self,
+        resource_white_list: t.Dict[HWTool, t.Optional[Path]],
+        resource_black_list: t.Dict[HWTool, bool],
     ) -> t.Dict[HWTool, bool]:
         """Install tools."""
         logger.info("hw_tool_white_list: %s", self.hw_tool_white_list)
@@ -430,6 +432,10 @@ class HWToolHelper:
         resource_install_status = {}
         # Iterate over each white listed strategy and execute.
         for strategy in self.strategy_white_list:
+            if resource_black_list.get(strategy.name, False):
+                logger.info("Strategy %s already installed, skipping", strategy)
+                continue
+
             try:
                 # TPRStrategy
                 if isinstance(strategy, TPRStrategyABC):
