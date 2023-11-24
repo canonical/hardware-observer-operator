@@ -103,10 +103,6 @@ class StrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
     def check_status(self) -> bool:
         """Check installation status of the tool."""
 
-    @abstractmethod
-    def validate_tool(self, path: Path) -> bool:
-        """Check if the tool is valid or not."""
-
 
 class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
     """Abstract strategy for apt install tool."""
@@ -115,15 +111,24 @@ class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
     package_source_mapping = t.Dict[str, str]
 
     @abstractmethod
+    def add_repos(self) -> None:
+        """Add apt repositories."""
+
+    @abstractmethod
+    def disable_repos(self) -> None:
+        """Disable apt repositories."""
+
+    @abstractmethod
     def install(self) -> None:
         """Installation details."""
 
     @abstractmethod
     def remove(self) -> None:
         """Remove details."""
-        # Note: The repo and keys should be remove when removing
-        # hook is triggered. But currently the apt lib don't have
-        # the remove option.
+
+    @abstractmethod
+    def validate_tool(self) -> bool:
+        """Check if the tool is valid or not."""
 
 
 class APTStrategy(APTStrategyABC):
@@ -148,12 +153,17 @@ class APTStrategy(APTStrategyABC):
             repositories.add(repo)
 
     def disable_repos(self) -> None:
-        """Disable the repository."""
+        """Disable apt repositories."""
         repositories = apt.RepositoryMapping()
         for repo in self.repos:
             repositories.disable(repo)
 
     def install(self) -> None:
+        """Install apt packages."""
+        if not self.validate_tool():
+            logger.error("%s is not valid.", self.name)
+            return
+
         for key in self.apt_keys:
             apt.import_key(key)
         self.add_repos()
@@ -161,6 +171,10 @@ class APTStrategy(APTStrategyABC):
             apt.add_package(package, update_cache=True)
 
     def remove(self) -> None:
+        """Remove apt packages."""
+        # Note: The repo and keys should be remove when removing
+        # hook is triggered. But currently the apt lib don't have
+        # the remove option.
         for package in self.package_source_mapping:
             apt.remove_package(package)
         self.disable_repos()
@@ -172,7 +186,7 @@ class APTStrategy(APTStrategyABC):
             success &= check_deb_pkg_installed(package)
         return success
 
-    def validate_tool(self, path: Path) -> bool:
+    def validate_tool(self) -> bool:
         """Check package status."""
         # Needs implementation
         return True
@@ -194,6 +208,14 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     def remove(self) -> None:
         """Remove details."""
 
+    @abstractmethod
+    def check_status(self) -> bool:
+        """Check installation status of the tool."""
+
+    @abstractmethod
+    def validate_tool(self, path: Path) -> bool:
+        """Check if the tool is valid or not."""
+
 
 class TPRStrategy(TPRStrategyABC):
     """Third party resource strategy base class."""
@@ -206,6 +228,7 @@ class TPRStrategy(TPRStrategyABC):
     def install(self, path: Path) -> None:
         """Install third party tool."""
         if not self.validate_tool(path):
+            logger.error("%s is not valid.", self.name)
             return
 
         if self.is_debian_package:
@@ -319,7 +342,7 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
         """Check redfish status."""
         return True
 
-    def validate_tool(self, path: Path) -> bool:
+    def validate_tool(self) -> bool:
         """Validate if redfish tool is valid or not."""
         return True
 
@@ -329,6 +352,7 @@ class HWToolHelper:
 
     _hw_tool_white_list: t.Optional[t.List[HWTool]] = None
     _hw_collector_white_list: t.Optional[t.List[str]] = None
+    _strategy_white_list: t.Optional[t.List[StrategyABC]] = None
 
     @property
     def strategies(self) -> t.List[StrategyABC]:
@@ -364,65 +388,57 @@ class HWToolHelper:
             self._hw_collector_white_list = collectors
         return self._hw_collector_white_list
 
-    def fetch_tools(self, resources: Resources) -> t.Dict[HWTool, Path]:
-        """Fetch resource from juju if it's VENDOR_TOOLS."""
-        fetch_tools: t.Dict[HWTool, Path] = {}
-        # Fetch all tools from juju resources
+    @property
+    def strategy_white_list(self) -> t.List[StrategyABC]:
+        """Define strategy white list."""
+        # cache the white list because it might be expensive to get
+        if self._strategy_white_list is None:
+            strategies = [s for s in self.strategies if s.name in self.hw_tool_white_list]
+            self._strategy_white_list = strategies
+        return self._strategy_white_list
+
+    def get_resource_white_list(self, resources: Resources) -> t.Dict[HWTool, t.Optional[Path]]:
+        """Fetch white listed tool and path pair from juju if it's VENDOR_TOOLSa."""
+        resource_white_list: t.Dict[HWTool, t.Optional[Path]] = {}
+        # Note: we need to loop over TRP_RESOURCES rather than hw tool
+        # whitelist because some hw tools don't need to install any resources.
         for tool, resource in TPR_RESOURCES.items():
-            if tool not in self.hw_tool_white_list:
-                logger.info("Skip fetch tool: %s", tool)
+            if tool not in self.hw_collector_white_list:
+                logger.warning("Skip fetching resource for tool: %s (not in white list)", tool)
                 continue
+
             try:
                 path = resources.fetch(resource)
-                fetch_tools[tool] = path
+                logger.info("Fetched resource for tool: %s", tool)
             except ModelError:
-                logger.warning("Fail to fetch tool: %s", resource)
+                # If path is None, this means the resource cannot be installed or it's missing.
+                path = None
+                logger.warning("Failed to fetch resource for tool: %s", tool)
+            else:
+                resource_white_list[tool] = path
 
-        return fetch_tools
+        logger.info("resource_white_list: %s", resource_white_list)
+        return resource_white_list
 
-    def check_missing_resources(self, fetch_tools: t.Dict[HWTool, Path]) -> t.Tuple[bool, str]:
-        """Check if required resources are not been uploaded."""
-        missing_resources = []
-        for tool in self.hw_tool_white_list:
-            if tool in TPR_RESOURCES:
-                # Resource hasn't been uploaded
-                if tool not in fetch_tools:
-                    missing_resources.append(TPR_RESOURCES[tool])
-                # Uploaded but file size is zero
-                path = fetch_tools.get(tool)
-                if path and not hw_resources.validate_size(path):
-                    logger.warning("Tool: %s path: %s size is zero", tool, path)
-                    missing_resources.append(TPR_RESOURCES[tool])
-        if len(missing_resources) > 0:
-            return False, f"Missing resources: {missing_resources}"
-        return True, ""
-
-    def install(self, resources: Resources) -> t.Tuple[bool, str]:
+    def install(
+        self, resource_white_list: t.Dict[HWTool, t.Optional[Path]]
+    ) -> t.Dict[HWTool, bool]:
         """Install tools."""
         logger.info("hw_tool_white_list: %s", self.hw_tool_white_list)
+        logger.info("hw_collector_white_list: %s", self.hw_collector_white_list)
 
-        fetch_tools = self.fetch_tools(resources)
-
-        ok, msg = self.check_missing_resources(fetch_tools)
-        if not ok:
-            return ok, msg
-
-        fail_strategies = []
-        strategy_errors = []
-
-        # Iterate over each strategy and execute.
-        for strategy in self.strategies:
-            if strategy.name not in self.hw_tool_white_list:
-                continue
-            # TPRStrategy
+        resource_install_status = {}
+        # Iterate over each white listed strategy and execute.
+        for strategy in self.strategy_white_list:
             try:
+                # TPRStrategy
                 if isinstance(strategy, TPRStrategyABC):
-                    path = fetch_tools.get(strategy.name)  # pylint: disable=W0212
+                    path = resource_white_list.get(strategy.name)
                     if path:
                         strategy.install(path)
                 # APTStrategy
                 elif isinstance(strategy, APTStrategyABC):
-                    strategy.install()  # pylint: disable=E1120
+                    strategy.install()
                 logger.info("Strategy %s install success", strategy)
             except (
                 OSError,
@@ -430,30 +446,25 @@ class HWToolHelper:
                 hw_resources.ResourceChecksumError,
                 hw_resources.ResourceFileSizeZeroError,
             ) as e:
+                resource_install_status[strategy.name] = False
                 logger.warning("Strategy %s install fail: %s", strategy, e)
-                fail_strategies.append(strategy.name)
-                strategy_errors.append(e)
+            else:
+                resource_install_status[strategy.name] = True
 
-        if len(strategy_errors) > 0:
-            return False, f"Fail strategies: {fail_strategies}"
-        return True, ""
+        return resource_install_status
 
     def remove(self, resources: Resources) -> None:  # pylint: disable=W0613
         """Execute all remove strategies."""
-        for strategy in self.strategies:
-            if strategy.name not in self.hw_tool_white_list:
-                continue
+        for strategy in self.strategy_white_list:
             if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
 
-    def check(self) -> t.Tuple[bool, str]:
+    def check_statuses(self) -> t.Tuple[bool, str]:
         """Check tool status."""
         failed_checks = []
 
-        for strategy in self.strategies:
-            if strategy.name not in self.hw_tool_white_list:
-                continue
+        for strategy in self.strategy_white_list:
             ok = strategy.check_status()
             if not ok:
                 failed_checks.append(strategy.name)

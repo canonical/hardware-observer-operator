@@ -46,11 +46,14 @@ class HardwareObserverCharm(ops.CharmBase):
     def _on_install_or_upgrade(self, event: ops.InstallEvent) -> None:
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
-        resource_installed, msg = self.hw_tool_helper.install(self.model.resources)
-        if not resource_installed:
+        resource_white_list = self.hw_tool_helper.get_resource_white_list(self.model.resources)
+        resource_install_status = self.hw_tool_helper.install(resource_white_list)
+        if not all(resource_install_status.values()):
+            failed_resources = [r for r, s in resource_install_status.items() if not s]
+            msg = f"Failed to install resources: {', '.join(failed_resources)}"
             logger.error(msg)
             self._stored.blocked_msg = msg
-            self.model.unit.status = ErrorStatus(f"Failed to install resources: {msg}")
+            self.model.unit.status = ErrorStatus(msg)
             return
 
         self.model.unit.status = MaintenanceStatus("Installing exporter...")
