@@ -34,11 +34,11 @@ class ResourceNotFoundError(Exception):
 
     def __init__(self, tool: HWTool, path: Path):
         """Init."""
-        self.message = f"{tool}: {path} does not exists"
+        self.message = f"{tool}: {path} does not exist"
 
 
 class ResourceNotExecutableError(Exception):
-    """Raise if resources is not an executable."""
+    """Raise if resource is not an executable."""
 
     def __init__(self, tool: HWTool, path: Path):
         """Init."""

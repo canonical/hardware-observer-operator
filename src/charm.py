@@ -122,18 +122,18 @@ class HardwareObserverCharm(ops.CharmBase):
     def update_status(self) -> None:
         """Update the charm's status."""
         if not self.cos_agent_relation_handler.exporter_enabled:
-            self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
+            self.model.unit.status = BlockedStatus(f"Missing relation: [{EXPORTER_RELATION_NAME}]")
             return
 
         if self.cos_agent_relation_handler.too_many_relations:
-            self.model.unit.status = BlockedStatus("Cannot relate to more than one grafan-agent")
+            self.model.unit.status = BlockedStatus("Cannot relate to more than one grafana-agent")
             return
 
         if (
             self.cos_agent_relation_handler.exporter_enabled
             and not self.cos_agent_relation_handler.exporter_online
         ):
-            error_msg = "Exporter crashes unexpectedly, please refer to systemd logs..."
+            error_msg = "Exporter crashed unexpectedly, please refer to systemd logs..."
             self.model.unit.status = ErrorStatus(error_msg)
             return
 
