@@ -54,17 +54,19 @@ def lshw(class_filter: t.Optional[str] = None) -> t.Any:
         raise err
 
 
+def install_apt_package(pkg_name: str) -> None:
+    """Install APT package if it's not installed."""
+    try:
+        apt.DebianPackage.from_installed_package(pkg_name)
+    except apt.PackageNotFoundError:
+        logger.info("installing %s", pkg_name)
+        apt.add_package(pkg_name, update_cache=False)
+    else:
+        logger.info("%s already installed", pkg_name)
+
+
 def get_bmc_address() -> t.Optional[str]:
     """Get BMC IP address by ipmitool."""
-    pkg = "ipmitool"
-    try:
-        apt.DebianPackage.from_installed_package(pkg)
-    except apt.PackageNotFoundError:
-        logger.info("installing %s", pkg)
-        apt.add_package(pkg, update_cache=False)
-    else:
-        logger.info("%s already installed", pkg)
-
     cmd = "ipmitool lan print"
     try:
         output = subprocess.check_output(cmd.split(), text=True)
@@ -173,6 +175,8 @@ def bmc_hw_verifier() -> t.List[HWTool]:
 
 def get_hw_tool_white_list() -> t.List[HWTool]:
     """Return HWTool white list."""
-    raid_white_list = raid_hw_verifier()
+    # bmc_hw_verifier requires `ipmitool`
+    install_apt_package("ipmitool")
     bmc_white_list = bmc_hw_verifier()
+    raid_white_list = raid_hw_verifier()
     return raid_white_list + bmc_white_list

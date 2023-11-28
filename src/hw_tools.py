@@ -9,6 +9,7 @@ import stat
 import subprocess
 import typing as t
 from abc import ABCMeta, abstractmethod
+from functools import cached_property
 from pathlib import Path
 
 from charms.operator_libs_linux.v0 import apt
@@ -20,7 +21,6 @@ from checksum import (
     SAS2IRCU_VERSION_INFOS,
     SAS3IRCU_VERSION_INFOS,
     STORCLI_VERSION_INFOS,
-    ToolVersionInfo,
 )
 from config import EXPORTER_COLLECTOR_MAPPING, SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool
 from hardware import get_hw_tool_white_list
@@ -100,23 +100,12 @@ class StrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
         return self._name
 
     @abstractmethod
-    def check_status(self) -> bool:
+    def check_status(self) -> t.Dict[str, bool]:
         """Check installation status of the tool."""
 
 
 class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
-    """Abstract strategy for apt install tool."""
-
-    apt_keys: t.List
-    package_source_mapping = t.Dict[str, str]
-
-    @abstractmethod
-    def add_repos(self) -> None:
-        """Add apt repositories."""
-
-    @abstractmethod
-    def disable_repos(self) -> None:
-        """Disable apt repositories."""
+    """Strategy for apt install tool."""
 
     @abstractmethod
     def install(self) -> None:
@@ -125,80 +114,17 @@ class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
     @abstractmethod
     def remove(self) -> None:
         """Remove details."""
+        # Note: The repo and keys should be remove when removing
+        # hook is triggered. But currently the apt lib don't have
+        # the remove option.
 
     @abstractmethod
     def validate_tool(self) -> bool:
         """Check if the tool is valid or not."""
 
 
-class APTStrategy(APTStrategyABC):
-    """Strategy for apt install tool."""
-
-    apt_keys = []
-    package_source_mapping: t.Dict[str, str] = {}
-
-    @property
-    def repos(self) -> t.List[apt.DebianRepository]:
-        """Third party DebianRepositories."""
-        repos = []
-        for repo_line in self.package_source_mapping.values():
-            if not repo_line:
-                repos.append(apt.DebianRepository.from_repo_line(repo_line))
-        return repos
-
-    def add_repos(self) -> None:
-        """Add apt repositories."""
-        repositories = apt.RepositoryMapping()
-        for repo in self.repos:
-            repositories.add(repo)
-
-    def disable_repos(self) -> None:
-        """Disable apt repositories."""
-        repositories = apt.RepositoryMapping()
-        for repo in self.repos:
-            repositories.disable(repo)
-
-    def install(self) -> None:
-        """Install apt packages."""
-        if not self.validate_tool():
-            logger.error("%s is not valid.", self.name)
-            return
-
-        for key in self.apt_keys:
-            apt.import_key(key)
-        self.add_repos()
-        for package in self.package_source_mapping:
-            apt.add_package(package, update_cache=True)
-
-    def remove(self) -> None:
-        """Remove apt packages."""
-        # Note: The repo and keys should be remove when removing
-        # hook is triggered. But currently the apt lib don't have
-        # the remove option.
-        for package in self.package_source_mapping:
-            apt.remove_package(package)
-        self.disable_repos()
-
-    def check_status(self) -> bool:
-        """Check package status."""
-        success = True
-        for package in self.package_source_mapping:
-            success &= check_deb_pkg_installed(package)
-        return success
-
-    def validate_tool(self) -> bool:
-        """Check package status."""
-        # Needs implementation
-        return True
-
-
 class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
-    """Third party resource strategy abstract class."""
-
-    origin_path: Path
-    symlink_bin: Path
-    is_debian_package: bool
-    version_infos: t.List[ToolVersionInfo]
+    """Third party resource strategy class."""
 
     @abstractmethod
     def install(self, path: Path) -> None:
@@ -207,46 +133,35 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     @abstractmethod
     def remove(self) -> None:
         """Remove details."""
-
-    @abstractmethod
-    def check_status(self) -> bool:
-        """Check installation status of the tool."""
 
     @abstractmethod
     def validate_tool(self, path: Path) -> bool:
         """Check if the tool is valid or not."""
 
 
-class TPRStrategy(TPRStrategyABC):
-    """Third party resource strategy base class."""
+class StorCLIStrategy(TPRStrategyABC):
+    """Strategy to install storcli."""
 
-    origin_path = Path("")
-    symlink_bin = Path("")
-    is_debian_package = False
-    version_infos = []
+    _name = HWTool.STORCLI
+    origin_path = Path("/opt/MegaRAID/storcli/storcli64")
+    symlink_bin = TOOLS_DIR / HWTool.STORCLI.value
 
     def install(self, path: Path) -> None:
-        """Install third party tool."""
+        """Install storcli."""
         if not self.validate_tool(path):
             logger.error("%s is not valid.", self.name)
             return
 
-        if self.is_debian_package:
-            install_deb(self.name, path)
-            if self.origin_path != Path(""):
-                symlink(src=self.origin_path, dst=self.symlink_bin)
-        else:
-            make_executable(path)
-            symlink(src=path, dst=self.symlink_bin)
+        install_deb(self.name, path)
+        symlink(src=self.origin_path, dst=self.symlink_bin)
 
     def remove(self) -> None:
-        """Remove third party tool."""
-        logger.debug("Remove file %s", self.symlink_bin)
+        """Remove storcli."""
         self.symlink_bin.unlink(missing_ok=True)
-        if self.is_debian_package:
-            remove_deb(pkg=self.name)
+        logger.debug("Remove file %s", self.symlink_bin)
+        remove_deb(pkg=self.name)
 
-    def check_status(self) -> bool:
+    def check_status(self) -> t.Dict[str, bool]:
         """Check installation status of third party tool."""
         try:
             path = self.symlink_bin
@@ -259,75 +174,206 @@ class TPRStrategy(TPRStrategyABC):
             raise hw_resources.ResourceNotFoundError(tool=self.name, path=path)
         if not executable:
             raise hw_resources.ResourceNotExecutableError(tool=self.name, path=path)
-        return True
+        return {str(self.name): True}
 
     def validate_tool(self, path: Path) -> bool:
         """Check if third party tool is valid."""
         if not hw_resources.validate_size(path):
             raise hw_resources.ResourceFileSizeZeroError(tool=self.name, path=path)
-        if not hw_resources.validate_checksum(self.version_infos, path):
+        if not hw_resources.validate_checksum(STORCLI_VERSION_INFOS, path):
             raise hw_resources.ResourceChecksumError(tool=self.name, path=path)
         return True
 
 
-class StorCLIStrategy(TPRStrategy):
-    """Strategy to install storcli."""
-
-    _name = HWTool.STORCLI
-    origin_path = Path("/opt/MegaRAID/storcli/storcli64")
-    symlink_bin = TOOLS_DIR / HWTool.STORCLI.value
-    is_debian_package = True
-    version_infos = STORCLI_VERSION_INFOS
-
-
-class PercCLIStrategy(TPRStrategy):
+class PercCLIStrategy(TPRStrategyABC):
     """Strategy to install storcli."""
 
     _name = HWTool.PERCCLI
     origin_path = Path("/opt/MegaRAID/perccli/perccli64")
     symlink_bin = TOOLS_DIR / HWTool.PERCCLI.value
-    is_debian_package = True
-    version_infos = PERCCLI_VERSION_INFOS
+
+    def install(self, path: Path) -> None:
+        """Install perccli."""
+        if not self.validate_tool(path):
+            logger.error("%s is not valid.", self.name)
+            return
+
+        install_deb(self.name, path)
+        symlink(src=self.origin_path, dst=self.symlink_bin)
+
+    def remove(self) -> None:
+        """Remove perccli."""
+        self.symlink_bin.unlink(missing_ok=True)
+        logger.debug("Remove file %s", self.symlink_bin)
+        remove_deb(pkg=self.name)
+
+    def check_status(self) -> t.Dict[str, bool]:
+        """Check installation status of third party tool."""
+        try:
+            path = self.symlink_bin
+            exists = hw_resources.check_file_exists(path)
+            executable = hw_resources.check_file_executable(path)
+        except hw_resources.ResourceIsDirectoryError as err:
+            raise err
+
+        if not exists:
+            raise hw_resources.ResourceNotFoundError(tool=self.name, path=path)
+        if not executable:
+            raise hw_resources.ResourceNotExecutableError(tool=self.name, path=path)
+        return {str(self.name): True}
+
+    def validate_tool(self, path: Path) -> bool:
+        """Check if third party tool is valid."""
+        if not hw_resources.validate_size(path):
+            raise hw_resources.ResourceFileSizeZeroError(tool=self.name, path=path)
+        if not hw_resources.validate_checksum(PERCCLI_VERSION_INFOS, path):
+            raise hw_resources.ResourceChecksumError(tool=self.name, path=path)
+        return True
 
 
-class SAS2IRCUStrategy(TPRStrategy):
+class SAS2IRCUStrategy(TPRStrategyABC):
     """Strategy to install storcli."""
 
     _name = HWTool.SAS2IRCU
-    origin_path = Path("")
     symlink_bin = TOOLS_DIR / HWTool.SAS2IRCU.value
-    is_debian_package = False
-    version_infos = SAS2IRCU_VERSION_INFOS
+
+    def install(self, path: Path) -> None:
+        """Install sas2ircu."""
+        if not self.validate_tool(path):
+            logger.error("%s is not valid.", self.name)
+            return
+
+        make_executable(path)
+        symlink(src=path, dst=self.symlink_bin)
+
+    def remove(self) -> None:
+        """Remove sas2ircu."""
+        self.symlink_bin.unlink(missing_ok=True)
+        logger.debug("Remove file %s", self.symlink_bin)
+
+    def check_status(self) -> t.Dict[str, bool]:
+        """Check installation status of third party tool."""
+        try:
+            path = self.symlink_bin
+            exists = hw_resources.check_file_exists(path)
+            executable = hw_resources.check_file_executable(path)
+        except hw_resources.ResourceIsDirectoryError as err:
+            raise err
+
+        if not exists:
+            raise hw_resources.ResourceNotFoundError(tool=self.name, path=path)
+        if not executable:
+            raise hw_resources.ResourceNotExecutableError(tool=self.name, path=path)
+        return {str(self.name): True}
+
+    def validate_tool(self, path: Path) -> bool:
+        """Check if third party tool is valid."""
+        if not hw_resources.validate_size(path):
+            raise hw_resources.ResourceFileSizeZeroError(tool=self.name, path=path)
+        if not hw_resources.validate_checksum(SAS2IRCU_VERSION_INFOS, path):
+            raise hw_resources.ResourceChecksumError(tool=self.name, path=path)
+        return True
 
 
-class SAS3IRCUStrategy(TPRStrategy):
+class SAS3IRCUStrategy(SAS2IRCUStrategy):
     """Strategy to install storcli."""
 
     _name = HWTool.SAS3IRCU
-    origin_path = Path("")
     symlink_bin = TOOLS_DIR / HWTool.SAS3IRCU.value
-    is_debian_package = False
-    version_infos = SAS3IRCU_VERSION_INFOS
+
+    def install(self, path: Path) -> None:
+        """Install sas3ircu."""
+        if not self.validate_tool(path):
+            logger.error("%s is not valid.", self.name)
+            return
+
+        make_executable(path)
+        symlink(src=path, dst=self.symlink_bin)
+
+    def validate_tool(self, path: Path) -> bool:
+        """Check if third party tool is valid."""
+        if not hw_resources.validate_size(path):
+            raise hw_resources.ResourceFileSizeZeroError(tool=self.name, path=path)
+        if not hw_resources.validate_checksum(SAS3IRCU_VERSION_INFOS, path):
+            raise hw_resources.ResourceChecksumError(tool=self.name, path=path)
+        return True
 
 
-class SSACLIStrategy(APTStrategy):
+class SSACLIStrategy(APTStrategyABC):
     """Strategy for install ssacli."""
 
     _name = HWTool.SSACLI
-    apt_keys = HP_KEYS
-    package_source_mapping = {
-        HWTool.SSACLI.value: (
-            "deb http://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
-        )
-    }
+    pkg = HWTool.SSACLI.value
+    repo_line = "deb http://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
+
+    @property
+    def repo(self) -> apt.DebianRepository:
+        """Third party DebianRepository."""
+        return apt.DebianRepository.from_repo_line(self.repo_line)
+
+    def add_repo(self) -> None:
+        """Add repository."""
+        repositories = apt.RepositoryMapping()
+        repositories.add(self.repo)
+
+    def disable_repo(self) -> None:
+        """Disable the repository."""
+        repositories = apt.RepositoryMapping()
+        repositories.disable(self.repo)
+
+    def install(self) -> None:
+        if not self.validate_tool():
+            logger.error("%s is not valid.", self.name)
+            return
+
+        for key in HP_KEYS:
+            apt.import_key(key)
+        self.add_repo()
+        apt.add_package(self.pkg, update_cache=True)
+
+    def remove(self) -> None:
+        apt.remove_package(self.pkg)
+        self.disable_repo()
+
+    def check_status(self) -> t.Dict[str, bool]:
+        """Check package status."""
+        return {self.pkg: check_deb_pkg_installed(self.pkg)}
+
+    def validate_tool(self) -> bool:
+        """Check package status."""
+        # Needs implementation
+        return True
 
 
-class IPMIStrategy(APTStrategy):
+class IPMIStrategy(APTStrategyABC):
     """Strategy for install ipmi."""
 
     _name = HWTool.IPMI
-    apt_keys = []
-    package_source_mapping = {"freeipmi-tools": ""}
+    pkgs = ["freeipmi-tools"]
+
+    def install(self) -> None:
+        if not self.validate_tool():
+            logger.error("%s is not valid.", self.name)
+            return
+
+        for pkg in self.pkgs:
+            apt.add_package(pkg)
+
+    def remove(self) -> None:
+        for pkg in self.pkgs:
+            apt.remove_package(pkg)
+
+    def check_status(self) -> t.Dict[str, bool]:
+        """Check package status."""
+        result = {}
+        for pkg in self.pkgs:
+            result[pkg] = check_deb_pkg_installed(pkg)
+        return result
+
+    def validate_tool(self) -> bool:
+        """Check package status."""
+        # Needs implementation
+        return True
 
 
 class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
@@ -338,9 +384,9 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
 
     _name = HWTool.REDFISH
 
-    def check_status(self) -> bool:
-        """Check redfish status."""
-        return True
+    def check_status(self) -> t.Dict[str, bool]:
+        """Check package status."""
+        return {"redfish": True}
 
     def validate_tool(self) -> bool:
         """Validate if redfish tool is valid or not."""
@@ -349,10 +395,6 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
 
 class HWToolHelper:
     """Helper to install vendor's or hardware related tools."""
-
-    _hw_tool_white_list: t.Optional[t.List[HWTool]] = None
-    _hw_collector_white_list: t.Optional[t.List[str]] = None
-    _strategy_white_list: t.Optional[t.List[StrategyABC]] = None
 
     @property
     def strategies(self) -> t.List[StrategyABC]:
@@ -367,35 +409,25 @@ class HWToolHelper:
             RedFishStrategy(),
         ]
 
-    @property
+    @cached_property
     def hw_tool_white_list(self) -> t.List[HWTool]:
         """Define hardware tool white list."""
-        # cache the white list because it might be expensive to get
-        if self._hw_tool_white_list is None:
-            self._hw_tool_white_list = get_hw_tool_white_list()
-        return self._hw_tool_white_list
+        return get_hw_tool_white_list()
 
     @property
     def hw_collector_white_list(self) -> t.List[str]:
         """Define hardware colletor white list."""
-        # cache the white list because it might be expensive to get
-        if self._hw_collector_white_list is None:
-            collectors = []
-            for tool in self.hw_tool_white_list:
-                collector = EXPORTER_COLLECTOR_MAPPING.get(tool)
-                if collector is not None:
-                    collectors += collector
-            self._hw_collector_white_list = collectors
-        return self._hw_collector_white_list
+        collectors = []
+        for tool in self.hw_tool_white_list:
+            collector = EXPORTER_COLLECTOR_MAPPING.get(tool)
+            if collector is not None:
+                collectors += collector
+        return collectors
 
     @property
     def strategy_white_list(self) -> t.List[StrategyABC]:
         """Define strategy white list."""
-        # cache the white list because it might be expensive to get
-        if self._strategy_white_list is None:
-            strategies = [s for s in self.strategies if s.name in self.hw_tool_white_list]
-            self._strategy_white_list = strategies
-        return self._strategy_white_list
+        return [s for s in self.strategies if s.name in self.hw_tool_white_list]
 
     def get_resource_white_list(self, resources: Resources) -> t.Dict[HWTool, t.Optional[Path]]:
         """Fetch white listed tool and path pair from juju if it's VENDOR_TOOLSa."""
@@ -471,10 +503,27 @@ class HWToolHelper:
         failed_checks = []
 
         for strategy in self.strategy_white_list:
-            ok = strategy.check_status()
-            if not ok:
+            try:
+                result = strategy.check_status()
+            except (
+                hw_resources.ResourceNotFoundError,
+                hw_resources.ResourceIsDirectoryError,
+                hw_resources.ResourceNotExecutableError,
+            ) as e:
                 failed_checks.append(strategy.name)
+                logger.error("Strategy %s check status failed: %s", strategy.name, e)
+            else:
+                for name, status in result.items():
+                    if not status:
+                        logger.error(
+                            "Strategy %s check status failed: %s not installed", strategy, name
+                        )
+                if not all(result.values()):
+                    failed_checks.append(strategy.name)
 
         if len(failed_checks) > 0:
-            return False, f"Fail strategy checks: {failed_checks}"
+            return (
+                False,
+                f"Fail strategy checks: {failed_checks}, please refer to juju debug-log.",
+            )
         return True, ""

@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 # For further info, check https://github.com/canonical/charmcraft
-"""Checksum definition."""
+"""Checksum definition, check functions and related utils."""
 import logging
 import typing as t
 from dataclasses import dataclass, field
