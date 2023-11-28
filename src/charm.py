@@ -100,7 +100,7 @@ class HardwareObserverCharm(ops.CharmBase):
         """Update the charm's status."""
         self.update_status()
 
-    def _on_config_changed(self, event: EventBase) -> None:
+    def _on_config_changed(self, _: EventBase) -> None:
         """Reconfigure charm."""
         change_set = self.update_config_store()
 
@@ -109,15 +109,12 @@ class HardwareObserverCharm(ops.CharmBase):
             success, message = self.cos_agent_relation_handler.validate_exporter_configs(options)
             if not success:
                 self.model.unit.status = BlockedStatus(message)
-                event.defer()
                 return
 
             success = self.cos_agent_relation_handler.configure_exporter(options, change_set)
             if not success:
-                self.model.unit.status = BlockedStatus(
-                    "Failed to configure exporter, please check if the server is healthy..."
-                )
-                event.defer()
+                message = "Failed to configure exporter, please check if the server is healthy."
+                self.model.unit.status = BlockedStatus(message)
                 return
 
         self.update_status()
