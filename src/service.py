@@ -19,8 +19,8 @@ from config import (
 logger = getLogger(__name__)
 
 
-NUM_RETRIES = 3
-RETRY_TIMEOUT = 3
+EXPORTER_HEALTH_RETRY_COUNT = 3
+EXPORTER_HEALTH_RETRY_TIMEOUT = 3
 
 
 def check_installed(func: Callable) -> Callable:
@@ -200,10 +200,10 @@ class Exporter:
                 logger.info("Exporter health check - healthy.")
                 return True
             logger.warning("Exporter health check - unhealthy.")
-            for i in range(1, NUM_RETRIES + 1):
+            for i in range(1, EXPORTER_HEALTH_RETRY_COUNT + 1):
                 logger.warning("Restarting exporter - %d retry", i)
                 self.restart()
-                sleep(RETRY_TIMEOUT)
+                sleep(EXPORTER_HEALTH_RETRY_TIMEOUT)
                 if self.check_active():
                     logger.info("Exporter restarted.")
                     return True

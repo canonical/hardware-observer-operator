@@ -80,7 +80,7 @@ def get_bmc_address() -> t.Optional[str]:
 
 
 def validate_redfish_credential(ip_address: str, username: str = "", password: str = "") -> bool:
-    """Validate redfish credential by logging in with the credential."""
+    """Validate redfish credentials by attempting to login with them."""
     try:
         result = True
         redfish_obj = redfish_client(
