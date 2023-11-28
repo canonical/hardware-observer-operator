@@ -498,7 +498,7 @@ class HWToolHelper:
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
 
-    def check_statuses(self) -> t.Tuple[bool, str]:
+    def check_status(self) -> t.Tuple[bool, str]:
         """Check tool status."""
         failed_checks = []
 

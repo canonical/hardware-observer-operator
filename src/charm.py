@@ -51,26 +51,24 @@ class HardwareObserverCharm(ops.CharmBase):
         self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
 
         self._stored.set_default(
-            exporter_installed=False,
-            resource_install_status={},
             config={},
-            blocked_msg="",
+            exporter_installed=False,
+            resource_install_result={},
         )
 
     def _on_install_or_upgrade(self, _: ops.InstallEvent) -> None:
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
         resource_white_list = self.hw_tool_helper.get_resource_white_list(self.model.resources)
-        resource_install_status = self.hw_tool_helper.install(
+        resource_install_result = self.hw_tool_helper.install(
             resource_white_list,
-            resource_black_list=self._stored.resource_install_status,  # type: ignore[arg-type]
+            resource_black_list=self._stored.resource_install_result,  # type: ignore[arg-type]
         )
-        self._stored.resource_install_status = resource_install_status
-        if not all(resource_install_status.values()):
-            failed_resources = [r for r, s in resource_install_status.items() if not s]
+        self._stored.resource_install_result = resource_install_result
+        if not all(resource_install_result.values()):
+            failed_resources = [r for r, s in resource_install_result.items() if not s]
             msg = f"Failed to install resources: {', '.join(failed_resources)}"
             logger.error(msg)
-            self._stored.blocked_msg = msg
             self.model.unit.status = ErrorStatus(msg)
             return
 
@@ -79,9 +77,8 @@ class HardwareObserverCharm(ops.CharmBase):
             success = self.cos_agent_relation_handler.install_exporter()
             self._stored.exporter_installed = success
             if not success:
-                msg = "Failed to installed exporter, please refer to `juju debug-log`"
+                msg = "Failed to install exporter, please refer to `juju debug-log`"
                 logger.error(msg)
-                self._stored.blocked_msg = msg
                 self.model.unit.status = ErrorStatus(msg)
                 return
 
@@ -90,10 +87,13 @@ class HardwareObserverCharm(ops.CharmBase):
     def _on_remove(self, _: EventBase) -> None:
         """Remove everything when charm is being removed."""
         logger.info("Start to remove.")
-        self.cos_agent_relation_handler.uninstall_exporter()
         self.hw_tool_helper.remove(self.model.resources)
-        self._stored.exporter_installed = False
-        self._stored.resource_install_status = {}
+        self._stored.resource_install_result = {}
+        success = self.cos_agent_relation_handler.uninstall_exporter()
+        if not success:
+            msg = "Failed to uninstall exporter, please refer to `juju debug-log`"
+            logger.warning(msg)
+        self._stored.exporter_installed = not success
         logger.info("Remove complete")
 
     def _on_update_status(self, _: EventBase) -> None:
@@ -136,12 +136,15 @@ class HardwareObserverCharm(ops.CharmBase):
             self.cos_agent_relation_handler.exporter_enabled
             and not self.cos_agent_relation_handler.exporter_online
         ):
-            self.model.unit.status = ErrorStatus(
-                "Exporter crashes unexpectedly, please refer to systemd logs..."
-            )
+            error_msg = "Exporter crashes unexpectedly, please refer to systemd logs..."
+            self.model.unit.status = ErrorStatus(error_msg)
             return
 
-        self._stored.blocked_msg = ""
+        hw_tool_ok, error_msg = self.hw_tool_helper.check_status()
+        if not hw_tool_ok:
+            self.model.unit.status = ErrorStatus(error_msg)
+            return
+
         self.model.unit.status = ActiveStatus("Unit is ready")
 
     def update_config_store(self) -> set:
