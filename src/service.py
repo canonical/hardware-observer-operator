@@ -109,6 +109,14 @@ class ExporterTemplate:
 class Exporter:
     """A class representing the exporter and the metric endpoints."""
 
+    config_options = {
+        "exporter-port",
+        "exporter-log-level",
+        "redfish-host",
+        "redfish-username",
+        "redfish-password",
+    }
+
     def __init__(self, charm_dir: Path) -> None:
         """Initialize the class."""
         self.charm_dir = charm_dir
@@ -154,6 +162,8 @@ class Exporter:
             return success
         systemd.daemon_reload()
         logger.info("%s configured.", EXPORTER_NAME)
+
+        self.restart()
         return success
 
     @check_installed

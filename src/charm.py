@@ -11,8 +11,9 @@ import ops
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus
 
-import exporter
-from config import HWTool
+import cos_agent
+import service
+from config import EXPORTER_RELATION_NAME, HWTool
 from hardware import get_bmc_address
 from hw_tools import HWToolHelper
 
@@ -28,7 +29,20 @@ class HardwareObserverCharm(ops.CharmBase):
         """Init."""
         super().__init__(*args)
         self.hw_tool_helper = HWToolHelper()
-        self.exporter_observer = exporter.Observer(self)
+        self.exporter = service.Exporter(self.charm_dir)
+        self.cos_agent_relation_handler = cos_agent.Handler(
+            self,
+            exporter=self.exporter,
+            relation_name=EXPORTER_RELATION_NAME,
+            metrics_endpoints=[
+                {
+                    "path": "/metrics",
+                    "port": int(
+                        self.model.config["exporter-port"],
+                    ),
+                }
+            ],
+        )
 
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.install, self._on_install_or_upgrade)
@@ -37,7 +51,7 @@ class HardwareObserverCharm(ops.CharmBase):
         self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
 
         self._stored.set_default(
-            agent_installed=False,
+            exporter_installed=False,
             resource_install_status={},
             config={},
             blocked_msg="",
@@ -60,10 +74,10 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = ErrorStatus(msg)
             return
 
-        if self._stored.agent_installed is not True:
+        if self._stored.exporter_installed is not True:
             self.model.unit.status = MaintenanceStatus("Installing exporter...")
-            success = self.exporter_observer.install_agent()
-            self._stored.agent_installed = success
+            success = self.cos_agent_relation_handler.install_exporter()
+            self._stored.exporter_installed = success
             if not success:
                 msg = "Failed to installed exporter, please refer to `juju debug-log`"
                 logger.error(msg)
@@ -76,9 +90,9 @@ class HardwareObserverCharm(ops.CharmBase):
     def _on_remove(self, _: EventBase) -> None:
         """Remove everything when charm is being removed."""
         logger.info("Start to remove.")
-        self.exporter_observer.uninstall_agent()
+        self.cos_agent_relation_handler.uninstall_exporter()
         self.hw_tool_helper.remove(self.model.resources)
-        self._stored.agent_installed = False
+        self._stored.exporter_installed = False
         self._stored.resource_install_status = {}
         logger.info("Remove complete")
 
@@ -90,15 +104,15 @@ class HardwareObserverCharm(ops.CharmBase):
         """Reconfigure charm."""
         change_set = self.update_config_store()
 
-        if self.exporter_observer.agent_enabled:
+        if self.cos_agent_relation_handler.exporter_enabled:
             options = self.get_exporter_configs()
-            success, message = self.exporter_observer.validate_agent_configs(options)
+            success, message = self.cos_agent_relation_handler.validate_exporter_configs(options)
             if not success:
                 self.model.unit.status = BlockedStatus(message)
                 event.defer()
                 return
 
-            success = self.exporter_observer.configure_agent(options, change_set)
+            success = self.cos_agent_relation_handler.configure_exporter(options, change_set)
             if not success:
                 self.model.unit.status = BlockedStatus(
                     "Failed to configure exporter, please check if the server is healthy..."
@@ -110,15 +124,18 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def update_status(self) -> None:
         """Update the charm's status."""
-        if not self.exporter_observer.agent_enabled:
+        if not self.cos_agent_relation_handler.exporter_enabled:
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
             return
 
-        if self.exporter_observer.too_many_relations:
+        if self.cos_agent_relation_handler.too_many_relations:
             self.model.unit.status = BlockedStatus("Cannot relate to more than one grafan-agent")
             return
 
-        if self.exporter_observer.agent_enabled and not self.exporter_observer.agent_online:
+        if (
+            self.cos_agent_relation_handler.exporter_enabled
+            and not self.cos_agent_relation_handler.exporter_online
+        ):
             self.model.unit.status = ErrorStatus(
                 "Exporter crashes unexpectedly, please refer to systemd logs..."
             )
