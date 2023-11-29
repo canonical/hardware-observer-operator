@@ -9,6 +9,7 @@ import stat
 import subprocess
 import typing as t
 from abc import ABCMeta, abstractmethod
+from functools import cached_property
 from pathlib import Path
 
 from charms.operator_libs_linux.v0 import apt
@@ -26,10 +27,10 @@ from checksum import (
     SAS2IRCU_VERSION_INFOS,
     SAS3IRCU_VERSION_INFOS,
     STORCLI_VERSION_INFOS,
-    ResourceChecksumError,
     validate_checksum,
 )
 from config import (
+    EXPORTER_COLLECTOR_MAPPING,
     REDFISH_MAX_RETRY,
     REDFISH_TIMEOUT,
     SNAP_COMMON,
@@ -50,7 +51,63 @@ class ResourceFileSizeZeroError(Exception):
 
     def __init__(self, tool: HWTool, path: Path):
         """Init."""
-        self.message = f"Tool: {tool} path: {path} size is zero"
+        self.message = f"{tool}: {path} has zero size"
+
+
+class ResourceChecksumError(Exception):
+    """Raise if checksum does not match."""
+
+    def __init__(self, tool: HWTool, path: Path):
+        """Init."""
+        self.message = f"{tool}: {path} has incorrect checksum"
+
+
+class ResourceNotFoundError(Exception):
+    """Raise if resource not found."""
+
+    def __init__(self, tool: HWTool, path: Path):
+        """Init."""
+        self.message = f"{tool}: {path} does not exist"
+
+
+class ResourceNotExecutableError(Exception):
+    """Raise if resource is not an executable."""
+
+    def __init__(self, tool: HWTool, path: Path):
+        """Init."""
+        self.message = f"{tool}: {path} is not an executable"
+
+
+class ResourceIsDirectoryError(Exception):
+    """Raise if the resource is a directory."""
+
+
+def check_file_exists(src: Path) -> bool:
+    """Check if file exists or not."""
+    if src.is_dir():
+        raise ResourceIsDirectoryError(f"{src} is not a file.")
+    return src.exists()
+
+
+def check_file_executable(src: Path) -> bool:
+    """Check if file is executable or not."""
+    if src.is_dir():
+        raise ResourceIsDirectoryError(f"{src} is not a file.")
+    return os.access(src, os.X_OK)
+
+
+def check_file_size(path: Path) -> bool:
+    """Verify if the file size > 0.
+
+    Because charm focus us to publish the resources on charmhub,
+    but most of the hardware related tools have the un-republish
+    policy. Currently our solution is publish a empty file which
+    size is 0.
+    """
+    if path.stat().st_size == 0:
+        logger.info("%s size is 0, skip install", path)
+        return False
+    return True
 
 
 def copy_to_snap_common_bin(source: Path, filename: str) -> None:
@@ -67,20 +124,6 @@ def symlink(src: Path, dst: Path) -> None:
     except OSError as err:
         logger.exception(err)
         raise
-
-
-def check_file_size(path: Path) -> bool:
-    """Verify if the file size > 0.
-
-    Because charm focus us to publish the resources on charmhub,
-    but most of the hardware related tools have the un-republish
-    policy. Currently our solution is publish a empty file which
-    size is 0.
-    """
-    if path.stat().st_size == 0:
-        logger.info("% size is 0, skip install", path)
-        return False
-    return True
 
 
 def install_deb(name: str, path: Path) -> None:
@@ -117,6 +160,16 @@ def make_executable(src: Path) -> None:
         raise err
 
 
+def check_deb_pkg_installed(pkg: str) -> bool:
+    """Check if debian package is installed."""
+    try:
+        apt.DebianPackage.from_installed_package(pkg)
+        return True
+    except apt.PackageNotFoundError:
+        logger.warning("package %s not found in installed package", pkg)
+    return False
+
+
 class StrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
     """Basic strategy."""
 
@@ -126,6 +179,10 @@ class StrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
     def name(self) -> HWTool:
         """Name."""
         return self._name
+
+    @abstractmethod
+    def check_status(self) -> t.Dict[str, bool]:
+        """Check installation status of the tool."""
 
 
 class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
@@ -142,6 +199,10 @@ class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
         # hook is triggered. But currently the apt lib don't have
         # the remove option.
 
+    @abstractmethod
+    def validate_tool(self) -> bool:
+        """Check if the tool is valid or not."""
+
 
 class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     """Third party resource strategy class."""
@@ -154,6 +215,10 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     def remove(self) -> None:
         """Remove details."""
 
+    @abstractmethod
+    def validate_tool(self, path: Path) -> bool:
+        """Check if the tool is valid or not."""
+
 
 class StorCLIStrategy(TPRStrategyABC):
     """Strategy to install storcli."""
@@ -164,10 +229,10 @@ class StorCLIStrategy(TPRStrategyABC):
 
     def install(self, path: Path) -> None:
         """Install storcli."""
-        if not check_file_size(path):
-            raise ResourceFileSizeZeroError(tool=self._name, path=path)
-        if not validate_checksum(STORCLI_VERSION_INFOS, path):
-            raise ResourceChecksumError
+        if not self.validate_tool(path):
+            logger.error("%s is not valid.", self.name)
+            return
+
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
 
@@ -176,6 +241,29 @@ class StorCLIStrategy(TPRStrategyABC):
         self.symlink_bin.unlink(missing_ok=True)
         logger.debug("Remove file %s", self.symlink_bin)
         remove_deb(pkg=self.name)
+
+    def check_status(self) -> t.Dict[str, bool]:
+        """Check installation status of third party tool."""
+        try:
+            path = self.symlink_bin
+            exists = check_file_exists(path)
+            executable = check_file_executable(path)
+        except ResourceIsDirectoryError as err:
+            raise err
+
+        if not exists:
+            raise ResourceNotFoundError(tool=self.name, path=path)
+        if not executable:
+            raise ResourceNotExecutableError(tool=self.name, path=path)
+        return {str(self.name): True}
+
+    def validate_tool(self, path: Path) -> bool:
+        """Check if third party tool is valid."""
+        if not check_file_size(path):
+            raise ResourceFileSizeZeroError(tool=self.name, path=path)
+        if not validate_checksum(STORCLI_VERSION_INFOS, path):
+            raise ResourceChecksumError(tool=self.name, path=path)
+        return True
 
 
 class PercCLIStrategy(TPRStrategyABC):
@@ -187,10 +275,10 @@ class PercCLIStrategy(TPRStrategyABC):
 
     def install(self, path: Path) -> None:
         """Install perccli."""
-        if not check_file_size(path):
-            raise ResourceFileSizeZeroError(tool=self._name, path=path)
-        if not validate_checksum(PERCCLI_VERSION_INFOS, path):
-            raise ResourceChecksumError
+        if not self.validate_tool(path):
+            logger.error("%s is not valid.", self.name)
+            return
+
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
 
@@ -199,6 +287,29 @@ class PercCLIStrategy(TPRStrategyABC):
         self.symlink_bin.unlink(missing_ok=True)
         logger.debug("Remove file %s", self.symlink_bin)
         remove_deb(pkg=self.name)
+
+    def check_status(self) -> t.Dict[str, bool]:
+        """Check installation status of third party tool."""
+        try:
+            path = self.symlink_bin
+            exists = check_file_exists(path)
+            executable = check_file_executable(path)
+        except ResourceIsDirectoryError as err:
+            raise err
+
+        if not exists:
+            raise ResourceNotFoundError(tool=self.name, path=path)
+        if not executable:
+            raise ResourceNotExecutableError(tool=self.name, path=path)
+        return {str(self.name): True}
+
+    def validate_tool(self, path: Path) -> bool:
+        """Check if third party tool is valid."""
+        if not check_file_size(path):
+            raise ResourceFileSizeZeroError(tool=self.name, path=path)
+        if not validate_checksum(PERCCLI_VERSION_INFOS, path):
+            raise ResourceChecksumError(tool=self.name, path=path)
+        return True
 
 
 class SAS2IRCUStrategy(TPRStrategyABC):
@@ -209,10 +320,10 @@ class SAS2IRCUStrategy(TPRStrategyABC):
 
     def install(self, path: Path) -> None:
         """Install sas2ircu."""
-        if not check_file_size(path):
-            raise ResourceFileSizeZeroError(tool=self._name, path=path)
-        if not validate_checksum(SAS2IRCU_VERSION_INFOS, path):
-            raise ResourceChecksumError
+        if not self.validate_tool(path):
+            logger.error("%s is not valid.", self.name)
+            return
+
         make_executable(path)
         symlink(src=path, dst=self.symlink_bin)
 
@@ -220,6 +331,29 @@ class SAS2IRCUStrategy(TPRStrategyABC):
         """Remove sas2ircu."""
         self.symlink_bin.unlink(missing_ok=True)
         logger.debug("Remove file %s", self.symlink_bin)
+
+    def check_status(self) -> t.Dict[str, bool]:
+        """Check installation status of third party tool."""
+        try:
+            path = self.symlink_bin
+            exists = check_file_exists(path)
+            executable = check_file_executable(path)
+        except ResourceIsDirectoryError as err:
+            raise err
+
+        if not exists:
+            raise ResourceNotFoundError(tool=self.name, path=path)
+        if not executable:
+            raise ResourceNotExecutableError(tool=self.name, path=path)
+        return {str(self.name): True}
+
+    def validate_tool(self, path: Path) -> bool:
+        """Check if third party tool is valid."""
+        if not check_file_size(path):
+            raise ResourceFileSizeZeroError(tool=self.name, path=path)
+        if not validate_checksum(SAS2IRCU_VERSION_INFOS, path):
+            raise ResourceChecksumError(tool=self.name, path=path)
+        return True
 
 
 class SAS3IRCUStrategy(SAS2IRCUStrategy):
@@ -230,12 +364,20 @@ class SAS3IRCUStrategy(SAS2IRCUStrategy):
 
     def install(self, path: Path) -> None:
         """Install sas3ircu."""
-        if not check_file_size(path):
-            raise ResourceFileSizeZeroError(tool=self._name, path=path)
-        if not validate_checksum(SAS3IRCU_VERSION_INFOS, path):
-            raise ResourceChecksumError
+        if not self.validate_tool(path):
+            logger.error("%s is not valid.", self.name)
+            return
+
         make_executable(path)
         symlink(src=path, dst=self.symlink_bin)
+
+    def validate_tool(self, path: Path) -> bool:
+        """Check if third party tool is valid."""
+        if not check_file_size(path):
+            raise ResourceFileSizeZeroError(tool=self.name, path=path)
+        if not validate_checksum(SAS3IRCU_VERSION_INFOS, path):
+            raise ResourceChecksumError(tool=self.name, path=path)
+        return True
 
 
 class SSACLIStrategy(APTStrategyABC):
@@ -261,6 +403,10 @@ class SSACLIStrategy(APTStrategyABC):
         repositories.disable(self.repo)
 
     def install(self) -> None:
+        if not self.validate_tool():
+            logger.error("%s is not valid.", self.name)
+            return
+
         for key in HP_KEYS:
             apt.import_key(key)
         self.add_repo()
@@ -270,6 +416,15 @@ class SSACLIStrategy(APTStrategyABC):
         apt.remove_package(self.pkg)
         self.disable_repo()
 
+    def check_status(self) -> t.Dict[str, bool]:
+        """Check package status."""
+        return {self.pkg: check_deb_pkg_installed(self.pkg)}
+
+    def validate_tool(self) -> bool:
+        """Check package status."""
+        # Needs implementation
+        return True
+
 
 class IPMIStrategy(APTStrategyABC):
     """Strategy for install ipmi."""
@@ -278,12 +433,28 @@ class IPMIStrategy(APTStrategyABC):
     pkgs = ["freeipmi-tools"]
 
     def install(self) -> None:
+        if not self.validate_tool():
+            logger.error("%s is not valid.", self.name)
+            return
+
         for pkg in self.pkgs:
             apt.add_package(pkg)
 
     def remove(self) -> None:
         for pkg in self.pkgs:
             apt.remove_package(pkg)
+
+    def check_status(self) -> t.Dict[str, bool]:
+        """Check package status."""
+        result = {}
+        for pkg in self.pkgs:
+            result[pkg] = check_deb_pkg_installed(pkg)
+        return result
+
+    def validate_tool(self) -> bool:
+        """Check package status."""
+        # Needs implementation
+        return True
 
 
 class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
@@ -293,6 +464,14 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
     """
 
     _name = HWTool.REDFISH
+
+    def check_status(self) -> t.Dict[str, bool]:
+        """Check package status."""
+        return {"redfish": True}
+
+    def validate_tool(self) -> bool:
+        """Validate if redfish tool is valid or not."""
+        return True
 
 
 def raid_hw_verifier() -> t.List[HWTool]:
@@ -421,6 +600,21 @@ class HWToolHelper:
             RedFishStrategy(),
         ]
 
+    @cached_property
+    def hw_tool_white_list(self) -> t.List[HWTool]:
+        """Define hardware tool white list."""
+        return get_hw_tool_white_list()
+
+    @property
+    def hw_collector_white_list(self) -> t.List[str]:
+        """Define hardware colletor white list."""
+        collectors = []
+        for tool in self.hw_tool_white_list:
+            collector = EXPORTER_COLLECTOR_MAPPING.get(tool)
+            if collector is not None:
+                collectors += collector
+        return collectors
+
     def fetch_tools(  # pylint: disable=W0102
         self,
         resources: Resources,
@@ -462,7 +656,7 @@ class HWToolHelper:
 
     def install(self, resources: Resources) -> t.Tuple[bool, str]:
         """Install tools."""
-        hw_white_list = get_hw_tool_white_list()
+        hw_white_list = self.hw_tool_white_list
         logger.info("hw_tool_white_list: %s", hw_white_list)
 
         fetch_tools = self.fetch_tools(resources, hw_white_list)
@@ -474,14 +668,14 @@ class HWToolHelper:
         fail_strategies = []
         strategy_errors = []
 
-        # Iterate over each strategy and execute.
+        # Iterate over each white listed strategy and execute.
         for strategy in self.strategies:
             if strategy.name not in hw_white_list:
                 continue
             # TPRStrategy
             try:
                 if isinstance(strategy, TPRStrategyABC):
-                    path = fetch_tools.get(strategy.name)  # pylint: disable=W0212
+                    path = fetch_tools.get(strategy.name)
                     if path:
                         strategy.install(path)
                 # APTStrategy
@@ -489,10 +683,10 @@ class HWToolHelper:
                     strategy.install()  # pylint: disable=E1120
                 logger.info("Strategy %s install success", strategy)
             except (
-                ResourceFileSizeZeroError,
                 OSError,
                 apt.PackageError,
                 ResourceChecksumError,
+                ResourceFileSizeZeroError,
             ) as e:
                 logger.warning("Strategy %s install fail: %s", strategy, e)
                 fail_strategies.append(strategy.name)
@@ -511,3 +705,36 @@ class HWToolHelper:
             if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
+
+    def check_installed(self) -> t.Tuple[bool, str]:
+        """Check tool status."""
+        hw_white_list = get_hw_tool_white_list()
+        failed_checks = []
+
+        for strategy in self.strategies:
+            if strategy.name not in hw_white_list:
+                continue
+            try:
+                result = strategy.check_status()
+            except (
+                ResourceNotFoundError,
+                ResourceIsDirectoryError,
+                ResourceNotExecutableError,
+            ) as e:
+                failed_checks.append(strategy.name)
+                logger.error("Strategy %s check status failed: %s", strategy.name, e)
+            else:
+                for name, status in result.items():
+                    if not status:
+                        logger.error(
+                            "Strategy %s check status failed: %s not installed", strategy, name
+                        )
+                if not all(result.values()):
+                    failed_checks.append(strategy.name)
+
+        if len(failed_checks) > 0:
+            return (
+                False,
+                f"Fail strategy checks: {failed_checks}, please refer to juju debug-log.",
+            )
+        return True, ""
