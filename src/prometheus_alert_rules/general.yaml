@@ -1,0 +1,13 @@
+groups:
+- name: HardwareObserver
+  rules:
+    - alert: CollectorFailed
+      expr: '{__name__=~"(.*)_collector_failed"} == 1'
+      for: 0m
+      labels:
+        severity: error
+      annotations:
+        summary: Collector failed. (instance {{ $labels.instance }})
+        description: |
+          A collector failed to fetch the metrics. Please reach out to hardware-observer maintainers.
+            LABELS = {{ $labels }}

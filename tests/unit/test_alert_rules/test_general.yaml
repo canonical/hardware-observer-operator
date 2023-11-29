@@ -1,0 +1,35 @@
+rule_files:
+  - ../../../src/prometheus_alert_rules/general.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: ipmidcmicollector_collector_failed{instance="ubuntu-99", collector="IPMIDCMICollector"}
+        values: '1x15'
+      - series: ipmiselcollector_collector_failed{instance="ubuntu-99", collector="IPMISELCollector"}
+        values: '1x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: CollectorFailed
+        exp_alerts:
+          - exp_labels:
+              severity: error
+              instance: ubuntu-99
+              collector: IPMIDCMICollector
+            exp_annotations:
+              summary: Collector failed. (instance ubuntu-99)
+              description: |
+                A collector failed to fetch the metrics. Please reach out to hardware-observer maintainers.
+                  LABELS = map[__name__:ipmidcmicollector_collector_failed collector:IPMIDCMICollector instance:ubuntu-99]
+          - exp_labels:
+              severity: error
+              instance: ubuntu-99
+              collector: IPMISELCollector
+            exp_annotations:
+              summary: Collector failed. (instance ubuntu-99)
+              description: |
+                A collector failed to fetch the metrics. Please reach out to hardware-observer maintainers.
+                  LABELS = map[__name__:ipmiselcollector_collector_failed collector:IPMISELCollector instance:ubuntu-99]
