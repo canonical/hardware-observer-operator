@@ -605,16 +605,6 @@ class HWToolHelper:
         """Define hardware tool white list."""
         return get_hw_tool_white_list()
 
-    @property
-    def hw_collector_white_list(self) -> t.List[str]:
-        """Define hardware colletor white list."""
-        collectors = []
-        for tool in self.hw_tool_white_list:
-            collector = EXPORTER_COLLECTOR_MAPPING.get(tool)
-            if collector is not None:
-                collectors += collector
-        return collectors
-
     def fetch_tools(  # pylint: disable=W0102
         self,
         resources: Resources,
