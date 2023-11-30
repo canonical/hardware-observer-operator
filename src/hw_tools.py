@@ -117,16 +117,6 @@ def make_executable(src: Path) -> None:
         raise err
 
 
-def check_executable(src: Path) -> bool:
-    """Check if file is executable or not."""
-    return os.access(src, os.X_OK)
-
-
-def check_file_exists(src: Path) -> bool:
-    """Check if file exists or not."""
-    return src.exists()
-
-
 def check_deb_pkg_installed(pkg: str) -> bool:
     """Check if debian package is installed."""
     try:

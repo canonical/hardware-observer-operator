@@ -35,6 +35,7 @@ from hw_tools import (
     StrategyABC,
     TPRStrategyABC,
     bmc_hw_verifier,
+    check_deb_pkg_installed,
     check_file_size,
     copy_to_snap_common_bin,
     get_hw_tool_white_list,
@@ -67,6 +68,13 @@ def test_copy_to_snap_common_bin(mock_path, mock_shutil):
     mock_path.assert_called_with(f"{SNAP_COMMON}/bin")
 
     mock_path_obj.mkdir.assert_called()
+
+
+@mock.patch("hw_tools.apt")
+def test_check_deb_pkg_installed_okay(mock_apt):
+    mock_pkg = "ipmitool"
+    result = check_deb_pkg_installed(mock_pkg)
+    assert result is True
 
 
 class TestSymlink(unittest.TestCase):
@@ -322,6 +330,55 @@ class TestHWToolHelper(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertEqual("Missing resources: ['storcli-deb']", msg)
+
+    @mock.patch("hw_tools.get_hw_tool_white_list", return_value=[HWTool.STORCLI])
+    @mock.patch(
+        "hw_tools.HWToolHelper.strategies",
+        return_value=[
+            mock.PropertyMock(spec=TPRStrategyABC),
+        ],
+        new_callable=mock.PropertyMock,
+    )
+    def test_12_check_installed_okay(self, mock_strategies, _):
+        self.harness.begin()
+        mock_strategies.return_value[0].name = HWTool.STORCLI
+        self.hw_tool_helper.check_installed()
+        for strategy in mock_strategies.return_value:
+            strategy.check.assert_called()
+
+    @mock.patch("hw_tools.get_hw_tool_white_list", return_value=[HWTool.STORCLI])
+    @mock.patch(
+        "hw_tools.HWToolHelper.strategies",
+        return_value=[
+            mock.PropertyMock(spec=TPRStrategyABC),
+        ],
+        new_callable=mock.PropertyMock,
+    )
+    def test_13_check_installed_okay(self, mock_strategies, _):
+        self.harness.begin()
+        mock_strategies.return_value[0].name = HWTool.SSACLI
+        success, msg = self.hw_tool_helper.check_installed()
+        self.assertTrue(success)
+        self.assertEqual(msg, "")
+
+    @mock.patch("hw_tools.os")
+    @mock.patch("hw_tools.Path")
+    @mock.patch(
+        "hw_tools.get_hw_tool_white_list",
+        return_value=[
+            HWTool.STORCLI,
+            HWTool.PERCCLI,
+            HWTool.SAS2IRCU,
+            HWTool.SAS3IRCU,
+            HWTool.SSACLI,
+            HWTool.IPMI,
+            HWTool.REDFISH,
+        ],
+    )
+    def test_14_check_installed_not_okay(self, _, mock_os, mock_path):
+        self.harness.begin()
+        success, msg = self.hw_tool_helper.check_installed()
+        self.assertFalse(success)
 
 
 class TestStorCLIStrategy(unittest.TestCase):

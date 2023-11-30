@@ -103,7 +103,7 @@ class HardwareObserverCharm(ops.CharmBase):
         self._stored.exporter_installed = not success
         logger.info("Remove complete")
 
-    def _on_update_status(self, _: EventBase) -> None:
+    def _on_update_status(self, _: EventBase) -> None:  # noqa: C901
         """Update the charm's status."""
         if not self._stored.installed:  # type: ignore
             self.model.unit.status = BlockedStatus("Resoures are not installed")  # type: ignore
@@ -117,6 +117,11 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus("Cannot relate to more than one grafana-agent")
             return
 
+        hw_tool_ok, error_msg = self.hw_tool_helper.check_installed()
+        if not hw_tool_ok:
+            self.model.unit.status = BlockedStatus(error_msg)
+            return
+
         if not self.exporter.check_health():
             logger.warning("Exporter health check - failed.")
             try:
@@ -127,18 +132,18 @@ class HardwareObserverCharm(ops.CharmBase):
                     if self.exporter.check_active():
                         logger.info("Exporter restarted.")
                         break
-                logger.error("Failed to restart the exporter.")
+                if not self.exporter.check_active():
+                    logger.error("Failed to restart the exporter.")
+                    self.model.unit.status = ErrorStatus(
+                        "Exporter crashed unexpectedly, please refer to systemd logs..."
+                    )
+                    return
             except Exception as err:  # pylint: disable=W0718
                 logger.error("Exporter crashed unexpectedly: %s", err)
                 self.model.unit.status = ErrorStatus(
                     "Exporter crashed unexpectedly, please refer to systemd logs..."
                 )
                 return
-
-        hw_tool_ok, error_msg = self.hw_tool_helper.check_installed()
-        if not hw_tool_ok:
-            self.model.unit.status = BlockedStatus(error_msg)
-            return
 
         self.model.unit.status = ActiveStatus("Unit is ready")
 
@@ -190,6 +195,7 @@ class HardwareObserverCharm(ops.CharmBase):
                     )
                     self.model.unit.status = BlockedStatus(message)
                     return
+                self.exporter.restart()
 
         self._on_update_status(event)
 
