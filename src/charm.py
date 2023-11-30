@@ -5,6 +5,7 @@
 """Charm the application."""
 
 import logging
+from time import sleep
 from typing import Any, Dict, Optional, Tuple
 
 import ops
@@ -12,7 +13,7 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus
 
-from config import HWTool
+from config import EXPORTER_HEALTH_RETRY_COUNT, EXPORTER_HEALTH_RETRY_TIMEOUT, HWTool
 from hardware import get_bmc_address
 from hw_tools import HWToolHelper, bmc_hw_verifier
 from service import Exporter
@@ -112,10 +113,23 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus("Cannot relate to more than one grafana-agent")
             return
 
-        if not self.exporter_online:
-            error_msg = "Exporter crashed unexpectedly, please refer to systemd logs..."
-            self.model.unit.status = ErrorStatus(error_msg)
-            return
+        if not self.exporter.check_health():
+            logger.warning("Exporter health check - failed.")
+            try:
+                for i in range(1, EXPORTER_HEALTH_RETRY_COUNT + 1):
+                    logger.warning("Restarting exporter - %d retry", i)
+                    self.exporter.restart()
+                    sleep(EXPORTER_HEALTH_RETRY_TIMEOUT)
+                    if self.exporter.check_active():
+                        logger.info("Exporter restarted.")
+                        break
+                logger.error("Failed to restart the exporter.")
+            except Exception as err:  # pylint: disable=W0718
+                logger.error("Exporter crashed unexpectedly: %s", err)
+                self.model.unit.status = ErrorStatus(
+                    "Exporter crashed unexpectedly, please refer to systemd logs..."
+                )
+                return
 
         hw_tool_ok, error_msg = self.hw_tool_helper.check_installed()
         if not hw_tool_ok:
@@ -227,11 +241,6 @@ class HardwareObserverCharm(ops.CharmBase):
     def exporter_enabled(self) -> bool:
         """Return True if cos-agent relation is present."""
         return self.num_cos_agent_relations != 0
-
-    @property
-    def exporter_online(self) -> bool:
-        """Return True if the exporter is online."""
-        return self.exporter.check_health()
 
     @property
     def too_many_cos_agent_relation(self) -> bool:
