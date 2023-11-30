@@ -105,6 +105,10 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_update_status(self, _: EventBase) -> None:
         """Update the charm's status."""
+        if not self._stored.installed:  # type: ignore
+            self.model.unit.status = BlockedStatus("Resoures are not installed")  # type: ignore
+            return
+
         if not self.exporter_enabled:
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
             return
@@ -133,7 +137,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
         hw_tool_ok, error_msg = self.hw_tool_helper.check_installed()
         if not hw_tool_ok:
-            self.model.unit.status = ErrorStatus(error_msg)
+            self.model.unit.status = BlockedStatus(error_msg)
             return
 
         self.model.unit.status = ActiveStatus("Unit is ready")
