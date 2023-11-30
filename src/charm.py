@@ -91,7 +91,7 @@ class HardwareObserverCharm(ops.CharmBase):
     def _on_remove(self, _: EventBase) -> None:
         """Remove everything when charm is being removed."""
         logger.info("Start to remove.")
-        # Remove binary too
+        # Remove binary tool
         self.hw_tool_helper.remove(self.model.resources)
         self._stored.installed = False
         success = self.exporter.uninstall()
