@@ -135,7 +135,7 @@ class TestCharm(unittest.TestCase):
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
-        rid = self.harness.add_relation("cos-agent", "cos-agent")
+        rid = self.harness.add_relation("cos-agent", "grafana-agent")
         self.harness.begin()
         self.harness.charm.on.install.emit()
         self.harness.add_relation_unit(rid, "grafana-agent/0")
@@ -151,7 +151,7 @@ class TestCharm(unittest.TestCase):
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_hw_tool_helper.return_value.check_installed.return_value = (False, "error")
         mock_exporter.return_value.install.return_value = True
-        rid = self.harness.add_relation("cos-agent", "cos-agent")
+        rid = self.harness.add_relation("cos-agent", "grafana-agent")
         self.harness.begin()
         self.harness.charm.on.install.emit()
         self.harness.add_relation_unit(rid, "grafana-agent/0")
@@ -169,7 +169,7 @@ class TestCharm(unittest.TestCase):
         mock_exporter.return_value.install.return_value = True
         mock_exporter.return_value.check_health.return_value = False
         mock_exporter.return_value.restart.side_effect = Exception()
-        rid = self.harness.add_relation("cos-agent", "cos-agent")
+        rid = self.harness.add_relation("cos-agent", "grafana-agent")
         self.harness.begin()
         self.harness.charm.on.install.emit()
         self.harness.add_relation_unit(rid, "grafana-agent/0")
