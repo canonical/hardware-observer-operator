@@ -78,7 +78,7 @@ def check_file_size(path: Path) -> bool:
     size is 0.
     """
     if path.stat().st_size == 0:
-        logger.info("% size is 0, skip install", path)
+        logger.info("%s size is 0, skip install", path)
         return False
     return True
 
@@ -117,6 +117,16 @@ def make_executable(src: Path) -> None:
         raise err
 
 
+def check_deb_pkg_installed(pkg: str) -> bool:
+    """Check if debian package is installed."""
+    try:
+        apt.DebianPackage.from_installed_package(pkg)
+        return True
+    except apt.PackageNotFoundError:
+        logger.warning("package %s not found in installed package", pkg)
+    return False
+
+
 class StrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
     """Basic strategy."""
 
@@ -126,6 +136,10 @@ class StrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
     def name(self) -> HWTool:
         """Name."""
         return self._name
+
+    @abstractmethod
+    def check(self) -> bool:
+        """Check installation status of the tool."""
 
 
 class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
@@ -177,6 +191,10 @@ class StorCLIStrategy(TPRStrategyABC):
         logger.debug("Remove file %s", self.symlink_bin)
         remove_deb(pkg=self.name)
 
+    def check(self) -> bool:
+        """Check resource status."""
+        return self.symlink_bin.exists() and os.access(self.symlink_bin, os.X_OK)
+
 
 class PercCLIStrategy(TPRStrategyABC):
     """Strategy to install storcli."""
@@ -200,6 +218,10 @@ class PercCLIStrategy(TPRStrategyABC):
         logger.debug("Remove file %s", self.symlink_bin)
         remove_deb(pkg=self.name)
 
+    def check(self) -> bool:
+        """Check resource status."""
+        return self.symlink_bin.exists() and os.access(self.symlink_bin, os.X_OK)
+
 
 class SAS2IRCUStrategy(TPRStrategyABC):
     """Strategy to install storcli."""
@@ -220,6 +242,10 @@ class SAS2IRCUStrategy(TPRStrategyABC):
         """Remove sas2ircu."""
         self.symlink_bin.unlink(missing_ok=True)
         logger.debug("Remove file %s", self.symlink_bin)
+
+    def check(self) -> bool:
+        """Check resource status."""
+        return self.symlink_bin.exists() and os.access(self.symlink_bin, os.X_OK)
 
 
 class SAS3IRCUStrategy(SAS2IRCUStrategy):
@@ -270,6 +296,10 @@ class SSACLIStrategy(APTStrategyABC):
         apt.remove_package(self.pkg)
         self.disable_repo()
 
+    def check(self) -> bool:
+        """Check package status."""
+        return check_deb_pkg_installed(self.pkg)
+
 
 class IPMIStrategy(APTStrategyABC):
     """Strategy for install ipmi."""
@@ -285,6 +315,10 @@ class IPMIStrategy(APTStrategyABC):
         for pkg in self.pkgs:
             apt.remove_package(pkg)
 
+    def check(self) -> bool:
+        """Check package status."""
+        return check_deb_pkg_installed(self.pkgs[0])
+
 
 class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
     """Install strategy for redfish.
@@ -293,6 +327,10 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
     """
 
     _name = HWTool.REDFISH
+
+    def check(self) -> bool:
+        """Check package status."""
+        return True
 
 
 def raid_hw_verifier() -> t.List[HWTool]:
@@ -511,3 +549,19 @@ class HWToolHelper:
             if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
+
+    def check_installed(self) -> t.Tuple[bool, str]:
+        """Check tool status."""
+        hw_white_list = get_hw_tool_white_list()
+        failed_checks = []
+
+        for strategy in self.strategies:
+            if strategy.name not in hw_white_list:
+                continue
+            ok = strategy.check()
+            if not ok:
+                failed_checks.append(strategy.name)
+
+        if len(failed_checks) > 0:
+            return False, f"Fail strategy checks: {failed_checks}"
+        return True, ""
