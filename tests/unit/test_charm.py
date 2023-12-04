@@ -27,7 +27,12 @@ class TestCharm(unittest.TestCase):
 
         bmc_hw_verifier_patcher = mock.patch.object(charm, "bmc_hw_verifier")
         self.mock_bmc_hw_verifier = bmc_hw_verifier_patcher.start()
-        self.mock_bmc_hw_verifier.return_value = [HWTool.IPMI, HWTool.REDFISH]
+        self.mock_bmc_hw_verifier.return_value = [
+            HWTool.IPMI_SENSOR,
+            HWTool.IPMI_SEL,
+            HWTool.IPMI_DCMI,
+            HWTool.REDFISH,
+        ]
         self.addCleanup(bmc_hw_verifier_patcher.stop)
 
     @classmethod
@@ -102,7 +107,11 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_05_install_redfish_unavailable(self, mock_hw_tool_helper, mock_exporter) -> None:
         """Test event install."""
-        self.mock_bmc_hw_verifier.return_value = [HWTool.IPMI]
+        self.mock_bmc_hw_verifier.return_value = [
+            HWTool.IPMI_SENSOR,
+            HWTool.IPMI_SEL,
+            HWTool.IPMI_DCMI,
+        ]
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
         self.harness.begin()
@@ -131,7 +140,11 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_07_update_status_all_green(self, mock_hw_tool_helper, mock_exporter):
         """Test update_status when everything is okay."""
-        self.mock_bmc_hw_verifier.return_value = [HWTool.IPMI]
+        self.mock_bmc_hw_verifier.return_value = [
+            HWTool.IPMI_SENSOR,
+            HWTool.IPMI_SEL,
+            HWTool.IPMI_DCMI,
+        ]
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
@@ -147,7 +160,11 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_08_update_status_check_installed_false(self, mock_hw_tool_helper, mock_exporter):
         """Test update_status when hw tool checks failed."""
-        self.mock_bmc_hw_verifier.return_value = [HWTool.IPMI]
+        self.mock_bmc_hw_verifier.return_value = [
+            HWTool.IPMI_SENSOR,
+            HWTool.IPMI_SEL,
+            HWTool.IPMI_DCMI,
+        ]
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_hw_tool_helper.return_value.check_installed.return_value = (False, "error")
         mock_exporter.return_value.install.return_value = True
@@ -163,7 +180,11 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_09_update_status_exporter_crashed(self, mock_hw_tool_helper, mock_exporter):
         """Test update_status."""
-        self.mock_bmc_hw_verifier.return_value = [HWTool.IPMI]
+        self.mock_bmc_hw_verifier.return_value = [
+            HWTool.IPMI_SENSOR,
+            HWTool.IPMI_SEL,
+            HWTool.IPMI_DCMI,
+        ]
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True

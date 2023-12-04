@@ -55,7 +55,10 @@ class TestExporter(unittest.TestCase):
         cls.addClassCleanup(exporter_health_retry_timeout_patcher.stop)
 
     @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
+    @mock.patch(
+        "charm.bmc_hw_verifier",
+        return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+    )
     def test_00_install_okay(self, mock_bmc_hw_verifier, mock_get_bmc_address):
         """Test exporter service is installed when charm is installed - okay."""
         self.harness.begin()
@@ -66,7 +69,10 @@ class TestExporter(unittest.TestCase):
             self.mock_systemd.daemon_reload.assert_called_once()
 
     @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
+    @mock.patch(
+        "charm.bmc_hw_verifier",
+        return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+    )
     def test_01_install_failed_rendering(self, mock_bmc_hw_verifier, mock_get_bmc_address):
         """Test exporter service is failed to installed - failed to render."""
         self.harness.begin()
@@ -151,7 +157,10 @@ class TestExporter(unittest.TestCase):
         ]
     )
     @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
+    @mock.patch(
+        "charm.bmc_hw_verifier",
+        return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+    )
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_40_check_health(
         self,
@@ -175,7 +184,10 @@ class TestExporter(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, expected_status)
 
     @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
+    @mock.patch(
+        "charm.bmc_hw_verifier",
+        return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+    )
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_50_check_relation_exists(
         self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address
@@ -191,7 +203,10 @@ class TestExporter(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
 
     @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
+    @mock.patch(
+        "charm.bmc_hw_verifier",
+        return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+    )
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_51_check_relation_not_exists(
         self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address
@@ -207,7 +222,10 @@ class TestExporter(unittest.TestCase):
         )
 
     @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
+    @mock.patch(
+        "charm.bmc_hw_verifier",
+        return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+    )
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_52_too_many_relations(
         self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address
@@ -228,7 +246,10 @@ class TestExporter(unittest.TestCase):
         )
 
     @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
+    @mock.patch(
+        "charm.bmc_hw_verifier",
+        return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+    )
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_60_config_changed_log_level_okay(
         self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address
@@ -247,7 +268,10 @@ class TestExporter(unittest.TestCase):
             self.mock_systemd.service_restart.assert_called_once()
 
     @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
+    @mock.patch(
+        "charm.bmc_hw_verifier",
+        return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+    )
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_61_config_changed_not_okay(
         self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address
@@ -276,7 +300,10 @@ class TestExporter(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
+    @mock.patch(
+        "charm.bmc_hw_verifier",
+        return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+    )
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_62_config_changed_not_okay(
         self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address, mock_exporter
