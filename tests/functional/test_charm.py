@@ -14,6 +14,7 @@ import yaml
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
+pytestmark = pytest.mark.asyncio(scope="module")
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
