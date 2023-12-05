@@ -6,9 +6,9 @@ evaluation_interval: 1m
 tests:
   - interval: 1m
     input_series:
-      - series: ipmidcmicollector_collector_failed{instance="ubuntu-99", collector="IPMIDCMICollector"}
+      - series: ipmidcmi_collector_failed{instance="ubuntu-99", collector="ipmidcmi"}
         values: '1x15'
-      - series: ipmiselcollector_collector_failed{instance="ubuntu-99", collector="IPMISELCollector"}
+      - series: ipmisel_collector_failed{instance="ubuntu-99", collector="ipmisel"}
         values: '1x15'
 
     alert_rule_test:
@@ -18,18 +18,18 @@ tests:
           - exp_labels:
               severity: error
               instance: ubuntu-99
-              collector: IPMIDCMICollector
+              collector: ipmidcmi
             exp_annotations:
               summary: Collector failed. (instance ubuntu-99)
               description: |
                 A collector failed to fetch the metrics. Please reach out to hardware-observer maintainers.
-                  LABELS = map[__name__:ipmidcmicollector_collector_failed collector:IPMIDCMICollector instance:ubuntu-99]
+                  LABELS = map[__name__:ipmidcmi_collector_failed collector:ipmidcmi instance:ubuntu-99]
           - exp_labels:
               severity: error
               instance: ubuntu-99
-              collector: IPMISELCollector
+              collector: ipmisel
             exp_annotations:
               summary: Collector failed. (instance ubuntu-99)
               description: |
                 A collector failed to fetch the metrics. Please reach out to hardware-observer maintainers.
-                  LABELS = map[__name__:ipmiselcollector_collector_failed collector:IPMISELCollector instance:ubuntu-99]
+                  LABELS = map[__name__:ipmisel_collector_failed collector:ipmisel instance:ubuntu-99]
