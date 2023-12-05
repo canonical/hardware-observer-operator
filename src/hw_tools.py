@@ -304,6 +304,11 @@ class SSACLIStrategy(APTStrategyABC):
 class IPMIStrategy(APTStrategyABC):
     """Strategy for installing ipmi."""
 
+    # Because IPMISTrategy now encompasses all of
+    # HWTool.IPMI_SENSOR, HWTool.IPMI_SEL and HWTool.IPMI_DCMI,
+    # we will need some refactoring here to avoid misleading log
+    # messages. The installation should be good since all of these
+    # tools require the same `freeipmi-tools` to be installed.
     _name = HWTool.IPMI_SENSOR
     pkgs = ["freeipmi-tools"]
 
