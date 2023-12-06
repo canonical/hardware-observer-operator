@@ -20,6 +20,7 @@ from redfish.rest.v1 import (
     ServerDownOrUnreachableError,
     SessionCreationError,
 )
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 from checksum import (
     PERCCLI_VERSION_INFOS,
@@ -30,6 +31,8 @@ from checksum import (
     validate_checksum,
 )
 from config import (
+    APT_RETRY_ATTEMPT,
+    APT_RETRY_WAIT_FIXED,
     REDFISH_MAX_RETRY,
     REDFISH_TIMEOUT,
     SNAP_COMMON,
@@ -286,6 +289,12 @@ class SSACLIStrategy(APTStrategyABC):
         repositories = apt.RepositoryMapping()
         repositories.disable(self.repo)
 
+    # Retry to avoid networking issue
+    @retry(
+        stop=stop_after_attempt(APT_RETRY_ATTEMPT),
+        wait=wait_fixed(APT_RETRY_WAIT_FIXED),
+        reraise=True,
+    )
     def install(self) -> None:
         for key in HP_KEYS:
             apt.import_key(key)
@@ -307,6 +316,12 @@ class IPMIStrategy(APTStrategyABC):
     _name = HWTool.IPMI
     pkgs = ["freeipmi-tools"]
 
+    # Retry to avoid networking issue
+    @retry(
+        stop=stop_after_attempt(APT_RETRY_ATTEMPT),
+        wait=wait_fixed(APT_RETRY_WAIT_FIXED),
+        reraise=True,
+    )
     def install(self) -> None:
         for pkg in self.pkgs:
             apt.add_package(pkg)
@@ -481,7 +496,7 @@ class HWToolHelper:
 
     def check_missing_resources(
         self, hw_white_list: t.List[HWTool], fetch_tools: t.Dict[HWTool, Path]
-    ) -> t.Tuple[bool, str]:
+    ) -> t.List[str]:
         """Check if required resources are not been uploaded."""
         missing_resources = []
         for tool in hw_white_list:
@@ -494,23 +509,23 @@ class HWToolHelper:
                 if path and not check_file_size(path):
                     logger.warning("Tool: %s path: %s size is zero", tool, path)
                     missing_resources.append(TPR_RESOURCES[tool])
-        if len(missing_resources) > 0:
-            return False, f"Missing resources: {missing_resources}"
-        return True, ""
+        return missing_resources
 
-    def install(self, resources: Resources) -> t.Tuple[bool, str]:
+    def install(
+        self, resources: Resources
+    ) -> t.Tuple[t.List[HWTool], t.List[str], t.List[HWTool], t.List[HWTool]]:
         """Install tools."""
         hw_white_list = get_hw_tool_white_list()
         logger.info("hw_tool_white_list: %s", hw_white_list)
 
         fetch_tools = self.fetch_tools(resources, hw_white_list)
 
-        ok, msg = self.check_missing_resources(hw_white_list, fetch_tools)
-        if not ok:
-            return ok, msg
+        missing_resources = self.check_missing_resources(hw_white_list, fetch_tools)
+        if len(missing_resources) > 0:
+            return hw_white_list, missing_resources, [], []
 
-        fail_strategies = []
-        strategy_errors = []
+        failed_strategies = []
+        installed_strategies = []
 
         # Iterate over each strategy and execute.
         for strategy in self.strategies:
@@ -525,6 +540,7 @@ class HWToolHelper:
                 # APTStrategy
                 elif isinstance(strategy, APTStrategyABC):
                     strategy.install()  # pylint: disable=E1120
+                installed_strategies.append(strategy.name)
                 logger.info("Strategy %s install success", strategy)
             except (
                 ResourceFileSizeZeroError,
@@ -533,12 +549,9 @@ class HWToolHelper:
                 ResourceChecksumError,
             ) as e:
                 logger.warning("Strategy %s install fail: %s", strategy, e)
-                fail_strategies.append(strategy.name)
-                strategy_errors.append(e)
+                failed_strategies.append(strategy.name)
 
-        if len(strategy_errors) > 0:
-            return False, f"Fail strategies: {fail_strategies}"
-        return True, ""
+        return hw_white_list, missing_resources, installed_strategies, failed_strategies
 
     def remove(self, resources: Resources) -> None:  # pylint: disable=W0613
         """Execute all remove strategies."""
@@ -550,18 +563,18 @@ class HWToolHelper:
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
 
-    def check_installed(self) -> t.Tuple[bool, str]:
+    def check_installed(self) -> t.Tuple[t.List[HWTool], t.List[HWTool]]:
         """Check tool status."""
         hw_white_list = get_hw_tool_white_list()
-        failed_checks = []
+        installed_strategies = []
+        failed_strategies = []
 
         for strategy in self.strategies:
             if strategy.name not in hw_white_list:
                 continue
             ok = strategy.check()
-            if not ok:
-                failed_checks.append(strategy.name)
-
-        if len(failed_checks) > 0:
-            return False, f"Fail strategy checks: {failed_checks}"
-        return True, ""
+            if ok:
+                installed_strategies.append(strategy.name)
+            else:
+                failed_strategies.append(strategy.name)
+        return installed_strategies, failed_strategies

@@ -66,3 +66,7 @@ TOOLS_DIR = Path("/usr/sbin")
 
 # SNAP environment
 SNAP_COMMON = Path(f"/var/snap/{EXPORTER_NAME}/common")
+
+# RETRY POLICIES
+APT_RETRY_WAIT_FIXED = 10
+APT_RETRY_ATTEMPT = 10

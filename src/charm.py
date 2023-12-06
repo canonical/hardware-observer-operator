@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 # Copyright 2023 jneo8
 # See LICENSE file for licensing details.
-
 """Charm the application."""
-
 import logging
 from time import sleep
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
-from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus
+from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus, StatusBase
 
 from config import EXPORTER_HEALTH_RETRY_COUNT, EXPORTER_HEALTH_RETRY_TIMEOUT, HWTool
 from hardware import get_bmc_address
-from hw_tools import HWToolHelper, bmc_hw_verifier
+from hw_tools import HWToolHelper
 from service import Exporter
 
 logger = logging.getLogger(__name__)
@@ -51,39 +49,159 @@ class HardwareObserverCharm(ops.CharmBase):
             self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
         )
 
-        self._stored.set_default(config={}, exporter_installed=False, installed=False)
+        self._stored.set_default(
+            config={},
+            exporter_installed=False,
+            installed=False,
+            hw_white_list=[],
+            missing_resources=[],
+            failed_strategies=[],
+            installed_strategies=[],
+        )
         self.num_cos_agent_relations = self.get_num_cos_agent_relations("cos-agent")
+
+    def _log_stored(self) -> None:
+        """Logger print _stored information."""
+        msg = (
+            "Hw tool state: "  # type: ignore
+            f"hw_white_list: {list(self._stored.hw_white_list)}"
+            f" missing_resources: {list(self._stored.missing_resources)}"
+            f" installed_strategies: {list(self._stored.installed_strategies)}"
+            f" failed_strategies: {list(self._stored.failed_strategies)}"
+        )
+        logger.info(msg)
+
+    def str_list_to_hwtool_list(self, values: List[str]) -> List[HWTool]:
+        """Convent list of enum's value to enum."""
+        return [HWTool(value) for value in values]
+
+    @property
+    def state_resource_installed(self) -> bool:
+        """Return True if resources installed completely."""
+        if (
+            len(self._stored.missing_resources) > 0  # type: ignore
+            or len(self._stored.failed_strategies) > 0  # type: ignore
+        ):
+            return False
+        return True
+
+    @property
+    def state_missing_resource(self) -> bool:
+        """Return True if charm is missing resources."""
+        if len(self._stored.missing_resources) == 0:  # type: ignore
+            return False
+        return True
+
+    @property
+    def state_failed_install_strategies(self) -> bool:
+        """Return True if there are any strategy install failed."""
+        if len(self._stored.failed_strategies) == 0:  # type: ignore
+            return False
+        return True
+
+    @property
+    def state_exporter_installed(self) -> bool:
+        """Return True if charm install exporter succeeded."""
+        return self._stored.exporter_installed  # type: ignore
+
+    @property
+    def state_exporter_health(self) -> bool:
+        """Return True if exporter is health."""
+        health = self.exporter.check_health()
+        if not health:
+            logger.warning("Exporter health check - failed.")
+        return health
+
+    @property
+    def state_exporter_enabled(self) -> bool:
+        """Return True if cos-agent relation is present."""
+        return self.num_cos_agent_relations != 0
+
+    @property
+    def state_too_many_cos_agent_relation(self) -> bool:
+        """Return True if there're more than one cos-agent relation."""
+        return self.num_cos_agent_relations > 1
+
+    @property
+    def state_msg_missing_resources(self) -> str:
+        """Message for missing resources."""
+        return f"Missing resources: {list(self._stored.missing_resources)}"  # type: ignore
+
+    @property
+    def state_msg_failed_install_strategies(self) -> str:
+        """Message for failed install strategies."""
+        return (
+            "Fail install strategies:"
+            f" {list(self._stored.installed_strategies)}"  # type: ignore
+        )
+
+    @property
+    def state_msg_resource_installed(self) -> str:
+        """Return either message for missing resources or failed_install_strategies."""
+        if self.state_missing_resource:
+            return self.state_msg_missing_resources
+        return self.state_msg_failed_install_strategies
 
     def _on_install_or_upgrade(self, event: ops.InstallEvent) -> None:
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
+        (
+            hw_white_list,
+            missing_resources,
+            installed_strategies,
+            failed_strategies,
+        ) = self.hw_tool_helper.install(self.model.resources)
 
-        installed, msg = self.hw_tool_helper.install(self.model.resources)
-        self._stored.installed = installed
+        self._stored.hw_white_list = [tool.value for tool in hw_white_list]
+        self._stored.missing_resources = missing_resources
 
-        if not installed:
-            logger.error(msg)
+        self._log_stored()
+
+        # Missing resources, need user manually upload the resources.
+        if self.state_missing_resource:
+            msg = self.state_msg_missing_resources
+            logger.warning(msg)
             self.model.unit.status = BlockedStatus(msg)
-            event.defer()
             return
 
-        if self._stored.exporter_installed is not True:
+        # Only update if not missing resources, otherwise they will be overwrite
+        # to empty.
+        self._stored.failed_strategies = [tool.value for tool in failed_strategies]
+        self._stored.installed_strategies = [tool.value for tool in installed_strategies]
+
+        # The strategies fail for unexpected error, get into error status
+        # and wait for manually fix.
+        if self.state_failed_install_strategies:
+            msg = self.state_msg_failed_install_strategies
+            logger.error(msg)
+            self.model.unit.status = ErrorStatus(msg)
+
+        # Install exporter
+        if not self.state_exporter_installed:
             self.model.unit.status = MaintenanceStatus("Installing exporter...")
+            # Set to blocked status if config is not valid.
             success, err_msg = self.validate_exporter_configs()
             if not success:
                 self.model.unit.status = BlockedStatus(err_msg)
-                event.defer()
                 return
 
             port = self.model.config.get("exporter-port", "10000")
             level = self.model.config.get("exporter-log-level", "INFO")
+            logger.info("Get redfish creds." "")
             redfish_creds = self._get_redfish_creds()
-            success = self.exporter.install(port, level, redfish_creds)
-            self._stored.exporter_installed = success
-            if not success:
+
+            # Set to ErrorStatus if exporter fail to start
+            exporter_install_success = self.exporter.install(
+                port,
+                level,
+                redfish_creds,
+                self.str_list_to_hwtool_list(self._stored.hw_white_list),
+            )
+            self._stored.exporter_installed = exporter_install_success
+            if not exporter_install_success:
                 msg = "Failed to install exporter, please refer to `juju debug-log`"
                 logger.error(msg)
-                self.model.unit.status = BlockedStatus(msg)
+                self.model.unit.status = ErrorStatus(msg)
                 return
 
         self._on_update_status(event)
@@ -93,7 +211,6 @@ class HardwareObserverCharm(ops.CharmBase):
         logger.info("Start to remove.")
         # Remove binary tool
         self.hw_tool_helper.remove(self.model.resources)
-        self._stored.installed = False
         success = self.exporter.uninstall()
         if not success:
             msg = "Failed to uninstall exporter, please refer to `juju debug-log`"
@@ -105,47 +222,62 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_update_status(self, _: EventBase) -> None:  # noqa: C901
         """Update the charm's status."""
-        if not self._stored.installed:  # type: ignore
-            self.model.unit.status = BlockedStatus("Resoures are not installed")  # type: ignore
+        self._log_stored()
+        if not self.state_resource_installed:
+            msg = self.state_msg_resource_installed
+            self.model.unit.status = BlockedStatus(msg)
             return
 
-        if not self.exporter_enabled:
+        if not self.state_exporter_enabled:
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
             return
 
-        if self.too_many_cos_agent_relation:
+        if self.state_too_many_cos_agent_relation:
             self.model.unit.status = BlockedStatus("Cannot relate to more than one grafana-agent")
             return
 
-        hw_tool_ok, error_msg = self.hw_tool_helper.check_installed()
-        if not hw_tool_ok:
-            self.model.unit.status = BlockedStatus(error_msg)
+        installed_strategies, failed_strategies = self.hw_tool_helper.check_installed()
+        self._stored.failed_strategies = [tool.value for tool in failed_strategies]
+        self._stored.installed_strategies = [tool.value for tool in installed_strategies]
+
+        # The strategies fail for unexpected error, get into error status
+        # and wait for manually fix.
+        if self.state_failed_install_strategies:
+            msg = self.state_msg_failed_install_strategies
+            logger.error(msg)
+            self.model.unit.status = ErrorStatus(msg)
             return
 
-        if not self.exporter.check_health():
-            logger.warning("Exporter health check - failed.")
-            try:
-                for i in range(1, EXPORTER_HEALTH_RETRY_COUNT + 1):
-                    logger.warning("Restarting exporter - %d retry", i)
-                    self.exporter.restart()
-                    sleep(EXPORTER_HEALTH_RETRY_TIMEOUT)
-                    if self.exporter.check_active():
-                        logger.info("Exporter restarted.")
-                        break
-                if not self.exporter.check_active():
-                    logger.error("Failed to restart the exporter.")
-                    self.model.unit.status = ErrorStatus(
-                        "Exporter crashed unexpectedly, please refer to systemd logs..."
-                    )
-                    return
-            except Exception as err:  # pylint: disable=W0718
-                logger.error("Exporter crashed unexpectedly: %s", err)
-                self.model.unit.status = ErrorStatus(
-                    "Exporter crashed unexpectedly, please refer to systemd logs..."
-                )
+        # Check exporter health and try to restart exporter service
+        if not self.state_exporter_health:
+            restart_ok, restart_status = self.restart_exporter()
+            if not restart_ok and restart_status is not None:
+                self.model.unit.status = restart_status
                 return
 
         self.model.unit.status = ActiveStatus("Unit is ready")
+
+    def restart_exporter(self) -> Tuple[bool, Optional[StatusBase]]:
+        """Restart exporter with retry."""
+        try:
+            for i in range(1, EXPORTER_HEALTH_RETRY_COUNT + 1):
+                logger.warning("Restarting exporter - %d retry", i)
+                self.exporter.restart()
+                sleep(EXPORTER_HEALTH_RETRY_TIMEOUT)
+                if self.exporter.check_active():
+                    logger.info("Exporter restarted.")
+                    break
+            if not self.exporter.check_active():
+                logger.error("Failed to restart the exporter.")
+                return False, ErrorStatus(
+                    "Exporter crashed unexpectedly, please refer to systemd logs..."
+                )
+        except Exception as err:  # pylint: disable=W0718
+            logger.error("Exporter crashed unexpectedly: %s", err)
+            return False, ErrorStatus(
+                "Exporter crashed unexpectedly, please refer to systemd logs..."
+            )
+        return True, None
 
     def _on_config_changed(self, event: EventBase) -> None:
         """Reconfigure charm."""
@@ -160,14 +292,14 @@ class HardwareObserverCharm(ops.CharmBase):
                 self._stored.config[key] = value  # type: ignore
                 change_set.add(key)
 
-        if not self._stored.installed:  # type: ignore
-            logging.info(  # type: ignore
-                "Config changed called before install complete, deferring event: %s",
+        if not self.state_resource_installed:
+            logging.info(
+                "Config changed called before resource install complete, deferring event: %s",
                 event.handle,
             )
             event.defer()
 
-        if self.exporter_enabled:
+        if self.state_exporter_enabled:
             success, message = self.validate_exporter_configs()
             if not success:
                 self.model.unit.status = BlockedStatus(message)
@@ -187,7 +319,12 @@ class HardwareObserverCharm(ops.CharmBase):
 
                 redfish_creds = self._get_redfish_creds()
                 success = self.exporter.template.render_config(
-                    port=port, level=level, redfish_creds=redfish_creds
+                    port=port,
+                    level=level,
+                    redfish_creds=redfish_creds,
+                    hw_white_list=self.str_list_to_hwtool_list(
+                        self._stored.hw_white_list  # type: ignore
+                    ),
                 )
                 if not success:
                     message = (
@@ -211,8 +348,9 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _get_redfish_creds(self) -> Dict[str, str]:
         """Provide redfish config if redfish is available, else empty dict."""
-        bmc_tools = bmc_hw_verifier()
-        if HWTool.REDFISH in bmc_tools:
+        if HWTool.REDFISH in self.str_list_to_hwtool_list(
+            self._stored.hw_white_list  # type: ignore
+        ):
             bmc_address = get_bmc_address()
             redfish_creds = {
                 # Force to use https as default protocol
@@ -239,23 +377,12 @@ class HardwareObserverCharm(ops.CharmBase):
                 allowed_choices,
             )
             return False, "Invalid config: 'exporter-log-level'"
-
         return True, "Exporter config is valid."
 
     def get_num_cos_agent_relations(self, relation_name: str) -> int:
         """Get the number of relation given a relation_name."""
         relations = self.model.relations.get(relation_name, [])
         return len(relations)
-
-    @property
-    def exporter_enabled(self) -> bool:
-        """Return True if cos-agent relation is present."""
-        return self.num_cos_agent_relations != 0
-
-    @property
-    def too_many_cos_agent_relation(self) -> bool:
-        """Return True if there're more than one cos-agent relation."""
-        return self.num_cos_agent_relations > 1
 
 
 if __name__ == "__main__":  # pragma: nocover
