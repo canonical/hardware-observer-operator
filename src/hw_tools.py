@@ -302,9 +302,14 @@ class SSACLIStrategy(APTStrategyABC):
 
 
 class IPMIStrategy(APTStrategyABC):
-    """Strategy for install ipmi."""
+    """Strategy for installing ipmi."""
 
-    _name = HWTool.IPMI
+    # Because IPMISTrategy now encompasses all of
+    # HWTool.IPMI_SENSOR, HWTool.IPMI_SEL and HWTool.IPMI_DCMI,
+    # we will need some refactoring here to avoid misleading log
+    # messages. The installation should be good since all of these
+    # tools require the same `freeipmi-tools` to be installed.
+    _name = HWTool.IPMI_SENSOR
     pkgs = ["freeipmi-tools"]
 
     def install(self) -> None:
@@ -417,18 +422,32 @@ def redfish_available() -> bool:
 def bmc_hw_verifier() -> t.List[HWTool]:
     """Verify if the ipmi is available on the machine.
 
-    Using ipmitool to verify, the package will be removed in removing stage.
+    Using freeipmi-tools to verify, the package will be removed in removing stage.
     """
     tools = []
-    # Check IPMI available
-    apt.add_package("ipmitool", update_cache=False)
-    try:
-        subprocess.check_output("ipmitool lan print".split())
-        tools.append(HWTool.IPMI)
-    except subprocess.CalledProcessError:
-        logger.info("IPMI is not available")
 
-    # Check RedFish available
+    # Check if ipmi services are available
+    apt.add_package("freeipmi-tools", update_cache=False)
+
+    try:
+        subprocess.check_output("ipmimonitoring".split())
+        tools.append(HWTool.IPMI_SENSOR)
+    except subprocess.CalledProcessError:
+        logger.info("IPMI sensors monitoring is not available")
+
+    try:
+        subprocess.check_output("ipmi-sel".split())
+        tools.append(HWTool.IPMI_SEL)
+    except subprocess.CalledProcessError:
+        logger.info("IPMI SEL monitoring is not available")
+
+    try:
+        subprocess.check_output("ipmi-dcmi --get-system-power-statistics".split())
+        tools.append(HWTool.IPMI_DCMI)
+    except subprocess.CalledProcessError:
+        logger.info("IPMI DCMI monitoring is not available")
+
+    # Check if RedFish is available
     if redfish_available():
         tools.append(HWTool.REDFISH)
     else:

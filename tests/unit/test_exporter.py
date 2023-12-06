@@ -42,6 +42,17 @@ class TestExporter(unittest.TestCase):
         get_hw_tool_white_list_patcher.start()
         self.addCleanup(get_hw_tool_white_list_patcher.stop)
 
+        get_bmc_address_patcher = mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
+        get_bmc_address_patcher.start()
+        self.addCleanup(get_bmc_address_patcher.stop)
+
+        bmc_hw_verifier_patcher = mock.patch(
+            "charm.bmc_hw_verifier",
+            return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+        )
+        bmc_hw_verifier_patcher.start()
+        self.addCleanup(bmc_hw_verifier_patcher.stop)
+
     @classmethod
     def setUpClass(cls):
         exporter_health_retry_count_patcher = mock.patch("charm.EXPORTER_HEALTH_RETRY_COUNT", 1)
@@ -54,9 +65,7 @@ class TestExporter(unittest.TestCase):
         exporter_health_retry_timeout_patcher.start()
         cls.addClassCleanup(exporter_health_retry_timeout_patcher.stop)
 
-    @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
-    def test_00_install_okay(self, mock_bmc_hw_verifier, mock_get_bmc_address):
+    def test_00_install_okay(self):
         """Test exporter service is installed when charm is installed - okay."""
         self.harness.begin()
 
@@ -65,9 +74,7 @@ class TestExporter(unittest.TestCase):
             mock_open.assert_called()
             self.mock_systemd.daemon_reload.assert_called_once()
 
-    @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
-    def test_01_install_failed_rendering(self, mock_bmc_hw_verifier, mock_get_bmc_address):
+    def test_01_install_failed_rendering(self):
         """Test exporter service is failed to installed - failed to render."""
         self.harness.begin()
 
@@ -150,8 +157,6 @@ class TestExporter(unittest.TestCase):
             ),
         ]
     )
-    @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_40_check_health(
         self,
@@ -159,8 +164,6 @@ class TestExporter(unittest.TestCase):
         expected_status,
         restart_okay,
         mock_service_installed,
-        mock_bmc_hw_verifier,
-        mock_get_bmc_address,
     ):
         """Test check_health function when service is installed."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
@@ -174,12 +177,8 @@ class TestExporter(unittest.TestCase):
         self.harness.charm.on.update_status.emit()
         self.assertEqual(self.harness.charm.unit.status, expected_status)
 
-    @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_50_check_relation_exists(
-        self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address
-    ):
+    def test_50_check_relation_exists(self, mock_service_installed):
         """Test check_relation function when relation exists."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -190,12 +189,8 @@ class TestExporter(unittest.TestCase):
         self.harness.charm.on.update_status.emit()
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
 
-    @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_51_check_relation_not_exists(
-        self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address
-    ):
+    def test_51_check_relation_not_exists(self, mock_service_installed):
         """Test check_relation function when relation does not exists."""
         self.harness.begin()
         with mock.patch("builtins.open", new_callable=mock.mock_open) as _:
@@ -206,12 +201,8 @@ class TestExporter(unittest.TestCase):
             self.harness.charm.unit.status, BlockedStatus("Missing relation: [cos-agent]")
         )
 
-    @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_52_too_many_relations(
-        self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address
-    ):
+    def test_52_too_many_relations(self, mock_service_installed):
         """Test there too many relations."""
         rid_1 = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         rid_2 = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
@@ -227,12 +218,8 @@ class TestExporter(unittest.TestCase):
             BlockedStatus("Cannot relate to more than one grafana-agent"),
         )
 
-    @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_60_config_changed_log_level_okay(
-        self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address
-    ):
+    def test_60_config_changed_log_level_okay(self, mock_service_installed):
         """Test on_config_change function when exporter-log-level is changed."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -246,12 +233,8 @@ class TestExporter(unittest.TestCase):
             self.assertEqual(self.harness.charm._stored.config.get("exporter-log-level"), "DEBUG")
             self.mock_systemd.service_restart.assert_called_once()
 
-    @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_61_config_changed_not_okay(
-        self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address
-    ):
+    def test_61_config_changed_not_okay(self, mock_service_installed):
         """Test on_config_change function when exporter-log-level is changed."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -275,12 +258,8 @@ class TestExporter(unittest.TestCase):
             )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
-    @mock.patch("charm.bmc_hw_verifier", return_value=[HWTool.IPMI, HWTool.REDFISH])
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_62_config_changed_not_okay(
-        self, mock_service_installed, mock_bmc_hw_verifier, mock_get_bmc_address, mock_exporter
-    ):
+    def test_62_config_changed_not_okay(self, mock_service_installed, mock_exporter):
         """Test on_config_change function when exporter-log-level is changed."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
