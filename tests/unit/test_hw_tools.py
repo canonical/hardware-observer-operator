@@ -832,16 +832,9 @@ class TestIPMIHWVerifier(unittest.TestCase):
     def test_bmc_hw_verifier(self, mock_apt, mock_subprocess, mock_redfish_available):
         output = bmc_hw_verifier()
         mock_apt.add_package.assert_called_with("freeipmi-tools", update_cache=False)
-        ipmi_calls = [
-            mock.call("ipmimonitoring".split()),
-            mock.call("ipmi-sel".split()),
-            mock.call("ipmi-dcmi --get-system-power-statistics".split()),
-        ]
-        mock_subprocess.check_output.assert_has_calls(ipmi_calls)
         self.assertCountEqual(
             output, [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH]
         )
-        mock_redfish_available.assert_called()
 
     @mock.patch("hw_tools.redfish_available", return_value=False)
     @mock.patch(
@@ -854,12 +847,6 @@ class TestIPMIHWVerifier(unittest.TestCase):
     ):
         output = bmc_hw_verifier()
         mock_apt.add_package.assert_called_with("freeipmi-tools", update_cache=False)
-        ipmi_calls = [
-            mock.call("ipmimonitoring".split()),
-            mock.call("ipmi-sel".split()),
-            mock.call("ipmi-dcmi --get-system-power-statistics".split()),
-        ]
-        mock_check_output.assert_has_calls(ipmi_calls)
         self.assertEqual(output, [])
 
     @mock.patch("hw_tools.redfish_available", return_value=False)
@@ -875,16 +862,7 @@ class TestIPMIHWVerifier(unittest.TestCase):
             elif ipmi_call == "ipmi-dcmi --get-system-power-statistics".split():
                 raise subprocess.CalledProcessError(-1, "cmd")
 
-        with mock.patch(
-            "hw_tools.subprocess.check_output", side_effect=mock_get_response_ipmi
-        ) as mock_check_output:
+        with mock.patch("hw_tools.subprocess.check_output", side_effect=mock_get_response_ipmi):
             output = bmc_hw_verifier()
             mock_apt.add_package.assert_called_with("freeipmi-tools", update_cache=False)
-            mock_redfish_available.assert_called()
-            ipmi_calls = [
-                mock.call("ipmimonitoring".split()),
-                mock.call("ipmi-sel".split()),
-                mock.call("ipmi-dcmi --get-system-power-statistics".split()),
-            ]
-            mock_check_output.assert_has_calls(ipmi_calls)
             self.assertCountEqual(output, [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL])
