@@ -19,6 +19,21 @@ jobs:
     with:
       python-version: ${{ matrix.python-version }}
       tox-version: "<4"
+  
+  promtool:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      # prometheus snap comes pre-packaged with promtool
+      - name: Install prometheus snap
+        run: sudo snap install prometheus
+      - name: Check validity of prometheus alert rules
+        run: |
+          promtool check rules src/prometheus_alert_rules/*.yaml
+      - name: Run unit tests for prometheus alert rules 
+        run: |
+          promtool test rules tests/unit/test_alert_rules/*.yaml
 
   func:
     uses: canonical/bootstack-actions/.github/workflows/func.yaml@v2
