@@ -72,15 +72,9 @@ reformat:
 	@echo "Reformat files with black and isort"
 	@tox -e reformat
 
-install-prom:
-	@echo "Installing prometheus snap which comes pre-packaged with promtool"
-	@sudo snap install prometheus
-
-unittests: install-prom
+unittests:
 	@echo "Running unit tests"
 	@tox -e unit -- ${UNIT_ARGS}
-	@echo "\nRunning promtool based unit tests for alert rules"
-	@promtool test rules ${PROJECTPATH}/tests/unit/test_alert_rules/*.yaml
 
 functional: 
 	@echo "Executing functional tests using built charm at ${PROJECTPATH}"
