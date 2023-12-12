@@ -55,7 +55,6 @@ class HardwareObserverCharm(ops.CharmBase):
             config={},
             exporter_installed=False,
             resource_installed=False,
-            resource_failed_msg="",
         )
         self.num_cos_agent_relations = self.get_num_cos_agent_relations("cos-agent")
 
@@ -68,7 +67,6 @@ class HardwareObserverCharm(ops.CharmBase):
 
         if not resource_installed:
             logger.warning(msg)
-            self._stored.resource_failed_msg = msg
             self.model.unit.status = BlockedStatus(msg)
             return
 
@@ -108,11 +106,9 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_update_status(self, _: EventBase) -> None:  # noqa: C901
         """Update the charm's status."""
-        if not self._stored.resource_installed:  # type: ignore
-            self.model.unit.status = BlockedStatus(  # type: ignore
-                self._stored.resource_failed_msg
-            )
-            return
+        if not self._stored.resource_installed:  # type: ignore[truthy-function]
+            # The charm should be in BlockedStatus with install failed msg
+            return  # type: ignore[unreachable]
 
         if not self.exporter_enabled:
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
