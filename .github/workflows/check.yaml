@@ -37,7 +37,7 @@ jobs:
 
   func:
     uses: canonical/bootstack-actions/.github/workflows/func.yaml@v2
-    needs: lint-unit
+    needs: [lint-unit, promtool]
     strategy:
       fail-fast: false
       matrix:
