@@ -156,13 +156,16 @@ class HardwareObserverCharm(ops.CharmBase):
         change_set = set()
         model_config: Dict[str, Optional[str]] = dict(self.model.config.items())
         for key, value in model_config.items():
-            if key not in self._stored.config or self._stored.config[key] != value:  # type: ignore
+            if (
+                key not in self._stored.config  # type: ignore[operator]
+                or self._stored.config[key] != value  # type: ignore[index]
+            ):
                 logger.info("Setting %s to: %s", key, value)
                 self._stored.config[key] = value  # type: ignore
                 change_set.add(key)
 
-        if not self._stored.resource_installed:  # type: ignore
-            logging.info(  # type: ignore
+        if not self._stored.resource_installed:  # type: ignore[truthy-function]
+            logging.info(  # type: ignore[unreachable]
                 "Config changed called before install complete, deferring event: %s",
                 event.handle,
             )
@@ -202,12 +205,18 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_cos_agent_relation_joined(self, event: EventBase) -> None:
         """Start the exporter when relation joined."""
+        if (
+            not self._stored.resource_installed  # type: ignore[truthy-function]
+            or not self._stored.exporter_installed  # type: ignore[truthy-function]
+        ):
+            event.defer()  # type: ignore[unreachable]
         self.exporter.start()
         self._on_update_status(event)
 
     def _on_cos_agent_relation_departed(self, event: EventBase) -> None:
         """Remove the exporter when relation departed."""
-        self.exporter.stop()
+        if self._stored.exporter_installed:  # type: ignore[truthy-function]
+            self.exporter.stop()
         self._on_update_status(event)
 
     def _get_redfish_creds(self) -> Dict[str, str]:
