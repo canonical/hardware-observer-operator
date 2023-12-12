@@ -9,6 +9,7 @@ import stat
 import subprocess
 import typing as t
 from abc import ABCMeta, abstractmethod
+from functools import lru_cache
 from pathlib import Path
 
 from charms.operator_libs_linux.v0 import apt
@@ -338,6 +339,9 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
         return True
 
 
+# Using cache here to avoid repeat call.
+# The lru_cache should be clean everytime the hook been triggered.
+@lru_cache
 def raid_hw_verifier() -> t.List[HWTool]:
     """Verify if the HWTool support RAID card exists on machine."""
     hw_info = lshw()
@@ -388,6 +392,9 @@ def raid_hw_verifier() -> t.List[HWTool]:
     return list(tools)
 
 
+# Using cache here to avoid repeat call.
+# The lru_cache should be clean everytime the hook been triggered.
+@lru_cache
 def redfish_available() -> bool:
     """Check if redfish service is available."""
     bmc_address = get_bmc_address()
@@ -419,6 +426,9 @@ def redfish_available() -> bool:
     return result
 
 
+# Using cache here to avoid repeat call.
+# The lru_cache should be clean everytime the hook been triggered.
+@lru_cache
 def bmc_hw_verifier() -> t.List[HWTool]:
     """Verify if the ipmi is available on the machine.
 
@@ -455,6 +465,9 @@ def bmc_hw_verifier() -> t.List[HWTool]:
     return tools
 
 
+# Using cache here to avoid repeat call.
+# The lru_cache should be clean everytime the hook been triggered.
+@lru_cache
 def get_hw_tool_white_list() -> t.List[HWTool]:
     """Return HWTool white list."""
     raid_white_list = raid_hw_verifier()

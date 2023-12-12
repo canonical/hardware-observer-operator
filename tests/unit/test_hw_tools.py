@@ -284,7 +284,7 @@ class TestHWToolHelper(unittest.TestCase):
         ok, msg = self.hw_tool_helper.install(mock_resources)
         self.assertFalse(ok)
         self.assertEqual(msg, "Missing resources: ['storcli-deb', 'perccli-deb']")
-        self.assertFalse(self.harness.charm._stored.installed)
+        self.assertFalse(self.harness.charm._stored.resource_installed)
 
     @mock.patch(
         "hw_tools.get_hw_tool_white_list",
@@ -762,6 +762,7 @@ def test_get_hw_tool_white_list(mock_raid_verifier, mock_bmc_hw_verifier):
 @mock.patch("hw_tools.lshw")
 def test_raid_hw_verifier(mock_lshw, lshw_output, lshw_storage_output, expect):
     mock_lshw.side_effect = [lshw_output, lshw_storage_output]
+    raid_hw_verifier.cache_clear()
     output = raid_hw_verifier()
     case = unittest.TestCase()
     case.assertCountEqual(output, expect)
@@ -775,6 +776,7 @@ class TestIPMIHWVerifier(unittest.TestCase):
         mock_redfish_client.return_value = mock_redfish_obj
         mock_redfish_obj.login.side_effect = RetriesExhaustedError()
 
+        redfish_available.cache_clear()
         result = redfish_available()
 
         self.assertEqual(result, False)
@@ -789,6 +791,7 @@ class TestIPMIHWVerifier(unittest.TestCase):
         mock_redfish_client.return_value = mock_redfish_obj
         mock_redfish_obj.login.side_effect = Exception()
 
+        redfish_available.cache_clear()
         result = redfish_available()
 
         self.assertEqual(result, False)
@@ -817,6 +820,7 @@ class TestIPMIHWVerifier(unittest.TestCase):
         mock_redfish_obj = mock.Mock()
         mock_redfish_client.return_value = mock_redfish_obj
 
+        redfish_available.cache_clear()
         result = redfish_available()
 
         self.assertEqual(result, True)
@@ -830,6 +834,7 @@ class TestIPMIHWVerifier(unittest.TestCase):
     @mock.patch("hw_tools.subprocess")
     @mock.patch("hw_tools.apt")
     def test_bmc_hw_verifier(self, mock_apt, mock_subprocess, mock_redfish_available):
+        bmc_hw_verifier.cache_clear()
         output = bmc_hw_verifier()
         mock_apt.add_package.assert_called_with("freeipmi-tools", update_cache=False)
         self.assertCountEqual(
@@ -845,6 +850,7 @@ class TestIPMIHWVerifier(unittest.TestCase):
     def test_bmc_hw_verifier_error_handling(
         self, mock_apt, mock_check_output, mock_redfish_available
     ):
+        bmc_hw_verifier.cache_clear()
         output = bmc_hw_verifier()
         mock_apt.add_package.assert_called_with("freeipmi-tools", update_cache=False)
         self.assertEqual(output, [])
@@ -862,6 +868,7 @@ class TestIPMIHWVerifier(unittest.TestCase):
             elif ipmi_call == "ipmi-dcmi --get-system-power-statistics".split():
                 raise subprocess.CalledProcessError(-1, "cmd")
 
+        bmc_hw_verifier.cache_clear()
         with mock.patch("hw_tools.subprocess.check_output", side_effect=mock_get_response_ipmi):
             output = bmc_hw_verifier()
             mock_apt.add_package.assert_called_with("freeipmi-tools", update_cache=False)
