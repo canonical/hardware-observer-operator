@@ -226,3 +226,22 @@ class TestCharm(unittest.TestCase):
 
         self.harness.charm.on.config_changed.emit()
         self.assertEqual(self._get_notice_count("config_changed"), 1)
+
+    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
+    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
+    def test_12_upgrade_force_reconfig_exporter(self, mock_hw_tool_helper, mock_exporter) -> None:
+        """Test event install."""
+        mock_hw_tool_helper.return_value.install.return_value = (True, "")
+        mock_exporter.return_value.install.return_value = True
+        self.harness.begin()
+        self.harness.charm._stored.exporter_installed = True
+        print(dir(self.harness.charm.on))
+        self.harness.charm.on.upgrade_charm.emit()
+
+        self.assertTrue(self.harness.charm._stored.resource_installed)
+        self.assertTrue(self.harness.charm._stored.exporter_installed)
+
+        self.harness.charm.exporter.install.assert_called_once()
+        self.harness.charm.hw_tool_helper.install.assert_called_with(
+            self.harness.charm.model.resources
+        )
