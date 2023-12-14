@@ -669,8 +669,8 @@ class TestSSACLIStrategy(unittest.TestCase):
         mock_apt.RepositoryMapping.return_value = mock_repos
 
         strategy.remove()
-        mock_apt.remove_package.assert_called_with(strategy.pkg)
-        mock_repos.disable.assert_called_with(strategy.repo)
+        mock_apt.remove_package.assert_not_called()
+        mock_repos.disable.assert_not_called()
 
 
 class TestIPMIStrategy(unittest.TestCase):

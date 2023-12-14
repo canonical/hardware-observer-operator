@@ -282,11 +282,6 @@ class SSACLIStrategy(APTStrategyABC):
         repositories = apt.RepositoryMapping()
         repositories.add(self.repo)
 
-    def disable_repo(self) -> None:
-        """Disable the repository."""
-        repositories = apt.RepositoryMapping()
-        repositories.disable(self.repo)
-
     def install(self) -> None:
         for key in HP_KEYS:
             apt.import_key(key)
@@ -294,8 +289,9 @@ class SSACLIStrategy(APTStrategyABC):
         apt.add_package(self.pkg, update_cache=True)
 
     def remove(self) -> None:
-        apt.remove_package(self.pkg)
-        self.disable_repo()
+        # Skip removing because we afriad this cause dependency error
+        # for other services on the same machine.
+        logger.info("SSACLIStrategy skip removing %s", self.pkg)
 
     def check(self) -> bool:
         """Check package status."""
