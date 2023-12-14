@@ -51,20 +51,23 @@ class HardwareObserverCharm(ops.CharmBase):
             self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
         )
 
-        self._stored.set_default(config={}, exporter_installed=False, installed=False)
+        self._stored.set_default(
+            config={},
+            exporter_installed=False,
+            resource_installed=False,
+        )
         self.num_cos_agent_relations = self.get_num_cos_agent_relations("cos-agent")
 
     def _on_install_or_upgrade(self, event: ops.InstallEvent) -> None:
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
 
-        installed, msg = self.hw_tool_helper.install(self.model.resources)
-        self._stored.installed = installed
+        resource_installed, msg = self.hw_tool_helper.install(self.model.resources)
+        self._stored.resource_installed = resource_installed
 
-        if not installed:
-            logger.error(msg)
+        if not resource_installed:
+            logger.warning(msg)
             self.model.unit.status = BlockedStatus(msg)
-            event.defer()
             return
 
         if self._stored.exporter_installed is not True:
@@ -72,7 +75,6 @@ class HardwareObserverCharm(ops.CharmBase):
             success, err_msg = self.validate_exporter_configs()
             if not success:
                 self.model.unit.status = BlockedStatus(err_msg)
-                event.defer()
                 return
 
             port = self.model.config.get("exporter-port", "10000")
@@ -85,7 +87,6 @@ class HardwareObserverCharm(ops.CharmBase):
                 logger.error(msg)
                 self.model.unit.status = BlockedStatus(msg)
                 return
-
         self._on_update_status(event)
 
     def _on_remove(self, _: EventBase) -> None:
@@ -93,7 +94,7 @@ class HardwareObserverCharm(ops.CharmBase):
         logger.info("Start to remove.")
         # Remove binary tool
         self.hw_tool_helper.remove(self.model.resources)
-        self._stored.installed = False
+        self._stored.resource_installed = False
         success = self.exporter.uninstall()
         if not success:
             msg = "Failed to uninstall exporter, please refer to `juju debug-log`"
@@ -105,9 +106,9 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_update_status(self, _: EventBase) -> None:  # noqa: C901
         """Update the charm's status."""
-        if not self._stored.installed:  # type: ignore
-            self.model.unit.status = BlockedStatus("Resoures are not installed")  # type: ignore
-            return
+        if not self._stored.resource_installed:  # type: ignore[truthy-function]
+            # The charm should be in BlockedStatus with install failed msg
+            return  # type: ignore[unreachable]
 
         if not self.exporter_enabled:
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
@@ -155,13 +156,16 @@ class HardwareObserverCharm(ops.CharmBase):
         change_set = set()
         model_config: Dict[str, Optional[str]] = dict(self.model.config.items())
         for key, value in model_config.items():
-            if key not in self._stored.config or self._stored.config[key] != value:  # type: ignore
+            if (
+                key not in self._stored.config  # type: ignore[operator]
+                or self._stored.config[key] != value  # type: ignore[index]
+            ):
                 logger.info("Setting %s to: %s", key, value)
                 self._stored.config[key] = value  # type: ignore
                 change_set.add(key)
 
-        if not self._stored.installed:  # type: ignore
-            logging.info(  # type: ignore
+        if not self._stored.resource_installed:  # type: ignore[truthy-function]
+            logging.info(  # type: ignore[unreachable]
                 "Config changed called before install complete, deferring event: %s",
                 event.handle,
             )
@@ -201,12 +205,24 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_cos_agent_relation_joined(self, event: EventBase) -> None:
         """Start the exporter when relation joined."""
+        if (
+            not self._stored.resource_installed  # type: ignore[truthy-function]
+            or not self._stored.exporter_installed  # type: ignore[truthy-function]
+        ):
+            logger.info(  # type: ignore[unreachable]
+                "Defer cos-agent relation join because exporter or resources is not ready yet."
+            )
+            event.defer()
+            return
         self.exporter.start()
+        logger.info("Start exporter service")
         self._on_update_status(event)
 
     def _on_cos_agent_relation_departed(self, event: EventBase) -> None:
         """Remove the exporter when relation departed."""
-        self.exporter.stop()
+        if self._stored.exporter_installed:  # type: ignore[truthy-function]
+            self.exporter.stop()
+            logger.info("Stop exporter service")
         self._on_update_status(event)
 
     def _get_redfish_creds(self) -> Dict[str, str]:

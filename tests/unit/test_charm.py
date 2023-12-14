@@ -51,7 +51,7 @@ class TestCharm(unittest.TestCase):
     def test_01_harness(self) -> None:
         """Test charm initialise."""
         self.harness.begin()
-        self.assertFalse(self.harness.charm._stored.installed)
+        self.assertFalse(self.harness.charm._stored.resource_installed)
         self.assertTrue(isinstance(self.harness.charm._stored.config, ops.framework.StoredDict))
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
@@ -63,7 +63,7 @@ class TestCharm(unittest.TestCase):
         self.harness.begin()
         self.harness.charm.on.install.emit()
 
-        self.assertTrue(self.harness.charm._stored.installed)
+        self.assertTrue(self.harness.charm._stored.resource_installed)
 
         self.harness.charm.exporter.install.assert_called_once()
         self.harness.charm.hw_tool_helper.install.assert_called_with(
@@ -79,7 +79,7 @@ class TestCharm(unittest.TestCase):
         self.harness.begin()
         self.harness.charm.on.install.emit()
 
-        self.assertTrue(self.harness.charm._stored.installed)
+        self.assertTrue(self.harness.charm._stored.resource_installed)
 
         self.harness.charm.exporter.install.assert_called_once()
         self.harness.charm.hw_tool_helper.install.assert_called_with(
@@ -117,7 +117,7 @@ class TestCharm(unittest.TestCase):
         self.harness.begin()
         self.harness.charm.on.install.emit()
 
-        self.assertTrue(self.harness.charm._stored.installed)
+        self.assertTrue(self.harness.charm._stored.resource_installed)
 
         self.harness.charm.exporter.install.assert_called_with(10000, "INFO", {})
 
@@ -132,7 +132,7 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.validate_exporter_configs.return_value = (False, "error")
         self.harness.charm.on.install.emit()
 
-        self.assertTrue(self.harness.charm._stored.installed)
+        self.assertTrue(self.harness.charm._stored.resource_installed)
 
         self.assertEqual(self.harness.charm.unit.status, BlockedStatus("error"))
 
@@ -205,7 +205,7 @@ class TestCharm(unittest.TestCase):
     def test_10_config_changed(self, mock_exporter):
         """Test config change event updates the charm's internal store."""
         self.harness.begin()
-        self.harness.charm._stored.installed = True
+        self.harness.charm._stored.resource_installed = True
 
         new_config = {"exporter-port": 80, "exporter-log-level": "DEBUG"}
         self.harness.update_config(new_config)
@@ -222,7 +222,7 @@ class TestCharm(unittest.TestCase):
     def test_11_config_changed_before_install_complete(self, mock_exporter):
         """Test: config change event is deferred if charm not installed."""
         self.harness.begin()
-        self.harness.charm._stored.installed = False
+        self.harness.charm._stored.resource_installed = False
 
         self.harness.charm.on.config_changed.emit()
         self.assertEqual(self._get_notice_count("config_changed"), 1)

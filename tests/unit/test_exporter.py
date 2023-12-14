@@ -116,6 +116,8 @@ class TestExporter(unittest.TestCase):
         """Test exporter service started when relation is joined."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
+        self.harness.charm._stored.resource_installed = True
+        self.harness.charm._stored.exporter_installed = True
         self.harness.add_relation_unit(rid, "grafana-agent/0")
         self.mock_systemd.service_start.assert_called_once()
 
@@ -128,10 +130,32 @@ class TestExporter(unittest.TestCase):
         self.mock_systemd.service_start.assert_not_called()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_22_start_defer_resource_not_ready(self, mock_service_installed):
+        """Test exporter service started when relation is joined."""
+        rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
+        self.harness.begin()
+        self.harness.charm._stored.resource_installed = False
+        self.harness.charm._stored.exporter_installed = True
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
+        self.mock_systemd.service_start.assert_not_called()
+
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_23_start_defer_exporter_not_ready(self, mock_service_installed):
+        """Test exporter service started when relation is joined."""
+        rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
+        self.harness.begin()
+        self.harness.charm._stored.resource_installed = True
+        self.harness.charm._stored.exporter_installed = False
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
+        self.mock_systemd.service_start.assert_not_called()
+
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_30_stop_okay(self, mock_service_installed):
         """Test exporter service is stopped when service is installed and relation is departed."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
+        self.harness.charm._stored.resource_installed = True
+        self.harness.charm._stored.exporter_installed = True
         self.harness.add_relation_unit(rid, "grafana-agent/0")
         self.harness.remove_relation_unit(rid, "grafana-agent/0")
         self.mock_systemd.service_stop.assert_called_once()
@@ -141,6 +165,8 @@ class TestExporter(unittest.TestCase):
         """Test exporter service failed to stop when service is not installed."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
+        self.harness.charm._stored.resource_installed = True
+        self.harness.charm._stored.exporter_installed = True
         self.harness.add_relation_unit(rid, "grafana-agent/0")
         self.harness.remove_relation_unit(rid, "grafana-agent/0")
         self.mock_systemd.service_stop.assert_not_called()
