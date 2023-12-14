@@ -209,14 +209,20 @@ class HardwareObserverCharm(ops.CharmBase):
             not self._stored.resource_installed  # type: ignore[truthy-function]
             or not self._stored.exporter_installed  # type: ignore[truthy-function]
         ):
-            event.defer()  # type: ignore[unreachable]
+            logger.info(  # type: ignore[unreachable]
+                "Defer cos-agent relation join because exporter or resources is not ready yet."
+            )
+            event.defer()
+            return
         self.exporter.start()
+        logger.info("Start exporter service")
         self._on_update_status(event)
 
     def _on_cos_agent_relation_departed(self, event: EventBase) -> None:
         """Remove the exporter when relation departed."""
         if self._stored.exporter_installed:  # type: ignore[truthy-function]
             self.exporter.stop()
+            logger.info("Stop exporter service")
         self._on_update_status(event)
 
     def _get_redfish_creds(self) -> Dict[str, str]:
