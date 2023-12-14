@@ -268,4 +268,3 @@ class TestCharm(unittest.TestCase):
 
         self.harness.charm.on.update_status.emit()
         self.assertEqual(self.harness.charm.unit.status, BlockedStatus("config fail message"))
-
