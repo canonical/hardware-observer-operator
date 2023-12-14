@@ -318,8 +318,9 @@ class IPMIStrategy(APTStrategyABC):
             apt.add_package(pkg)
 
     def remove(self) -> None:
-        for pkg in self.pkgs:
-            apt.remove_package(pkg)
+        # Skip removing because we afriad this cause dependency error
+        # for other services on the same machine.
+        logger.info("IPMIStrategy skip removing %s", self.pkgs)
 
     def check(self) -> bool:
         """Check package status."""

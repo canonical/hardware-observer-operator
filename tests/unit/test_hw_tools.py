@@ -686,7 +686,7 @@ class TestIPMIStrategy(unittest.TestCase):
         strategy = IPMIStrategy()
         strategy.remove()
 
-        mock_apt.remove_package.assert_called_with("freeipmi-tools")
+        mock_apt.remove_package.assert_not_called()
 
 
 @mock.patch("hw_tools.bmc_hw_verifier", return_value=[1, 2, 3])
