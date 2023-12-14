@@ -245,3 +245,27 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.hw_tool_helper.install.assert_called_with(
             self.harness.charm.model.resources
         )
+
+    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
+    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
+    def test_13_update_status_config_invalid(self, mock_hw_tool_helper, mock_exporter):
+        """Test update_status when everything is okay."""
+        self.mock_bmc_hw_verifier.return_value = [
+            HWTool.IPMI_SENSOR,
+            HWTool.IPMI_SEL,
+            HWTool.IPMI_DCMI,
+        ]
+        mock_hw_tool_helper.return_value.install.return_value = (True, "")
+        mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
+        mock_exporter.return_value.install.return_value = True
+        rid = self.harness.add_relation("cos-agent", "grafana-agent")
+        self.harness.begin()
+        self.harness.charm.on.install.emit()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
+
+        self.harness.charm.validate_exporter_configs = mock.MagicMock()
+        self.harness.charm.validate_exporter_configs.return_value = (False, "config fail message")
+
+        self.harness.charm.on.update_status.emit()
+        self.assertEqual(self.harness.charm.unit.status, BlockedStatus("config fail message"))
+
