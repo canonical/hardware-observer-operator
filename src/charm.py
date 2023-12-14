@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional, Tuple
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
-from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus
+from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus, StatusBase
 
 from config import EXPORTER_HEALTH_RETRY_COUNT, EXPORTER_HEALTH_RETRY_TIMEOUT, HWTool
 from hardware import get_bmc_address
@@ -125,28 +125,34 @@ class HardwareObserverCharm(ops.CharmBase):
 
         if not self.exporter.check_health():
             logger.warning("Exporter health check - failed.")
-            try:
-                for i in range(1, EXPORTER_HEALTH_RETRY_COUNT + 1):
-                    logger.warning("Restarting exporter - %d retry", i)
-                    self.exporter.restart()
-                    sleep(EXPORTER_HEALTH_RETRY_TIMEOUT)
-                    if self.exporter.check_active():
-                        logger.info("Exporter restarted.")
-                        break
-                if not self.exporter.check_active():
-                    logger.error("Failed to restart the exporter.")
-                    self.model.unit.status = ErrorStatus(
-                        "Exporter crashed unexpectedly, please refer to systemd logs..."
-                    )
-                    return
-            except Exception as err:  # pylint: disable=W0718
-                logger.error("Exporter crashed unexpectedly: %s", err)
-                self.model.unit.status = ErrorStatus(
-                    "Exporter crashed unexpectedly, please refer to systemd logs..."
-                )
+            restart_ok, restart_status = self.restart_exporter()
+            if not restart_ok and restart_status is not None:
+                self.model.unit.status = restart_status
                 return
 
         self.model.unit.status = ActiveStatus("Unit is ready")
+
+    def restart_exporter(self) -> Tuple[bool, Optional[StatusBase]]:
+        """Restart exporter service with retry."""
+        try:
+            for i in range(1, EXPORTER_HEALTH_RETRY_COUNT + 1):
+                logger.warning("Restarting exporter - %d retry", i)
+                self.exporter.restart()
+                sleep(EXPORTER_HEALTH_RETRY_TIMEOUT)
+                if self.exporter.check_active():
+                    logger.info("Exporter restarted.")
+                    break
+            if not self.exporter.check_active():
+                logger.error("Failed to restart the exporter.")
+                return False, ErrorStatus(
+                    "Exporter crashed unexpectedly, please refer to systemd logs..."
+                )
+        except Exception as err:  # pylint: disable=W0718
+            logger.error("Exporter crashed unexpectedly: %s", err)
+            return False, ErrorStatus(
+                "Exporter crashed unexpectedly, please refer to systemd logs..."
+            )
+        return True, None
 
     def _on_config_changed(self, event: EventBase) -> None:
         """Reconfigure charm."""
