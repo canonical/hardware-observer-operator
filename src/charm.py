@@ -70,23 +70,23 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus(msg)
             return
 
-        if self._stored.exporter_installed is not True:
-            self.model.unit.status = MaintenanceStatus("Installing exporter...")
-            success, err_msg = self.validate_exporter_configs()
-            if not success:
-                self.model.unit.status = BlockedStatus(err_msg)
-                return
+        # Install exporter
+        self.model.unit.status = MaintenanceStatus("Installing exporter...")
+        success, err_msg = self.validate_exporter_configs()
+        if not success:
+            self.model.unit.status = BlockedStatus(err_msg)
+            return
 
-            port = self.model.config.get("exporter-port", "10000")
-            level = self.model.config.get("exporter-log-level", "INFO")
-            redfish_creds = self._get_redfish_creds()
-            success = self.exporter.install(port, level, redfish_creds)
-            self._stored.exporter_installed = success
-            if not success:
-                msg = "Failed to install exporter, please refer to `juju debug-log`"
-                logger.error(msg)
-                self.model.unit.status = BlockedStatus(msg)
-                return
+        port = self.model.config.get("exporter-port", "10000")
+        level = self.model.config.get("exporter-log-level", "INFO")
+        redfish_creds = self._get_redfish_creds()
+        success = self.exporter.install(port, level, redfish_creds)
+        self._stored.exporter_installed = success
+        if not success:
+            msg = "Failed to install exporter, please refer to `juju debug-log`"
+            logger.error(msg)
+            self.model.unit.status = BlockedStatus(msg)
+            return
         self._on_update_status(event)
 
     def _on_remove(self, _: EventBase) -> None:
