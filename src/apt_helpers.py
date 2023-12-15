@@ -1,4 +1,4 @@
-"""Apt helper module for missing feature in operator_libs_linux."""
+"""Apt helper module for missing features in operator_libs_linux."""
 import re
 from subprocess import PIPE, CalledProcessError, check_output
 from typing import Optional
@@ -7,7 +7,10 @@ from charms.operator_libs_linux.v0 import apt
 
 
 def get_candidate_version(package: str) -> Optional[str]:
-    """Get candiate version of package from apt-cache."""
+    """Get candiate version of package from apt-cache.
+
+    Related issue: https://github.com/canonical/operator-libs-linux/issues/113
+    """
     try:
         output = check_output(
             ["apt-cache", "policy", package], stderr=PIPE, universal_newlines=True
@@ -25,6 +28,9 @@ def get_candidate_version(package: str) -> Optional[str]:
 
 
 def add_pkg_with_candidate_version(pkg: str) -> None:
-    """Install package with apt-cache candidate version."""
+    """Install package with apt-cache candidate version.
+
+    Related issue: https://github.com/canonical/operator-libs-linux/issues/113
+    """
     version = get_candidate_version(pkg)
     apt.add_package(pkg, version=version, update_cache=False)
