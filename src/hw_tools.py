@@ -22,6 +22,7 @@ from redfish.rest.v1 import (
     SessionCreationError,
 )
 
+import apt_helpers
 from checksum import (
     PERCCLI_VERSION_INFOS,
     SAS2IRCU_VERSION_INFOS,
@@ -307,20 +308,19 @@ class IPMIStrategy(APTStrategyABC):
     # messages. The installation should be good since all of these
     # tools require the same `freeipmi-tools` to be installed.
     _name = HWTool.IPMI_SENSOR
-    pkgs = ["freeipmi-tools"]
+    pkg = "freeipmi-tools"
 
     def install(self) -> None:
-        for pkg in self.pkgs:
-            apt.add_package(pkg)
+        apt_helpers.add_pkg_with_candidate_version(self.pkg)
 
     def remove(self) -> None:
         # Skip removing because we afriad this cause dependency error
         # for other services on the same machine.
-        logger.info("IPMIStrategy skip removing %s", self.pkgs)
+        logger.info("IPMIStrategy skip removing %s", self.pkg)
 
     def check(self) -> bool:
         """Check package status."""
-        return check_deb_pkg_installed(self.pkgs[0])
+        return check_deb_pkg_installed(self.pkg)
 
 
 class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
@@ -434,7 +434,7 @@ def bmc_hw_verifier() -> t.List[HWTool]:
     tools = []
 
     # Check if ipmi services are available
-    apt.add_package("freeipmi-tools", update_cache=False)
+    apt_helpers.add_pkg_with_candidate_version("freeipmi-tools")
 
     try:
         subprocess.check_output("ipmimonitoring".split())
