@@ -674,12 +674,16 @@ class TestSSACLIStrategy(unittest.TestCase):
 
 
 class TestIPMIStrategy(unittest.TestCase):
-    @mock.patch("hw_tools.apt")
-    def test_install(self, mock_apt):
+    @mock.patch("apt_helpers.get_candidate_version")
+    @mock.patch("apt_helpers.apt")
+    def test_install(self, mock_apt, mock_candidate_version):
         strategy = IPMIStrategy()
+        mock_candidate_version.return_value = "some-candidate-version"
         strategy.install()
 
-        mock_apt.add_package.assert_called_with("freeipmi-tools")
+        mock_apt.add_package.assert_called_with(
+            "freeipmi-tools", version="some-candidate-version", update_cache=False
+        )
 
     @mock.patch("hw_tools.apt")
     def test_remove(self, mock_apt):
@@ -832,11 +836,11 @@ class TestIPMIHWVerifier(unittest.TestCase):
 
     @mock.patch("hw_tools.redfish_available", return_value=True)
     @mock.patch("hw_tools.subprocess")
-    @mock.patch("hw_tools.apt")
-    def test_bmc_hw_verifier(self, mock_apt, mock_subprocess, mock_redfish_available):
+    @mock.patch("hw_tools.apt_helpers")
+    def test_bmc_hw_verifier(self, mock_apt_helpers, mock_subprocess, mock_redfish_available):
         bmc_hw_verifier.cache_clear()
         output = bmc_hw_verifier()
-        mock_apt.add_package.assert_called_with("freeipmi-tools", update_cache=False)
+        mock_apt_helpers.add_pkg_with_candidate_version.assert_called_with("freeipmi-tools")
         self.assertCountEqual(
             output, [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH]
         )
@@ -846,18 +850,18 @@ class TestIPMIHWVerifier(unittest.TestCase):
         "hw_tools.subprocess.check_output",
         side_effect=subprocess.CalledProcessError(-1, "cmd"),
     )
-    @mock.patch("hw_tools.apt")
+    @mock.patch("hw_tools.apt_helpers")
     def test_bmc_hw_verifier_error_handling(
-        self, mock_apt, mock_check_output, mock_redfish_available
+        self, mock_apt_helpers, mock_check_output, mock_redfish_available
     ):
         bmc_hw_verifier.cache_clear()
         output = bmc_hw_verifier()
-        mock_apt.add_package.assert_called_with("freeipmi-tools", update_cache=False)
+        mock_apt_helpers.add_pkg_with_candidate_version.assert_called_with("freeipmi-tools")
         self.assertEqual(output, [])
 
     @mock.patch("hw_tools.redfish_available", return_value=False)
-    @mock.patch("hw_tools.apt")
-    def test_bmc_hw_verifier_mixed(self, mock_apt, mock_redfish_available):
+    @mock.patch("hw_tools.apt_helpers")
+    def test_bmc_hw_verifier_mixed(self, mock_apt_helpers, mock_redfish_available):
         """Test a mixture of failures and successes for ipmi."""
 
         def mock_get_response_ipmi(ipmi_call):
@@ -871,5 +875,5 @@ class TestIPMIHWVerifier(unittest.TestCase):
         bmc_hw_verifier.cache_clear()
         with mock.patch("hw_tools.subprocess.check_output", side_effect=mock_get_response_ipmi):
             output = bmc_hw_verifier()
-            mock_apt.add_package.assert_called_with("freeipmi-tools", update_cache=False)
+            mock_apt_helpers.add_pkg_with_candidate_version.assert_called_with("freeipmi-tools")
             self.assertCountEqual(output, [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL])
