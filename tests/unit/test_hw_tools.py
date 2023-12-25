@@ -35,6 +35,7 @@ from hw_tools import (
     StrategyABC,
     TPRStrategyABC,
     bmc_hw_verifier,
+    check_deb_pkg_installed,
     check_file_size,
     copy_to_snap_common_bin,
     get_hw_tool_white_list,
@@ -67,6 +68,13 @@ def test_copy_to_snap_common_bin(mock_path, mock_shutil):
     mock_path.assert_called_with(f"{SNAP_COMMON}/bin")
 
     mock_path_obj.mkdir.assert_called()
+
+
+@mock.patch("hw_tools.apt")
+def test_check_deb_pkg_installed_okay(mock_apt):
+    mock_pkg = "ipmitool"
+    result = check_deb_pkg_installed(mock_pkg)
+    assert result is True
 
 
 class TestSymlink(unittest.TestCase):
@@ -276,11 +284,15 @@ class TestHWToolHelper(unittest.TestCase):
         ok, msg = self.hw_tool_helper.install(mock_resources)
         self.assertFalse(ok)
         self.assertEqual(msg, "Missing resources: ['storcli-deb', 'perccli-deb']")
-        self.assertFalse(self.harness.charm._stored.installed)
+        self.assertFalse(self.harness.charm._stored.resource_installed)
 
     @mock.patch(
         "hw_tools.get_hw_tool_white_list",
-        return_value=[HWTool.STORCLI, HWTool.IPMI, HWTool.REDFISH],
+        return_value=[
+            HWTool.STORCLI,
+            HWTool.IPMI_SENSOR,
+            HWTool.REDFISH,
+        ],
     )
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
@@ -297,7 +309,7 @@ class TestHWToolHelper(unittest.TestCase):
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         mock_strategies.return_value[0].name = HWTool.STORCLI
-        mock_strategies.return_value[1].name = HWTool.IPMI
+        mock_strategies.return_value[1].name = HWTool.IPMI_SENSOR
         mock_strategies.return_value[2].name = HWTool.REDFISH
 
         mock_strategies.return_value[0].install.side_effect = ResourceFileSizeZeroError(
@@ -311,7 +323,10 @@ class TestHWToolHelper(unittest.TestCase):
         ok, msg = self.hw_tool_helper.install(mock_resources)
 
         self.assertFalse(ok)
-        self.assertEqual(f"Fail strategies: {[HWTool.STORCLI, HWTool.IPMI, HWTool.REDFISH]}", msg)
+        self.assertEqual(
+            f"Fail strategies: {[HWTool.STORCLI, HWTool.IPMI_SENSOR, HWTool.REDFISH]}",
+            msg,
+        )
 
     @mock.patch("hw_tools.check_file_size", return_value=False)
     def test_11_check_missing_resources_zero_size_resources(self, check_file_size):
@@ -322,6 +337,57 @@ class TestHWToolHelper(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertEqual("Missing resources: ['storcli-deb']", msg)
+
+    @mock.patch("hw_tools.get_hw_tool_white_list", return_value=[HWTool.STORCLI])
+    @mock.patch(
+        "hw_tools.HWToolHelper.strategies",
+        return_value=[
+            mock.PropertyMock(spec=TPRStrategyABC),
+        ],
+        new_callable=mock.PropertyMock,
+    )
+    def test_12_check_installed_okay(self, mock_strategies, _):
+        self.harness.begin()
+        mock_strategies.return_value[0].name = HWTool.STORCLI
+        self.hw_tool_helper.check_installed()
+        for strategy in mock_strategies.return_value:
+            strategy.check.assert_called()
+
+    @mock.patch("hw_tools.get_hw_tool_white_list", return_value=[HWTool.STORCLI])
+    @mock.patch(
+        "hw_tools.HWToolHelper.strategies",
+        return_value=[
+            mock.PropertyMock(spec=TPRStrategyABC),
+        ],
+        new_callable=mock.PropertyMock,
+    )
+    def test_13_check_installed_okay(self, mock_strategies, _):
+        self.harness.begin()
+        mock_strategies.return_value[0].name = HWTool.SSACLI
+        success, msg = self.hw_tool_helper.check_installed()
+        self.assertTrue(success)
+        self.assertEqual(msg, "")
+
+    @mock.patch("hw_tools.os")
+    @mock.patch("hw_tools.Path")
+    @mock.patch(
+        "hw_tools.get_hw_tool_white_list",
+        return_value=[
+            HWTool.STORCLI,
+            HWTool.PERCCLI,
+            HWTool.SAS2IRCU,
+            HWTool.SAS3IRCU,
+            HWTool.SSACLI,
+            HWTool.IPMI_SENSOR,
+            HWTool.IPMI_SEL,
+            HWTool.IPMI_DCMI,
+            HWTool.REDFISH,
+        ],
+    )
+    def test_14_check_installed_not_okay(self, _, mock_os, mock_path):
+        self.harness.begin()
+        success, msg = self.hw_tool_helper.check_installed()
+        self.assertFalse(success)
 
 
 class TestStorCLIStrategy(unittest.TestCase):
@@ -603,24 +669,28 @@ class TestSSACLIStrategy(unittest.TestCase):
         mock_apt.RepositoryMapping.return_value = mock_repos
 
         strategy.remove()
-        mock_apt.remove_package.assert_called_with(strategy.pkg)
-        mock_repos.disable.assert_called_with(strategy.repo)
+        mock_apt.remove_package.assert_not_called()
+        mock_repos.disable.assert_not_called()
 
 
 class TestIPMIStrategy(unittest.TestCase):
-    @mock.patch("hw_tools.apt")
-    def test_install(self, mock_apt):
+    @mock.patch("apt_helpers.get_candidate_version")
+    @mock.patch("apt_helpers.apt")
+    def test_install(self, mock_apt, mock_candidate_version):
         strategy = IPMIStrategy()
+        mock_candidate_version.return_value = "some-candidate-version"
         strategy.install()
 
-        mock_apt.add_package.assert_called_with("freeipmi-tools")
+        mock_apt.add_package.assert_called_with(
+            "freeipmi-tools", version="some-candidate-version", update_cache=False
+        )
 
     @mock.patch("hw_tools.apt")
     def test_remove(self, mock_apt):
         strategy = IPMIStrategy()
         strategy.remove()
 
-        mock_apt.remove_package.assert_called_with("freeipmi-tools")
+        mock_apt.remove_package.assert_not_called()
 
 
 @mock.patch("hw_tools.bmc_hw_verifier", return_value=[1, 2, 3])
@@ -696,6 +766,7 @@ def test_get_hw_tool_white_list(mock_raid_verifier, mock_bmc_hw_verifier):
 @mock.patch("hw_tools.lshw")
 def test_raid_hw_verifier(mock_lshw, lshw_output, lshw_storage_output, expect):
     mock_lshw.side_effect = [lshw_output, lshw_storage_output]
+    raid_hw_verifier.cache_clear()
     output = raid_hw_verifier()
     case = unittest.TestCase()
     case.assertCountEqual(output, expect)
@@ -709,6 +780,7 @@ class TestIPMIHWVerifier(unittest.TestCase):
         mock_redfish_client.return_value = mock_redfish_obj
         mock_redfish_obj.login.side_effect = RetriesExhaustedError()
 
+        redfish_available.cache_clear()
         result = redfish_available()
 
         self.assertEqual(result, False)
@@ -723,6 +795,7 @@ class TestIPMIHWVerifier(unittest.TestCase):
         mock_redfish_client.return_value = mock_redfish_obj
         mock_redfish_obj.login.side_effect = Exception()
 
+        redfish_available.cache_clear()
         result = redfish_available()
 
         self.assertEqual(result, False)
@@ -751,6 +824,7 @@ class TestIPMIHWVerifier(unittest.TestCase):
         mock_redfish_obj = mock.Mock()
         mock_redfish_client.return_value = mock_redfish_obj
 
+        redfish_available.cache_clear()
         result = redfish_available()
 
         self.assertEqual(result, True)
@@ -762,24 +836,44 @@ class TestIPMIHWVerifier(unittest.TestCase):
 
     @mock.patch("hw_tools.redfish_available", return_value=True)
     @mock.patch("hw_tools.subprocess")
-    @mock.patch("hw_tools.apt")
-    def test_bmc_hw_verifier(self, mock_apt, mock_subprocess, mock_redfish_available):
+    @mock.patch("hw_tools.apt_helpers")
+    def test_bmc_hw_verifier(self, mock_apt_helpers, mock_subprocess, mock_redfish_available):
+        bmc_hw_verifier.cache_clear()
         output = bmc_hw_verifier()
-        mock_apt.add_package.assert_called_with("ipmitool", update_cache=False)
-        mock_subprocess.check_output.assert_called_with("ipmitool lan print".split())
-        self.assertCountEqual(output, [HWTool.IPMI, HWTool.REDFISH])
-        mock_redfish_available.assert_called()
+        mock_apt_helpers.add_pkg_with_candidate_version.assert_called_with("freeipmi-tools")
+        self.assertCountEqual(
+            output, [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH]
+        )
 
     @mock.patch("hw_tools.redfish_available", return_value=False)
     @mock.patch(
         "hw_tools.subprocess.check_output",
         side_effect=subprocess.CalledProcessError(-1, "cmd"),
     )
-    @mock.patch("hw_tools.apt")
+    @mock.patch("hw_tools.apt_helpers")
     def test_bmc_hw_verifier_error_handling(
-        self, mock_apt, mock_check_output, mock_redfish_available
+        self, mock_apt_helpers, mock_check_output, mock_redfish_available
     ):
+        bmc_hw_verifier.cache_clear()
         output = bmc_hw_verifier()
-        mock_apt.add_package.assert_called_with("ipmitool", update_cache=False)
-        mock_check_output.assert_called_with("ipmitool lan print".split())
+        mock_apt_helpers.add_pkg_with_candidate_version.assert_called_with("freeipmi-tools")
         self.assertEqual(output, [])
+
+    @mock.patch("hw_tools.redfish_available", return_value=False)
+    @mock.patch("hw_tools.apt_helpers")
+    def test_bmc_hw_verifier_mixed(self, mock_apt_helpers, mock_redfish_available):
+        """Test a mixture of failures and successes for ipmi."""
+
+        def mock_get_response_ipmi(ipmi_call):
+            if ipmi_call == "ipmimonitoring".split():
+                pass
+            elif ipmi_call == "ipmi-sel".split():
+                pass
+            elif ipmi_call == "ipmi-dcmi --get-system-power-statistics".split():
+                raise subprocess.CalledProcessError(-1, "cmd")
+
+        bmc_hw_verifier.cache_clear()
+        with mock.patch("hw_tools.subprocess.check_output", side_effect=mock_get_response_ipmi):
+            output = bmc_hw_verifier()
+            mock_apt_helpers.add_pkg_with_candidate_version.assert_called_with("freeipmi-tools")
+            self.assertCountEqual(output, [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL])

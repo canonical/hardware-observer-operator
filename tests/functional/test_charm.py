@@ -35,9 +35,9 @@ class AppStatus(str, Enum):
     INSTALL = "Install complete"
     READY = "Unit is ready"
     MISSING_RELATION = "Missing relation: [cos-agent]"
-    UNHEALTHY = "Exporter is unhealthy"
     NOT_RUNNING = "Exporter is not running"
     MISSING_RESOURCES = "Missing resources:"
+    INVALID_CONFIG_EXPORTER_LOG_LEVEL = "Invalid config: 'exporter-log-level'"
 
 
 @pytest.mark.abort_on_fail
@@ -162,20 +162,11 @@ class TestCharm:
 
     async def test_10_start_and_stop_exporter(self, app, unit, sync_helper, ops_test):
         """Test starting and stopping the exporter results in correct charm status."""
-        # Stop the exporter
+        # Stop the exporter, and the exporter should auto-restart after update status fire.
         stop_cmd = "systemctl stop hardware-exporter"
         async with ops_test.fast_forward():
             await asyncio.gather(
                 unit.run(stop_cmd),
-                ops_test.model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=TIMEOUT),
-            )
-            assert unit.workload_status_message == AppStatus.NOT_RUNNING
-
-        # Start the exporter
-        start_cmd = "systemctl start hardware-exporter"
-        async with ops_test.fast_forward():
-            await asyncio.gather(
-                unit.run(start_cmd),
                 ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=TIMEOUT),
             )
             assert unit.workload_status_message == AppStatus.READY
@@ -188,7 +179,7 @@ class TestCharm:
                 app.set_config({"exporter-log-level": "RANDOM_LEVEL"}),
                 ops_test.model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=TIMEOUT),
             )
-            assert unit.workload_status_message == AppStatus.UNHEALTHY
+            assert unit.workload_status_message == AppStatus.INVALID_CONFIG_EXPORTER_LOG_LEVEL
 
         async with ops_test.fast_forward():
             await asyncio.gather(

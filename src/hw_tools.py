@@ -9,6 +9,7 @@ import stat
 import subprocess
 import typing as t
 from abc import ABCMeta, abstractmethod
+from functools import lru_cache
 from pathlib import Path
 
 from charms.operator_libs_linux.v0 import apt
@@ -21,6 +22,7 @@ from redfish.rest.v1 import (
     SessionCreationError,
 )
 
+import apt_helpers
 from checksum import (
     PERCCLI_VERSION_INFOS,
     SAS2IRCU_VERSION_INFOS,
@@ -78,7 +80,7 @@ def check_file_size(path: Path) -> bool:
     size is 0.
     """
     if path.stat().st_size == 0:
-        logger.info("% size is 0, skip install", path)
+        logger.info("%s size is 0, skip install", path)
         return False
     return True
 
@@ -117,6 +119,16 @@ def make_executable(src: Path) -> None:
         raise err
 
 
+def check_deb_pkg_installed(pkg: str) -> bool:
+    """Check if debian package is installed."""
+    try:
+        apt.DebianPackage.from_installed_package(pkg)
+        return True
+    except apt.PackageNotFoundError:
+        logger.warning("package %s not found in installed package", pkg)
+    return False
+
+
 class StrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
     """Basic strategy."""
 
@@ -126,6 +138,10 @@ class StrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
     def name(self) -> HWTool:
         """Name."""
         return self._name
+
+    @abstractmethod
+    def check(self) -> bool:
+        """Check installation status of the tool."""
 
 
 class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
@@ -177,6 +193,10 @@ class StorCLIStrategy(TPRStrategyABC):
         logger.debug("Remove file %s", self.symlink_bin)
         remove_deb(pkg=self.name)
 
+    def check(self) -> bool:
+        """Check resource status."""
+        return self.symlink_bin.exists() and os.access(self.symlink_bin, os.X_OK)
+
 
 class PercCLIStrategy(TPRStrategyABC):
     """Strategy to install storcli."""
@@ -200,6 +220,10 @@ class PercCLIStrategy(TPRStrategyABC):
         logger.debug("Remove file %s", self.symlink_bin)
         remove_deb(pkg=self.name)
 
+    def check(self) -> bool:
+        """Check resource status."""
+        return self.symlink_bin.exists() and os.access(self.symlink_bin, os.X_OK)
+
 
 class SAS2IRCUStrategy(TPRStrategyABC):
     """Strategy to install storcli."""
@@ -220,6 +244,10 @@ class SAS2IRCUStrategy(TPRStrategyABC):
         """Remove sas2ircu."""
         self.symlink_bin.unlink(missing_ok=True)
         logger.debug("Remove file %s", self.symlink_bin)
+
+    def check(self) -> bool:
+        """Check resource status."""
+        return self.symlink_bin.exists() and os.access(self.symlink_bin, os.X_OK)
 
 
 class SAS3IRCUStrategy(SAS2IRCUStrategy):
@@ -255,11 +283,6 @@ class SSACLIStrategy(APTStrategyABC):
         repositories = apt.RepositoryMapping()
         repositories.add(self.repo)
 
-    def disable_repo(self) -> None:
-        """Disable the repository."""
-        repositories = apt.RepositoryMapping()
-        repositories.disable(self.repo)
-
     def install(self) -> None:
         for key in HP_KEYS:
             apt.import_key(key)
@@ -267,23 +290,37 @@ class SSACLIStrategy(APTStrategyABC):
         apt.add_package(self.pkg, update_cache=True)
 
     def remove(self) -> None:
-        apt.remove_package(self.pkg)
-        self.disable_repo()
+        # Skip removing because we afriad this cause dependency error
+        # for other services on the same machine.
+        logger.info("SSACLIStrategy skip removing %s", self.pkg)
+
+    def check(self) -> bool:
+        """Check package status."""
+        return check_deb_pkg_installed(self.pkg)
 
 
 class IPMIStrategy(APTStrategyABC):
-    """Strategy for install ipmi."""
+    """Strategy for installing ipmi."""
 
-    _name = HWTool.IPMI
-    pkgs = ["freeipmi-tools"]
+    # Because IPMISTrategy now encompasses all of
+    # HWTool.IPMI_SENSOR, HWTool.IPMI_SEL and HWTool.IPMI_DCMI,
+    # we will need some refactoring here to avoid misleading log
+    # messages. The installation should be good since all of these
+    # tools require the same `freeipmi-tools` to be installed.
+    _name = HWTool.IPMI_SENSOR
+    pkg = "freeipmi-tools"
 
     def install(self) -> None:
-        for pkg in self.pkgs:
-            apt.add_package(pkg)
+        apt_helpers.add_pkg_with_candidate_version(self.pkg)
 
     def remove(self) -> None:
-        for pkg in self.pkgs:
-            apt.remove_package(pkg)
+        # Skip removing because we afriad this cause dependency error
+        # for other services on the same machine.
+        logger.info("IPMIStrategy skip removing %s", self.pkg)
+
+    def check(self) -> bool:
+        """Check package status."""
+        return check_deb_pkg_installed(self.pkg)
 
 
 class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
@@ -294,7 +331,14 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
 
     _name = HWTool.REDFISH
 
+    def check(self) -> bool:
+        """Check package status."""
+        return True
 
+
+# Using cache here to avoid repeat call.
+# The lru_cache should be clean everytime the hook been triggered.
+@lru_cache
 def raid_hw_verifier() -> t.List[HWTool]:
     """Verify if the HWTool support RAID card exists on machine."""
     hw_info = lshw()
@@ -345,6 +389,9 @@ def raid_hw_verifier() -> t.List[HWTool]:
     return list(tools)
 
 
+# Using cache here to avoid repeat call.
+# The lru_cache should be clean everytime the hook been triggered.
+@lru_cache
 def redfish_available() -> bool:
     """Check if redfish service is available."""
     bmc_address = get_bmc_address()
@@ -376,21 +423,38 @@ def redfish_available() -> bool:
     return result
 
 
+# Using cache here to avoid repeat call.
+# The lru_cache should be clean everytime the hook been triggered.
+@lru_cache
 def bmc_hw_verifier() -> t.List[HWTool]:
     """Verify if the ipmi is available on the machine.
 
-    Using ipmitool to verify, the package will be removed in removing stage.
+    Using freeipmi-tools to verify, the package will be removed in removing stage.
     """
     tools = []
-    # Check IPMI available
-    apt.add_package("ipmitool", update_cache=False)
-    try:
-        subprocess.check_output("ipmitool lan print".split())
-        tools.append(HWTool.IPMI)
-    except subprocess.CalledProcessError:
-        logger.info("IPMI is not available")
 
-    # Check RedFish available
+    # Check if ipmi services are available
+    apt_helpers.add_pkg_with_candidate_version("freeipmi-tools")
+
+    try:
+        subprocess.check_output("ipmimonitoring".split())
+        tools.append(HWTool.IPMI_SENSOR)
+    except subprocess.CalledProcessError:
+        logger.info("IPMI sensors monitoring is not available")
+
+    try:
+        subprocess.check_output("ipmi-sel".split())
+        tools.append(HWTool.IPMI_SEL)
+    except subprocess.CalledProcessError:
+        logger.info("IPMI SEL monitoring is not available")
+
+    try:
+        subprocess.check_output("ipmi-dcmi --get-system-power-statistics".split())
+        tools.append(HWTool.IPMI_DCMI)
+    except subprocess.CalledProcessError:
+        logger.info("IPMI DCMI monitoring is not available")
+
+    # Check if RedFish is available
     if redfish_available():
         tools.append(HWTool.REDFISH)
     else:
@@ -398,6 +462,9 @@ def bmc_hw_verifier() -> t.List[HWTool]:
     return tools
 
 
+# Using cache here to avoid repeat call.
+# The lru_cache should be clean everytime the hook been triggered.
+@lru_cache
 def get_hw_tool_white_list() -> t.List[HWTool]:
     """Return HWTool white list."""
     raid_white_list = raid_hw_verifier()
@@ -511,3 +578,19 @@ class HWToolHelper:
             if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
+
+    def check_installed(self) -> t.Tuple[bool, str]:
+        """Check tool status."""
+        hw_white_list = get_hw_tool_white_list()
+        failed_checks = []
+
+        for strategy in self.strategies:
+            if strategy.name not in hw_white_list:
+                continue
+            ok = strategy.check()
+            if not ok:
+                failed_checks.append(strategy.name)
+
+        if len(failed_checks) > 0:
+            return False, f"Fail strategy checks: {failed_checks}"
+        return True, ""
