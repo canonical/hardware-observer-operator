@@ -10,6 +10,8 @@ tests:
         values: '1x15'
       - series: ipmisel_collector_failed{instance="ubuntu-99", collector="ipmisel"}
         values: '1x15'
+      - series: ipmiselcollector_collector_failed{instance="ubuntu-99", collector="IpmiSelCollector"}
+        values: '1x15'
 
     alert_rule_test:
       - eval_time: 0m
@@ -33,3 +35,15 @@ tests:
               description: |
                 A collector failed to fetch the metrics. Please reach out to hardware-observer maintainers.
                   LABELS = map[__name__:ipmisel_collector_failed collector:ipmisel instance:ubuntu-99]
+      - eval_time: 1m
+        alertname: IpmiSelCollectorFailed
+        exp_alerts:
+          - exp_labels:
+              severity: error
+              instance: ubuntu-99
+              collector: IpmiSelCollector
+            exp_annotations:
+              summary: Ipmi Sel Collector failed. (instance ubuntu-99)
+              description: |
+                Ipmi sel collector failed to fetch the metrics. Please reach out to hardware-observer maintainers.
+                  LABELS = map[__name__:ipmiselcollector_collector_failed collector:IpmiSelCollector instance:ubuntu-99]
