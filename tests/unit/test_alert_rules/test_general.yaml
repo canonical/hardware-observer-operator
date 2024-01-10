@@ -12,7 +12,7 @@ tests:
         values: '1x15'
 
     alert_rule_test:
-      - eval_time: 1m
+      - eval_time: 2m
         alertname: CollectorFailed
         exp_alerts:
           - exp_labels:
