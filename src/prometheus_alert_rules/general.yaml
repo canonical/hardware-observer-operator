@@ -2,22 +2,12 @@ groups:
 - name: HardwareObserver
   rules:
     - alert: CollectorFailed
-      expr: '{__name__=~"(.*)_collector_failed",__name__!="ipmiselcollector_collector_failed"} == 1'
-      for: 0m
+      expr: '{__name__=~"(.*)_collector_failed"} == 1'
+      for: 1m
       labels:
         severity: error
       annotations:
         summary: Collector failed. (instance {{ $labels.instance }})
         description: |
           A collector failed to fetch the metrics. Please reach out to hardware-observer maintainers.
-            LABELS = {{ $labels }}
-    - alert: IpmiSelCollectorFailed
-      expr: '{__name__="ipmiselcollector_collector_failed"} == 1'
-      for: 1m
-      labels:
-        severity: error
-      annotations:
-        summary: Ipmi Sel Collector failed. (instance {{ $labels.instance }})
-        description: |
-          Ipmi sel collector failed to fetch the metrics. Please reach out to hardware-observer maintainers.
             LABELS = {{ $labels }}
