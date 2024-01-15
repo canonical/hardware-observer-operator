@@ -1,10 +1,10 @@
 rule_files:
   - ../../../src/prometheus_alert_rules/general.yaml
 
-evaluation_interval: 1m
+evaluation_interval: 2m
 
 tests:
-  - interval: 1m
+  - interval: 2m
     input_series:
       - series: ipmidcmi_collector_failed{instance="ubuntu-99", collector="ipmidcmi"}
         values: '1x15'
@@ -12,7 +12,7 @@ tests:
         values: '1x15'
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 2m
         alertname: CollectorFailed
         exp_alerts:
           - exp_labels:
