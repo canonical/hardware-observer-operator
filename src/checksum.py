@@ -169,6 +169,14 @@ SAS2IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
 
 SAS3IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ToolVersionInfo(
+        version="17.00.00.00",
+        support_all_series=True,
+        supported_architectures=[Architecture.X86_64],
+        link="https://docs.broadcom.com/docs/SAS3IRCU_P16.zip",
+        desc="P16, linux_x86",
+        sha256_checksum="7fa299a36254c582cf579d197463d6e59ffa9270b7241d98d0e477f05235be26",
+    ),
+    ToolVersionInfo(
         version="16.00.00.00",
         support_all_series=True,
         supported_architectures=[Architecture.X86_64],
