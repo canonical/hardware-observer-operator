@@ -33,6 +33,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
         self.cos_agent_provider = COSAgentProvider(
             self,
+            refresh_events=[self.on.config_changed, self.on.upgrade_charm],
             metrics_endpoints=[
                 {"path": "/metrics", "port": int(self.model.config["exporter-port"])}
             ],

@@ -2,6 +2,7 @@
 
 Define strategy for install, remove and verifier for different hardwares.
 """
+
 import logging
 import os
 import shutil
