@@ -81,7 +81,7 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus(err_msg)
             return
 
-        port = self.model.config.get("exporter-port", "10000")
+        port = self.model.config.get("exporter-port", "10200")
         level = self.model.config.get("exporter-log-level", "INFO")
         redfish_creds = self._get_redfish_creds()
         success = self.exporter.install(port, level, redfish_creds)
@@ -201,7 +201,7 @@ class HardwareObserverCharm(ops.CharmBase):
             }
             if exporter_configs.intersection(change_set):
                 logger.info("Detected changes in exporter config.")
-                port = self.model.config.get("exporter-port", "10000")
+                port = self.model.config.get("exporter-port", "10200")
                 level = self.model.config.get("exporter-log-level", "INFO")
 
                 redfish_creds = self._get_redfish_creds()
@@ -257,7 +257,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
-        port = int(self.model.config.get("exporter-port", "10000"))
+        port = int(self.model.config.get("exporter-port", "10200"))
         if not 1 <= port <= 65535:
             logger.error("Invalid exporter-port: port must be in [1, 65535].")
             return False, "Invalid config: 'exporter-port'"

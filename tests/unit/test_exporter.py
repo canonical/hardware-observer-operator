@@ -271,7 +271,7 @@ class TestExporter(unittest.TestCase):
             self.harness.add_relation_unit(rid, "grafana-agent/0")
             # self.harness.charm.validate_exporter_configs = mock.Mock()
             # self.harness.charm.validate_exporter_configs.return_value = (False, "error")
-            self.harness.update_config({"exporter-port": 100000, "exporter-log-level": "DEBUG"})
+            self.harness.update_config({"exporter-port": 102000, "exporter-log-level": "DEBUG"})
             self.harness.charm.on.config_changed.emit()
             self.assertEqual(
                 self.harness.charm.unit.status, BlockedStatus("Invalid config: 'exporter-port'")
