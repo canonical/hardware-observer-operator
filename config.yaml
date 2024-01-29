@@ -5,10 +5,10 @@
 options:
   exporter-port:
     type: int
-    default: 10000
+    default: 10200
     description: |
       Start the prometheus exporter at "exporter-port". By default, it will
-      start at port 10000.
+      start at port 10200.
   exporter-log-level:
     type: string
     default: "INFO"
