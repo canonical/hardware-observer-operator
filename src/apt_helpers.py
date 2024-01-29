@@ -1,4 +1,5 @@
 """Apt helper module for missing features in operator_libs_linux."""
+
 import re
 from subprocess import PIPE, CalledProcessError, check_output
 from typing import Optional
