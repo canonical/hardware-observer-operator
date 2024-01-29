@@ -31,6 +31,9 @@ class HardwareObserverCharm(ops.CharmBase):
         super().__init__(*args)
         self.hw_tool_helper = HWToolHelper()
 
+        # Add refresh_events to COSAgentProvider to update relation data when
+        # config changed (default behavior) and upgrade charm. This is useful
+        # for updating alert rules.
         self.cos_agent_provider = COSAgentProvider(
             self,
             refresh_events=[self.on.config_changed, self.on.upgrade_charm],
