@@ -295,7 +295,7 @@ class TestCharm(unittest.TestCase):
         with mock.patch(
             "charm.COSAgentProvider._metrics_alert_rules", new_callable=mock.PropertyMock
         ) as mock_alert_rules:
-            fake_metrics_alert_rules = {}  # just make it empty
+            fake_metrics_alert_rules = {}
             mock_alert_rules.return_value = fake_metrics_alert_rules
             self.harness.charm.on.config_changed.emit()
 
@@ -308,7 +308,7 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_15_upgrade_charm_update__alert_rules(self, mock_hw_tool_helper, mock_exporter):
+    def test_15_upgrade_charm_update_alert_rules(self, mock_hw_tool_helper, mock_exporter):
         """Test upgrade charm will update alert rule."""
         self.mock_bmc_hw_verifier.return_value = [
             HWTool.IPMI_SENSOR,
@@ -331,7 +331,7 @@ class TestCharm(unittest.TestCase):
         with mock.patch(
             "charm.COSAgentProvider._metrics_alert_rules", new_callable=mock.PropertyMock
         ) as mock_alert_rules:
-            fake_metrics_alert_rules = {}  # just make it empty
+            fake_metrics_alert_rules = {}
             mock_alert_rules.return_value = fake_metrics_alert_rules
             self.harness.charm.on.upgrade_charm.emit()
 
