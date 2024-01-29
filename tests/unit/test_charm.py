@@ -3,6 +3,7 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
+import json
 import unittest
 from unittest import mock
 
@@ -268,3 +269,75 @@ class TestCharm(unittest.TestCase):
 
         self.harness.charm.on.update_status.emit()
         self.assertEqual(self.harness.charm.unit.status, BlockedStatus("config fail message"))
+
+    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
+    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
+    def test_14_config_changed_update_alert_rules(self, mock_hw_tool_helper, mock_exporter):
+        """Test config changed will update alert rule."""
+        self.mock_bmc_hw_verifier.return_value = [
+            HWTool.IPMI_SENSOR,
+            HWTool.IPMI_SEL,
+            HWTool.IPMI_DCMI,
+        ]
+        mock_hw_tool_helper.return_value.install.return_value = (True, "")
+        mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
+        mock_exporter.return_value.install.return_value = True
+        rid = self.harness.add_relation("cos-agent", "grafana-agent")
+        self.harness.begin()
+        self.harness.charm.on.install.emit()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
+        self.harness.charm.on.update_status.emit()
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
+
+        relation_data = self.harness.get_relation_data(rid, "hardware-observer/0")
+        metrics_alert_rules = json.loads(relation_data["config"]).get("metrics_alert_rules")
+
+        with mock.patch(
+            "charm.COSAgentProvider._metrics_alert_rules", new_callable=mock.PropertyMock
+        ) as mock_alert_rules:
+            fake_metrics_alert_rules = {}
+            mock_alert_rules.return_value = fake_metrics_alert_rules
+            self.harness.charm.on.config_changed.emit()
+
+        relation_data = self.harness.get_relation_data(rid, "hardware-observer/0")
+        updated_metrics_alert_rules = json.loads(relation_data["config"]).get(
+            "metrics_alert_rules"
+        )
+        self.assertEqual(updated_metrics_alert_rules, fake_metrics_alert_rules)
+        self.assertNotEqual(updated_metrics_alert_rules, metrics_alert_rules)
+
+    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
+    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
+    def test_15_upgrade_charm_update_alert_rules(self, mock_hw_tool_helper, mock_exporter):
+        """Test upgrade charm will update alert rule."""
+        self.mock_bmc_hw_verifier.return_value = [
+            HWTool.IPMI_SENSOR,
+            HWTool.IPMI_SEL,
+            HWTool.IPMI_DCMI,
+        ]
+        mock_hw_tool_helper.return_value.install.return_value = (True, "")
+        mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
+        mock_exporter.return_value.install.return_value = True
+        rid = self.harness.add_relation("cos-agent", "grafana-agent")
+        self.harness.begin()
+        self.harness.charm.on.install.emit()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
+        self.harness.charm.on.update_status.emit()
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
+
+        relation_data = self.harness.get_relation_data(rid, "hardware-observer/0")
+        metrics_alert_rules = json.loads(relation_data["config"]).get("metrics_alert_rules")
+
+        with mock.patch(
+            "charm.COSAgentProvider._metrics_alert_rules", new_callable=mock.PropertyMock
+        ) as mock_alert_rules:
+            fake_metrics_alert_rules = {}
+            mock_alert_rules.return_value = fake_metrics_alert_rules
+            self.harness.charm.on.upgrade_charm.emit()
+
+        relation_data = self.harness.get_relation_data(rid, "hardware-observer/0")
+        updated_metrics_alert_rules = json.loads(relation_data["config"]).get(
+            "metrics_alert_rules"
+        )
+        self.assertEqual(updated_metrics_alert_rules, fake_metrics_alert_rules)
+        self.assertNotEqual(updated_metrics_alert_rules, metrics_alert_rules)

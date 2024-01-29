@@ -1,4 +1,5 @@
 """Hardware support config and command helper."""
+
 import json
 import logging
 import subprocess
