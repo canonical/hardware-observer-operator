@@ -120,7 +120,9 @@ class TestCharm(unittest.TestCase):
 
         self.assertTrue(self.harness.charm._stored.resource_installed)
 
-        self.harness.charm.exporter.install.assert_called_with(10200, "INFO", {})
+        self.harness.charm.exporter.install.assert_called_with(
+            int(self.harness.charm.DEFAULT_EXPORTER_PORT), "INFO", {}
+        )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
