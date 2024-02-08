@@ -2,6 +2,7 @@ name: Check workflow running linter, unit and functional tests
 
 on:
   workflow_call:
+  workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [master, main]
