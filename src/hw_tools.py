@@ -72,18 +72,15 @@ def symlink(src: Path, dst: Path) -> None:
         raise
 
 
-def check_file_size(path: Path) -> bool:
-    """Verify if the file size > 0.
+def file_is_empty(path: Path) -> bool:
+    """Check whether file size is 0.
 
-    Because charm focus us to publish the resources on charmhub,
-    but most of the hardware related tools have the un-republish
-    policy. Currently our solution is publish a empty file which
-    size is 0.
+    Returns True if file is empty, otherwise returns False.
     """
     if path.stat().st_size == 0:
         logger.info("%s size is 0, skip install", path)
-        return False
-    return True
+        return True
+    return False
 
 
 def install_deb(name: str, path: Path) -> None:
@@ -181,7 +178,7 @@ class StorCLIStrategy(TPRStrategyABC):
 
     def install(self, path: Path) -> None:
         """Install storcli."""
-        if not check_file_size(path):
+        if file_is_empty(path):
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
         if not validate_checksum(STORCLI_VERSION_INFOS, path):
             raise ResourceChecksumError
@@ -208,7 +205,7 @@ class PercCLIStrategy(TPRStrategyABC):
 
     def install(self, path: Path) -> None:
         """Install perccli."""
-        if not check_file_size(path):
+        if file_is_empty(path):
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
         if not validate_checksum(PERCCLI_VERSION_INFOS, path):
             raise ResourceChecksumError
@@ -234,7 +231,7 @@ class SAS2IRCUStrategy(TPRStrategyABC):
 
     def install(self, path: Path) -> None:
         """Install sas2ircu."""
-        if not check_file_size(path):
+        if file_is_empty(path):
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
         if not validate_checksum(SAS2IRCU_VERSION_INFOS, path):
             raise ResourceChecksumError
@@ -259,7 +256,7 @@ class SAS3IRCUStrategy(SAS2IRCUStrategy):
 
     def install(self, path: Path) -> None:
         """Install sas3ircu."""
-        if not check_file_size(path):
+        if file_is_empty(path):
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
         if not validate_checksum(SAS3IRCU_VERSION_INFOS, path):
             raise ResourceChecksumError
@@ -521,7 +518,7 @@ class HWToolHelper:
                     missing_resources.append(TPR_RESOURCES[tool])
                 # Uploaded but file size is zero
                 path = fetch_tools.get(tool)
-                if path and not check_file_size(path):
+                if path and file_is_empty(path):
                     logger.warning("Tool: %s path: %s size is zero", tool, path)
                     missing_resources.append(TPR_RESOURCES[tool])
         if len(missing_resources) > 0:
