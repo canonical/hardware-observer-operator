@@ -8,10 +8,10 @@ import os
 import shutil
 import stat
 import subprocess
-import typing as t
 from abc import ABCMeta, abstractmethod
 from functools import lru_cache
 from pathlib import Path
+from typing import Dict, List, Tuple
 
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError, Resources
@@ -88,7 +88,7 @@ def check_file_size(path: Path) -> bool:
 
 def install_deb(name: str, path: Path) -> None:
     """Install local deb package."""
-    _cmd: t.List[str] = ["dpkg", "-i", str(path)]
+    _cmd: List[str] = ["dpkg", "-i", str(path)]
     try:
         result = subprocess.check_output(_cmd, universal_newlines=True)
         logger.debug(result)
@@ -99,7 +99,7 @@ def install_deb(name: str, path: Path) -> None:
 
 def remove_deb(pkg: str) -> None:
     """Remove deb package."""
-    _cmd: t.List[str] = ["dpkg", "--remove", pkg]
+    _cmd: List[str] = ["dpkg", "--remove", pkg]
     try:
         result = subprocess.check_output(_cmd, universal_newlines=True)
         logger.debug(result)
@@ -340,7 +340,7 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
 # Using cache here to avoid repeat call.
 # The lru_cache should be clean everytime the hook been triggered.
 @lru_cache
-def raid_hw_verifier() -> t.List[HWTool]:
+def raid_hw_verifier() -> List[HWTool]:
     """Verify if the HWTool support RAID card exists on machine."""
     hw_info = lshw()
     system_vendor = hw_info.get("vendor")
@@ -427,7 +427,7 @@ def redfish_available() -> bool:
 # Using cache here to avoid repeat call.
 # The lru_cache should be clean everytime the hook been triggered.
 @lru_cache
-def bmc_hw_verifier() -> t.List[HWTool]:
+def bmc_hw_verifier() -> List[HWTool]:
     """Verify if the ipmi is available on the machine.
 
     Using freeipmi-tools to verify, the package will be removed in removing stage.
@@ -466,7 +466,7 @@ def bmc_hw_verifier() -> t.List[HWTool]:
 # Using cache here to avoid repeat call.
 # The lru_cache should be clean everytime the hook been triggered.
 @lru_cache
-def get_hw_tool_white_list() -> t.List[HWTool]:
+def get_hw_tool_white_list() -> List[HWTool]:
     """Return HWTool white list."""
     raid_white_list = raid_hw_verifier()
     bmc_white_list = bmc_hw_verifier()
@@ -477,7 +477,7 @@ class HWToolHelper:
     """Helper to install vendor's or hardware related tools."""
 
     @property
-    def strategies(self) -> t.List[StrategyABC]:
+    def strategies(self) -> List[StrategyABC]:
         """Define strategies for every tools."""
         return [
             StorCLIStrategy(),
@@ -492,10 +492,10 @@ class HWToolHelper:
     def fetch_tools(  # pylint: disable=W0102
         self,
         resources: Resources,
-        hw_white_list: t.List[HWTool] = [],
-    ) -> t.Dict[HWTool, Path]:
+        hw_white_list: List[HWTool] = [],
+    ) -> Dict[HWTool, Path]:
         """Fetch resource from juju if it's VENDOR_TOOLS."""
-        fetch_tools: t.Dict[HWTool, Path] = {}
+        fetch_tools: Dict[HWTool, Path] = {}
         # Fetch all tools from juju resources
         for tool, resource in TPR_RESOURCES.items():
             if tool not in hw_white_list:
@@ -510,8 +510,8 @@ class HWToolHelper:
         return fetch_tools
 
     def check_missing_resources(
-        self, hw_white_list: t.List[HWTool], fetch_tools: t.Dict[HWTool, Path]
-    ) -> t.Tuple[bool, str]:
+        self, hw_white_list: List[HWTool], fetch_tools: Dict[HWTool, Path]
+    ) -> Tuple[bool, str]:
         """Check if required resources are not been uploaded."""
         missing_resources = []
         for tool in hw_white_list:
@@ -524,23 +524,22 @@ class HWToolHelper:
                 if path and not check_file_size(path):
                     logger.warning("Tool: %s path: %s size is zero", tool, path)
                     missing_resources.append(TPR_RESOURCES[tool])
-        if len(missing_resources) > 0:
+        if missing_resources:
             return False, f"Missing resources: {missing_resources}"
         return True, ""
 
-    def install(self, resources: Resources) -> t.Tuple[bool, str]:
+    def install(self, resources: Resources) -> Tuple[bool, str]:
         """Install tools."""
-        hw_white_list = get_hw_tool_white_list()
+        hw_white_list: List[HWTool] = get_hw_tool_white_list()
         logger.info("hw_tool_white_list: %s", hw_white_list)
 
-        fetch_tools = self.fetch_tools(resources, hw_white_list)
+        fetch_tools: Dict[HWTool, Path] = self.fetch_tools(resources, hw_white_list)
 
         ok, msg = self.check_missing_resources(hw_white_list, fetch_tools)
         if not ok:
             return ok, msg
 
         fail_strategies = []
-        strategy_errors = []
 
         # Iterate over each strategy and execute.
         for strategy in self.strategies:
@@ -564,15 +563,14 @@ class HWToolHelper:
             ) as e:
                 logger.warning("Strategy %s install fail: %s", strategy, e)
                 fail_strategies.append(strategy.name)
-                strategy_errors.append(e)
 
-        if len(strategy_errors) > 0:
+        if fail_strategies:
             return False, f"Fail strategies: {fail_strategies}"
         return True, ""
 
     def remove(self, resources: Resources) -> None:  # pylint: disable=W0613
         """Execute all remove strategies."""
-        hw_white_list = get_hw_tool_white_list()
+        hw_white_list: List[HWTool] = get_hw_tool_white_list()
         for strategy in self.strategies:
             if strategy.name not in hw_white_list:
                 continue
@@ -580,10 +578,10 @@ class HWToolHelper:
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
 
-    def check_installed(self) -> t.Tuple[bool, str]:
+    def check_installed(self) -> Tuple[bool, str]:
         """Check tool status."""
-        hw_white_list = get_hw_tool_white_list()
-        failed_checks = []
+        hw_white_list: List[HWTool] = get_hw_tool_white_list()
+        failed_checks: List[HWTool] = []
 
         for strategy in self.strategies:
             if strategy.name not in hw_white_list:
@@ -592,6 +590,6 @@ class HWToolHelper:
             if not ok:
                 failed_checks.append(strategy.name)
 
-        if len(failed_checks) > 0:
+        if failed_checks:
             return False, f"Fail strategy checks: {failed_checks}"
         return True, ""

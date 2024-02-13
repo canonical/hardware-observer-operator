@@ -119,7 +119,7 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
             return
 
-        if self.too_many_cos_agent_relation:
+        if self.too_many_cos_agent_relations:
             self.model.unit.status = BlockedStatus("Cannot relate to more than one grafana-agent")
             return
 
@@ -285,7 +285,7 @@ class HardwareObserverCharm(ops.CharmBase):
         return self.num_cos_agent_relations != 0
 
     @property
-    def too_many_cos_agent_relation(self) -> bool:
+    def too_many_cos_agent_relations(self) -> bool:
         """Return True if there're more than one cos-agent relation."""
         return self.num_cos_agent_relations > 1
 
