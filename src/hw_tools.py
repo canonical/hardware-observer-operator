@@ -82,7 +82,7 @@ def file_is_empty(path: Path) -> bool:
     to replace. This function checks for those empty resource files.
     """
     if path.stat().st_size == 0:
-        logger.info("%s size is 0, skip install", path)
+        logger.info("%s size is 0", path)
         return True
     return False
 
@@ -183,6 +183,7 @@ class StorCLIStrategy(TPRStrategyABC):
     def install(self, path: Path) -> None:
         """Install storcli."""
         if file_is_empty(path):
+            logger.info("Skipping StorCLI resource install since empty file was detected.")
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
         if not validate_checksum(STORCLI_VERSION_INFOS, path):
             raise ResourceChecksumError
@@ -210,6 +211,7 @@ class PercCLIStrategy(TPRStrategyABC):
     def install(self, path: Path) -> None:
         """Install perccli."""
         if file_is_empty(path):
+            logger.info("Skipping PERCCLI resource install since empty file was detected.")
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
         if not validate_checksum(PERCCLI_VERSION_INFOS, path):
             raise ResourceChecksumError
@@ -236,6 +238,7 @@ class SAS2IRCUStrategy(TPRStrategyABC):
     def install(self, path: Path) -> None:
         """Install sas2ircu."""
         if file_is_empty(path):
+            logger.info("Skipping SAS2IRCU resource install since empty file was detected.")
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
         if not validate_checksum(SAS2IRCU_VERSION_INFOS, path):
             raise ResourceChecksumError
@@ -261,6 +264,7 @@ class SAS3IRCUStrategy(SAS2IRCUStrategy):
     def install(self, path: Path) -> None:
         """Install sas3ircu."""
         if file_is_empty(path):
+            logger.info("Skipping SAS3IRCU resource install since empty file was detected.")
             raise ResourceFileSizeZeroError(tool=self._name, path=path)
         if not validate_checksum(SAS3IRCU_VERSION_INFOS, path):
             raise ResourceChecksumError
@@ -523,7 +527,9 @@ class HWToolHelper:
                 # Uploaded but file size is zero
                 path = fetch_tools.get(tool)
                 if path and file_is_empty(path):
-                    logger.warning("Tool: %s path: %s size is zero", tool, path)
+                    logger.warning(
+                        "Empty resource file detected for tool %s at path %s", tool, path
+                    )
                     missing_resources.append(TPR_RESOURCES[tool])
         if len(missing_resources) > 0:
             return False, f"Missing resources: {missing_resources}"
