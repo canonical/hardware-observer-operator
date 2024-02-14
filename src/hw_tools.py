@@ -76,6 +76,10 @@ def file_is_empty(path: Path) -> bool:
     """Check whether file size is 0.
 
     Returns True if file is empty, otherwise returns False.
+
+    Third-party resources are not allowed to be redistributed on Charmhub.
+    Therefore, an empty file is uploaded as a resource which the user is expected
+    to replace. This function checks for those empty resource files.
     """
     if path.stat().st_size == 0:
         logger.info("%s size is 0, skip install", path)
