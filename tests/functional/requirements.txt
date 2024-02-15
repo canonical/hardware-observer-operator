@@ -1,3 +1,5 @@
+# Pin libjuju version since func tests are breaking with v3.3.1
+juju<=3.1.0
 pytest
 pytest-operator
 # Keep protobuf < 4.0 until macaroonbakery solves its incompatibility
