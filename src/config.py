@@ -31,6 +31,7 @@ class StorageVendor(str, Enum):
     """Hardware Storage vendor."""
 
     BROADCOM = "Broadcom / LSI"
+    ADAPTEC = "Adaptec"
 
 
 class HWTool(str, Enum):

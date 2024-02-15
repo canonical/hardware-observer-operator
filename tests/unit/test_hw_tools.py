@@ -733,6 +733,13 @@ def test_get_hw_tool_white_list(mock_raid_verifier, mock_bmc_hw_verifier):
             [HWTool.SSACLI],
         ),
         (
+            {},
+            [
+                {"id": "sas", "product": "Smart Storage PQI SAS", "vendor": "Adaptec"},
+            ],
+            [HWTool.SSACLI],
+        ),
+        (
             {"vendor": SystemVendor.DELL},
             [
                 {"id": "raid"},

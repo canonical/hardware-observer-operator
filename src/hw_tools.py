@@ -374,6 +374,16 @@ def raid_hw_verifier() -> List[HWTool]:
                 and vendor == StorageVendor.BROADCOM
             ):
                 tools.add(HWTool.SAS2IRCU)
+            # ssacli
+            if (
+                any(
+                    _product
+                    for _product in SUPPORTED_STORAGES[HWTool.SSACLI]
+                    if _product in product
+                )
+                and vendor == StorageVendor.ADAPTEC
+            ):
+                tools.add(HWTool.SSACLI)
 
         if _id == "raid":
             # ssacli

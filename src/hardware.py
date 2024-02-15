@@ -30,6 +30,7 @@ SUPPORTED_STORAGES = {
     HWTool.SSACLI: [
         "Smart Array Gen8 Controllers",
         "Smart Array Gen9 Controllers",
+        "Smart Storage PQI SAS",  # SAS controller that comes with Smart Array Gen10 Controller
     ],
 }
 
