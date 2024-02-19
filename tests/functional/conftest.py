@@ -3,8 +3,6 @@ import logging
 import pytest
 from async_lru import alru_cache
 
-from charm import HardwareObserverCharm
-
 log = logging.getLogger(__name__)
 
 
@@ -25,7 +23,7 @@ class SyncHelper:
     @alru_cache
     async def get_metrics_output(ops_test, unit_name):
         """Return prometheus metric output from endpoint on unit."""
-        port = HardwareObserverCharm.DEFAULT_EXPORTER_PORT
+        port = 10200
         command = f"curl localhost:{port}"
         results = await SyncHelper.run_command_on_unit(ops_test, unit_name, command)
         return results
@@ -55,7 +53,7 @@ def pytest_addoption(parser):
             "lsi_sas_2",
             "lsi_sas_3",
         ],
-        help="Provide space-separated collectors for testing with real hardware.",
+        help="Provide space-separated list of collectors for testing with real hardware.",
     )
 
 

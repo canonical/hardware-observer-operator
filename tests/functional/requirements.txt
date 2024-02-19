@@ -1,3 +1,4 @@
+async-lru
 pytest
 pytest-operator
 # Keep protobuf < 4.0 until macaroonbakery solves its incompatibility
