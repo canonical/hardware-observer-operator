@@ -38,8 +38,16 @@ class HardwareObserverCharm(ops.CharmBase):
         self.cos_agent_provider = COSAgentProvider(
             self,
             refresh_events=[self.on.config_changed, self.on.upgrade_charm],
-            metrics_endpoints=[
-                {"path": "/metrics", "port": int(self.model.config["exporter-port"])}
+            scrape_configs=[
+                {
+                    "static_configs": [
+                        {
+                            "metrics_path": "/metrics",
+                            "labels": self._instance_topology,
+                            "targets": [{"localhost": int(self.model.config["exporter-port"])}],
+                        },
+                    ],
+                },
             ],
         )
         self.exporter = Exporter(self.charm_dir)
@@ -288,6 +296,16 @@ class HardwareObserverCharm(ops.CharmBase):
     def too_many_cos_agent_relations(self) -> bool:
         """Return True if there're more than one cos-agent relation."""
         return self.num_cos_agent_relations > 1
+
+    @property
+    def _instance_topology(self) -> Dict[str, str]:
+        """Return a default topology."""
+        return {
+            "juju_model": self.model.name,
+            "juju_model_uuid": self.model.uuid,
+            "juju_application": self.model.app.name,
+            "juju_unit": self.model.unit.name,
+        }
 
 
 if __name__ == "__main__":  # pragma: nocover
