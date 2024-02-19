@@ -128,7 +128,7 @@ async def test_build_and_deploy(ops_test: OpsTest, series, sync_helper):
 class TestCharm:
     """Perform basic functional testing of the charm without having the actual hardware."""
 
-    async def test_00_config_changed_port(self, app, unit, sync_helper, ops_test):
+    async def test_config_changed_port(self, app, unit, sync_helper, ops_test):
         """Test changing the config option: exporter-port."""
         new_port = "10001"
         await asyncio.gather(
@@ -144,7 +144,7 @@ class TestCharm:
 
         await app.reset_config(["exporter-port"])
 
-    async def test_01_config_changed_log_level(self, app, unit, sync_helper, ops_test):
+    async def test_config_changed_log_level(self, app, unit, sync_helper, ops_test):
         """Test changing the config option: exporter-log-level."""
         new_log_level = "DEBUG"
         await asyncio.gather(
@@ -160,7 +160,7 @@ class TestCharm:
 
         await app.reset_config(["exporter-log-level"])
 
-    async def test_10_start_and_stop_exporter(self, app, unit, sync_helper, ops_test):
+    async def test_start_and_stop_exporter(self, app, unit, sync_helper, ops_test):
         """Test starting and stopping the exporter results in correct charm status."""
         # Stop the exporter, and the exporter should auto-restart after update status fire.
         stop_cmd = "systemctl stop hardware-exporter"
@@ -171,7 +171,7 @@ class TestCharm:
             )
             assert unit.workload_status_message == AppStatus.READY
 
-    async def test_11_exporter_failed(self, app, unit, sync_helper, ops_test):
+    async def test_exporter_failed(self, app, unit, sync_helper, ops_test):
         """Test failure in the exporter results in correct charm status."""
         # Setting incorrect log level will crash the exporter
         async with ops_test.fast_forward():
@@ -188,7 +188,7 @@ class TestCharm:
             )
             assert unit.workload_status_message == AppStatus.READY
 
-    async def test_20_on_remove_event(self, app, sync_helper, ops_test):
+    async def test_on_remove_event(self, app, sync_helper, ops_test):
         """Test _on_remove event cleans up the service on the host machine."""
         await asyncio.gather(
             app.remove_relation(f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"),
