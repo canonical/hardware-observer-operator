@@ -764,8 +764,51 @@ def test_get_hw_tool_white_list(mock_raid_verifier, mock_bmc_hw_verifier):
     ],
 )
 @mock.patch("hw_tools.lshw")
-def test_raid_hw_verifier(mock_lshw, lshw_output, lshw_storage_output, expect):
+@mock.patch("hw_tools.hwinfo")
+def test_raid_hw_verifier_lshw(mock_hwinfo, mock_lshw, lshw_output, lshw_storage_output, expect):
     mock_lshw.side_effect = [lshw_output, lshw_storage_output]
+    mock_hwinfo.return_value = {}
+    raid_hw_verifier.cache_clear()
+    output = raid_hw_verifier()
+    case = unittest.TestCase()
+    case.assertCountEqual(output, expect)
+
+
+@pytest.mark.parametrize(
+    "hwinfo_output, expect",
+    [
+        ({}, []),
+        (
+            {
+                "random-key-a": """
+                  [Created at pci.386]
+                  Hardware Class: storage
+                  Vendor: pci 0x9005 "Adaptec"
+                  Device: pci 0x028f "Smart Storage PQI 12G SAS/PCIe 3"
+                  SubDevice: pci 0x1100 "Smart Array P816i-a SR Gen10"
+                """
+            },
+            [HWTool.SSACLI],
+        ),
+        (
+            {
+                "random-key-a": """
+                  [Created at pci.386]
+                  Hardware Class: not-valid-class
+                  Vendor: pci 0x9005 "Adaptec"
+                  Device: pci 0x028f "Smart Storage PQI 12G SAS/PCIe 3"
+                  SubDevice: pci 0x1100 "Smart Array P816i-a SR Gen10"
+                """
+            },
+            [],
+        ),
+    ],
+)
+@mock.patch("hw_tools.lshw")
+@mock.patch("hw_tools.hwinfo")
+def test_raid_hw_verifier_hwinfo(mock_hwinfo, mock_lshw, hwinfo_output, expect):
+    mock_lshw.side_effect = [{"vendor": "somevendor"}, []]
+    mock_hwinfo.return_value = hwinfo_output
     raid_hw_verifier.cache_clear()
     output = raid_hw_verifier()
     case = unittest.TestCase()

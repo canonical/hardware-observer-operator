@@ -11,7 +11,7 @@ import subprocess
 from abc import ABCMeta, abstractmethod
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError, Resources
@@ -42,7 +42,13 @@ from config import (
     StorageVendor,
     SystemVendor,
 )
-from hardware import SUPPORTED_STORAGES, get_bmc_address, lshw
+from hardware import (
+    HWINFO_SUPPORTED_STORAGES,
+    LSHW_SUPPORTED_STORAGES,
+    get_bmc_address,
+    hwinfo,
+    lshw,
+)
 from keys import HP_KEYS
 
 logger = logging.getLogger(__name__)
@@ -342,18 +348,31 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
         return True
 
 
+def _raid_hw_verifier_hwinfo() -> Set[HWTool]:
+    """Verify if the HWTool support RAID card exists on machine with hwinfo."""
+    hwinfo_output = hwinfo("storage")
+
+    tools = set()
+    for _, hwinfo_content in hwinfo_output.items():
+        # ssacli
+        for support_storage in HWINFO_SUPPORTED_STORAGES[HWTool.SSACLI]:
+            if all(item in hwinfo_content for item in support_storage):
+                tools.add(HWTool.SSACLI)
+    return tools
+
+
 # Using cache here to avoid repeat call.
 # The lru_cache should be clean everytime the hook been triggered.
 @lru_cache
 def raid_hw_verifier() -> List[HWTool]:
     """Verify if the HWTool support RAID card exists on machine."""
-    hw_info = lshw()
-    system_vendor = hw_info.get("vendor")
-    storage_info = lshw(class_filter="storage")
+    lshw_output = lshw()
+    system_vendor = lshw_output.get("vendor")
+    lshw_storage = lshw(class_filter="storage")
 
     tools = set()
 
-    for info in storage_info:
+    for info in lshw_storage:
         _id = info.get("id")
         product = info.get("product")
         vendor = info.get("vendor")
@@ -363,7 +382,7 @@ def raid_hw_verifier() -> List[HWTool]:
             if (
                 any(
                     _product
-                    for _product in SUPPORTED_STORAGES[HWTool.SAS3IRCU]
+                    for _product in LSHW_SUPPORTED_STORAGES[HWTool.SAS3IRCU]
                     if _product in product
                 )
                 and vendor == StorageVendor.BROADCOM
@@ -373,7 +392,7 @@ def raid_hw_verifier() -> List[HWTool]:
             if (
                 any(
                     _product
-                    for _product in SUPPORTED_STORAGES[HWTool.SAS2IRCU]
+                    for _product in LSHW_SUPPORTED_STORAGES[HWTool.SAS2IRCU]
                     if _product in product
                 )
                 and vendor == StorageVendor.BROADCOM
@@ -383,7 +402,9 @@ def raid_hw_verifier() -> List[HWTool]:
         if _id == "raid":
             # ssacli
             if system_vendor == SystemVendor.HP and any(
-                _product for _product in SUPPORTED_STORAGES[HWTool.SSACLI] if _product in product
+                _product
+                for _product in LSHW_SUPPORTED_STORAGES[HWTool.SSACLI]
+                if _product in product
             ):
                 tools.add(HWTool.SSACLI)
             # perccli
@@ -392,7 +413,9 @@ def raid_hw_verifier() -> List[HWTool]:
             # storcli
             elif driver == "megaraid_sas" and vendor == StorageVendor.BROADCOM:
                 tools.add(HWTool.STORCLI)
-    return list(tools)
+
+    hwinfo_tools = _raid_hw_verifier_hwinfo()
+    return list(tools | hwinfo_tools)
 
 
 # Using cache here to avoid repeat call.
