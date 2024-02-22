@@ -22,7 +22,9 @@ from hw_tools import (
     APTStrategyABC,
     HWToolHelper,
     InvalidCredentialsError,
-    IPMIStrategy,
+    IPMIDCMIStrategy,
+    IPMISELStrategy,
+    IPMISENSORStrategy,
     PercCLIStrategy,
     ResourceChecksumError,
     ResourceFileSizeZeroError,
@@ -673,11 +675,11 @@ class TestSSACLIStrategy(unittest.TestCase):
         mock_repos.disable.assert_not_called()
 
 
-class TestIPMIStrategy(unittest.TestCase):
+class TestIPMISENSORStrategy(unittest.TestCase):
     @mock.patch("apt_helpers.get_candidate_version")
     @mock.patch("apt_helpers.apt")
     def test_install(self, mock_apt, mock_candidate_version):
-        strategy = IPMIStrategy()
+        strategy = IPMISENSORStrategy()
         mock_candidate_version.return_value = "some-candidate-version"
         strategy.install()
 
@@ -687,7 +689,47 @@ class TestIPMIStrategy(unittest.TestCase):
 
     @mock.patch("hw_tools.apt")
     def test_remove(self, mock_apt):
-        strategy = IPMIStrategy()
+        strategy = IPMISENSORStrategy()
+        strategy.remove()
+
+        mock_apt.remove_package.assert_not_called()
+
+
+class TestIPMISELStrategy(unittest.TestCase):
+    @mock.patch("apt_helpers.get_candidate_version")
+    @mock.patch("apt_helpers.apt")
+    def test_install(self, mock_apt, mock_candidate_version):
+        strategy = IPMISELStrategy()
+        mock_candidate_version.return_value = "some-candidate-version"
+        strategy.install()
+
+        mock_apt.add_package.assert_called_with(
+            "freeipmi-tools", version="some-candidate-version", update_cache=False
+        )
+
+    @mock.patch("hw_tools.apt")
+    def test_remove(self, mock_apt):
+        strategy = IPMISELStrategy()
+        strategy.remove()
+
+        mock_apt.remove_package.assert_not_called()
+
+
+class TestIPMIDCMIStrategy(unittest.TestCase):
+    @mock.patch("apt_helpers.get_candidate_version")
+    @mock.patch("apt_helpers.apt")
+    def test_install(self, mock_apt, mock_candidate_version):
+        strategy = IPMIDCMIStrategy()
+        mock_candidate_version.return_value = "some-candidate-version"
+        strategy.install()
+
+        mock_apt.add_package.assert_called_with(
+            "freeipmi-tools", version="some-candidate-version", update_cache=False
+        )
+
+    @mock.patch("hw_tools.apt")
+    def test_remove(self, mock_apt):
+        strategy = IPMIDCMIStrategy()
         strategy.remove()
 
         mock_apt.remove_package.assert_not_called()

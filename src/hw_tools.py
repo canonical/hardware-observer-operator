@@ -308,12 +308,6 @@ class SSACLIStrategy(APTStrategyABC):
 class IPMIStrategy(APTStrategyABC):
     """Strategy for installing ipmi."""
 
-    # Because IPMISTrategy now encompasses all of
-    # HWTool.IPMI_SENSOR, HWTool.IPMI_SEL and HWTool.IPMI_DCMI,
-    # we will need some refactoring here to avoid misleading log
-    # messages. The installation should be good since all of these
-    # tools require the same `freeipmi-tools` to be installed.
-    _name = HWTool.IPMI_SENSOR
     pkg = "freeipmi-tools"
 
     def install(self) -> None:
@@ -322,11 +316,29 @@ class IPMIStrategy(APTStrategyABC):
     def remove(self) -> None:
         # Skip removing because we afriad this cause dependency error
         # for other services on the same machine.
-        logger.info("IPMIStrategy skip removing %s", self.pkg)
+        logger.info("%s skip removing %s", self._name, self.pkg)
 
     def check(self) -> bool:
         """Check package status."""
         return check_deb_pkg_installed(self.pkg)
+
+
+class IPMISENSORStrategy(IPMIStrategy):
+    """Strategy for installing ipmi."""
+
+    _name = HWTool.IPMI_SENSOR
+
+
+class IPMISELStrategy(IPMIStrategy):
+    """Strategy for installing ipmi."""
+
+    _name = HWTool.IPMI_SEL
+
+
+class IPMIDCMIStrategy(IPMIStrategy):
+    """Strategy for installing ipmi."""
+
+    _name = HWTool.IPMI_DCMI
 
 
 class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
@@ -490,7 +502,9 @@ class HWToolHelper:
             SAS2IRCUStrategy(),
             SAS3IRCUStrategy(),
             SSACLIStrategy(),
-            IPMIStrategy(),
+            IPMISELStrategy(),
+            IPMIDCMIStrategy(),
+            IPMISENSORStrategy(),
             RedFishStrategy(),
         ]
 
