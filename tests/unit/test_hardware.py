@@ -19,7 +19,7 @@ def test_split_at(s, delimiter, num, expect):
 
 class TestHwinfo:
     @pytest.mark.parametrize(
-        "hw_classes,expect_cmd, hwinfo_output,expect",
+        "hw_classes,expect_cmd,hwinfo_output,expect",
         [
             (
                 [],
