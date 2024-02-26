@@ -1,32 +1,8 @@
 import logging
 
 import pytest
-from async_lru import alru_cache
 
 log = logging.getLogger(__name__)
-
-
-class SyncHelper:
-    """Helper class for running juju async function."""
-
-    @staticmethod
-    async def run_command_on_unit(ops_test, unit_name, command):
-        complete_command = ["exec", "--unit", unit_name, "--", *command.split()]
-        return_code, stdout, _ = await ops_test.juju(*complete_command)
-        results = {
-            "return-code": return_code,
-            "stdout": stdout,
-        }
-        return results
-
-    @staticmethod
-    @alru_cache
-    async def get_metrics_output(ops_test, unit_name):
-        """Return prometheus metric output from endpoint on unit."""
-        port = 10200
-        command = f"curl localhost:{port}"
-        results = await SyncHelper.run_command_on_unit(ops_test, unit_name, command)
-        return results
 
 
 def pytest_addoption(parser):
@@ -64,7 +40,7 @@ def series(request):
 
 @pytest.fixture(scope="module")
 def provided_collectors(request):
-    return request.config.getoption("collectors")
+    return set(request.config.getoption("collectors"))
 
 
 def pytest_configure(config):
@@ -81,11 +57,6 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "realhw" in item.keywords:
             item.add_marker(skip_real_hw)
-
-
-@pytest.fixture(scope="module")
-def sync_helper():
-    return SyncHelper
 
 
 @pytest.fixture()
