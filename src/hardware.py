@@ -79,28 +79,6 @@ def get_bmc_address() -> t.Optional[str]:
     return None
 
 
-def _split_at(s: str, c: str, n: int) -> t.Tuple[str, str]:
-    """Split a string 's' at the 'n'th occurrence of delimiter 'c'.
-
-    Args:
-        s (str): The string to split.
-        c (str): Delimiter for splitting.
-        n (int): Occurrence of 'c' to split at.
-
-    Returns:
-        Tuple[str, str]: The string before and after the 'n'th occurrence of 'c'.
-
-    Example:
-        >>> _split_at('one,two,three,four,five', ',', 2)
-        ('one,two', 'three,four,five')
-
-        This will split the string at the 2nd occurrence of ',', resulting in two parts:
-        'one,two' and 'three,four,five'.
-    """
-    words = s.split(c)
-    return c.join(words[:n]), c.join(words[n:])
-
-
 def hwinfo(*args: str) -> t.Dict[str, str]:
     """Run hwinfo command and return output as dictionary.
 

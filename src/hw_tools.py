@@ -361,11 +361,8 @@ def _raid_hw_verifier_hwinfo() -> Set[HWTool]:
     return tools
 
 
-# Using cache here to avoid repeat call.
-# The lru_cache should be clean everytime the hook been triggered.
-@lru_cache
-def raid_hw_verifier() -> List[HWTool]:
-    """Verify if the HWTool support RAID card exists on machine."""
+def _raid_hw_verifier_lshw() -> Set[HWTool]:
+    """Verify if a supported RAID card exists on the machine using the lshw command."""
     lshw_output = lshw()
     system_vendor = lshw_output.get("vendor")
     lshw_storage = lshw(class_filter="storage")
@@ -413,9 +410,17 @@ def raid_hw_verifier() -> List[HWTool]:
             # storcli
             elif driver == "megaraid_sas" and vendor == StorageVendor.BROADCOM:
                 tools.add(HWTool.STORCLI)
+    return tools
 
+
+# Using cache here to avoid repeat call.
+# The lru_cache should be clean everytime the hook been triggered.
+@lru_cache
+def raid_hw_verifier() -> List[HWTool]:
+    """Verify if the HWTool support RAID card exists on machine."""
+    lshw_tools = _raid_hw_verifier_lshw()
     hwinfo_tools = _raid_hw_verifier_hwinfo()
-    return list(tools | hwinfo_tools)
+    return list(lshw_tools | hwinfo_tools)
 
 
 # Using cache here to avoid repeat call.

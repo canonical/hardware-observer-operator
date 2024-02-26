@@ -4,17 +4,7 @@ from unittest import mock
 
 import pytest
 
-from hardware import _split_at, get_bmc_address, hwinfo, lshw
-
-
-@pytest.mark.parametrize(
-    "s,delimiter,num,expect",
-    [("abc-d1-d1-d1-def", "d1", 2, ("abc-d1-", "-d1-def"))],
-)
-def test_split_at(s, delimiter, num, expect):
-    output = _split_at(s, delimiter, num)
-    case = unittest.TestCase()
-    case.assertCountEqual(output, expect)
+from hardware import get_bmc_address, hwinfo, lshw
 
 
 class TestHwinfo:
