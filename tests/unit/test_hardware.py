@@ -2,12 +2,98 @@ import subprocess
 import unittest
 from unittest import mock
 
-from hardware import get_bmc_address, lshw
+import pytest
+
+from hardware import get_bmc_address, hwinfo, lshw
+
+
+class TestHwinfo:
+    @pytest.mark.parametrize(
+        "hw_classes,expect_cmd,hwinfo_output,expect",
+        [
+            (
+                [],
+                ["hwinfo"],
+                (
+                    ""
+                    "============ start debug info ============"
+                    "random-string"
+                    "random-string"
+                    "random-string"
+                    "random-string"
+                    "=========== end debug info ============"
+                    "10: key-a\n"
+                    "  [Created at pci.386]\n"
+                    "  Unique ID: unique-id-a\n"
+                    "  Parent ID: parent-id-a\n"
+                    "\n"
+                    "11: key-b\n"
+                    "  [Created at pci.386]\n"
+                    "  Unique ID: unique-id-b\n"
+                    "  Parent ID: parent-id-b\n"
+                ),
+                {
+                    "10: key-a": (
+                        "10: key-a\n"
+                        "  [Created at pci.386]\n"
+                        "  Unique ID: unique-id-a\n"
+                        "  Parent ID: parent-id-a"
+                    ),
+                    "11: key-b": (
+                        "11: key-b\n"
+                        "  [Created at pci.386]\n"
+                        "  Unique ID: unique-id-b\n"
+                        "  Parent ID: parent-id-b\n"
+                    ),
+                },
+            ),
+            (
+                ["storage"],
+                ["hwinfo", "--storage"],
+                (
+                    ""
+                    "10: key-a\n"
+                    "  [Created at pci.386]\n"
+                    "  Unique ID: unique-id-a\n"
+                    "  Parent ID: parent-id-a\n"
+                    "\n"
+                    "11: key-b\n"
+                    "  [Created at pci.386]\n"
+                    "  Unique ID: unique-id-b\n"
+                    "  Parent ID: parent-id-b\n"
+                ),
+                {
+                    "10: key-a": (
+                        "10: key-a\n"
+                        "  [Created at pci.386]\n"
+                        "  Unique ID: unique-id-a\n"
+                        "  Parent ID: parent-id-a"
+                    ),
+                    "11: key-b": (
+                        "11: key-b\n"
+                        "  [Created at pci.386]\n"
+                        "  Unique ID: unique-id-b\n"
+                        "  Parent ID: parent-id-b\n"
+                    ),
+                },
+            ),
+        ],
+    )
+    @mock.patch("hardware.apt")
+    @mock.patch("hardware.subprocess.check_output")
+    def test_hwinfo_output(
+        self, mock_subprocess, mock_apt, hw_classes, expect_cmd, hwinfo_output, expect
+    ):
+        mock_subprocess.return_value = hwinfo_output
+        output = hwinfo(*hw_classes)
+        mock_subprocess.assert_called_with(expect_cmd, text=True)
+        assert output == expect
 
 
 class TestLshw(unittest.TestCase):
+    @mock.patch("hardware.apt")
     @mock.patch("hardware.subprocess.check_output")
-    def test_lshw_list_output(self, mock_subprocess):
+    def test_lshw_list_output(self, mock_subprocess, mock_apt):
         mock_subprocess.return_value = """[{"expected_output": 1}]"""
         for class_filter in [None, "storage"]:
             output = lshw(class_filter)

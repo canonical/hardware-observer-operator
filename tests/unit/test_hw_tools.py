@@ -36,6 +36,8 @@ from hw_tools import (
     StorCLIStrategy,
     StrategyABC,
     TPRStrategyABC,
+    _raid_hw_verifier_hwinfo,
+    _raid_hw_verifier_lshw,
     bmc_hw_verifier,
     check_deb_pkg_installed,
     copy_to_snap_common_bin,
@@ -744,6 +746,14 @@ def test_get_hw_tool_white_list(mock_raid_verifier, mock_bmc_hw_verifier):
     assert output == [4, 5, 6, 1, 2, 3]
 
 
+@mock.patch("hw_tools._raid_hw_verifier_hwinfo", return_value=set([4, 5, 6]))
+@mock.patch("hw_tools._raid_hw_verifier_lshw", return_value=set([1, 2, 3, 4]))
+def test_raid_hw_verifier(mock_hw_verifier_lshw, mock_hw_verifier_hwinfo):
+    raid_hw_verifier.cache_clear()
+    output = raid_hw_verifier()
+    assert output == [1, 2, 3, 4, 5, 6]
+
+
 @pytest.mark.parametrize(
     "lshw_output, lshw_storage_output, expect",
     [
@@ -806,10 +816,47 @@ def test_get_hw_tool_white_list(mock_raid_verifier, mock_bmc_hw_verifier):
     ],
 )
 @mock.patch("hw_tools.lshw")
-def test_raid_hw_verifier(mock_lshw, lshw_output, lshw_storage_output, expect):
+def test_raid_hw_verifier_lshw(mock_lshw, lshw_output, lshw_storage_output, expect):
     mock_lshw.side_effect = [lshw_output, lshw_storage_output]
-    raid_hw_verifier.cache_clear()
-    output = raid_hw_verifier()
+    output = _raid_hw_verifier_lshw()
+    case = unittest.TestCase()
+    case.assertCountEqual(output, expect)
+
+
+@pytest.mark.parametrize(
+    "hwinfo_output, expect",
+    [
+        ({}, []),
+        (
+            {
+                "random-key-a": """
+                  [Created at pci.386]
+                  Hardware Class: storage
+                  Vendor: pci 0x9005 "Adaptec"
+                  Device: pci 0x028f "Smart Storage PQI 12G SAS/PCIe 3"
+                  SubDevice: pci 0x1100 "Smart Array P816i-a SR Gen10"
+                """
+            },
+            [HWTool.SSACLI],
+        ),
+        (
+            {
+                "random-key-a": """
+                  [Created at pci.386]
+                  Hardware Class: not-valid-class
+                  Vendor: pci 0x9005 "Adaptec"
+                  Device: pci 0x028f "Smart Storage PQI 12G SAS/PCIe 3"
+                  SubDevice: pci 0x1100 "Smart Array P816i-a SR Gen10"
+                """
+            },
+            [],
+        ),
+    ],
+)
+@mock.patch("hw_tools.hwinfo")
+def test_raid_hw_verifier_hwinfo(mock_hwinfo, hwinfo_output, expect):
+    mock_hwinfo.return_value = hwinfo_output
+    output = _raid_hw_verifier_hwinfo()
     case = unittest.TestCase()
     case.assertCountEqual(output, expect)
 

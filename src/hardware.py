@@ -12,7 +12,7 @@ from config import HWTool
 logger = logging.getLogger(__name__)
 
 
-SUPPORTED_STORAGES = {
+LSHW_SUPPORTED_STORAGES = {
     HWTool.SAS2IRCU: [
         # Broadcom
         "SAS2004",
@@ -31,6 +31,17 @@ SUPPORTED_STORAGES = {
         "Smart Array Gen8 Controllers",
         "Smart Array Gen9 Controllers",
     ],
+}
+
+HWINFO_SUPPORTED_STORAGES = {
+    HWTool.SSACLI: [
+        [
+            "Hardware Class: storage",
+            'Vendor: pci 0x9005 "Adaptec"',
+            'Device: pci 0x028f "Smart Storage PQI 12G SAS/PCIe 3"',
+            'SubDevice: pci 0x1100 "Smart Array P816i-a SR Gen10"',
+        ]
+    ]
 }
 
 
@@ -66,3 +77,28 @@ def get_bmc_address() -> t.Optional[str]:
     except subprocess.CalledProcessError:
         logger.debug("IPMI is not available")
     return None
+
+
+def hwinfo(*args: str) -> t.Dict[str, str]:
+    """Run hwinfo command and return output as dictionary.
+
+    Args:
+        args: Probe for a particular hardware class.
+    Returns:
+        hw_info: hardware information dictionary
+    """
+    apt.add_package("hwinfo", update_cache=False)
+    hw_classes = list(args)
+    for idx, hw_item in enumerate(args):
+        hw_classes[idx] = "--" + hw_item
+    hw_info_cmd = ["hwinfo"] + hw_classes
+
+    output = subprocess.check_output(hw_info_cmd, text=True)
+    if "start debug info" in output.splitlines()[0]:
+        output = output.split("=========== end debug info ============")[1]
+
+    hardwares: t.Dict[str, str] = {}
+    for item in output.split("\n\n"):
+        key = item.splitlines()[0].strip()
+        hardwares[key] = item
+    return hardwares
