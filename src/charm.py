@@ -234,15 +234,17 @@ class HardwareObserverCharm(ops.CharmBase):
             )
             event.defer()
             return
+        self.exporter.enable()
         self.exporter.start()
-        logger.info("Start exporter service")
+        logger.info("Start and enable exporter service")
         self._on_update_status(event)
 
     def _on_cos_agent_relation_departed(self, event: EventBase) -> None:
         """Remove the exporter when relation departed."""
         if self._stored.exporter_installed:  # type: ignore[truthy-function]
             self.exporter.stop()
-            logger.info("Stop exporter service")
+            self.exporter.disable()
+            logger.info("Stop and disable exporter service")
         self._on_update_status(event)
 
     def _get_redfish_creds(self) -> Dict[str, str]:
