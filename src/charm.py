@@ -13,7 +13,12 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus, StatusBase
 
-from config import EXPORTER_HEALTH_RETRY_COUNT, EXPORTER_HEALTH_RETRY_TIMEOUT, HWTool
+from config import (
+    EXPORTER_DEFAULT_PORT,
+    EXPORTER_HEALTH_RETRY_COUNT,
+    EXPORTER_HEALTH_RETRY_TIMEOUT,
+    HWTool,
+)
 from hardware import get_bmc_address
 from hw_tools import HWToolHelper, bmc_hw_verifier
 from service import Exporter
@@ -25,7 +30,6 @@ class HardwareObserverCharm(ops.CharmBase):
     """Charm the application."""
 
     _stored = StoredState()
-    DEFAULT_EXPORTER_PORT = "10200"
 
     def __init__(self, *args: Any) -> None:
         """Init."""
@@ -82,7 +86,7 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus(err_msg)
             return
 
-        port = self.model.config.get("exporter-port", self.DEFAULT_EXPORTER_PORT)
+        port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
         level = self.model.config.get("exporter-log-level", "INFO")
         redfish_creds = self._get_redfish_creds()
         success = self.exporter.install(port, level, redfish_creds)
@@ -202,7 +206,7 @@ class HardwareObserverCharm(ops.CharmBase):
             }
             if exporter_configs.intersection(change_set):
                 logger.info("Detected changes in exporter config.")
-                port = self.model.config.get("exporter-port", self.DEFAULT_EXPORTER_PORT)
+                port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
                 level = self.model.config.get("exporter-log-level", "INFO")
 
                 redfish_creds = self._get_redfish_creds()
@@ -258,7 +262,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
-        port = int(self.model.config.get("exporter-port", self.DEFAULT_EXPORTER_PORT))
+        port = int(self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT))
         if not 1 <= port <= 65535:
             logger.error("Invalid exporter-port: port must be in [1, 65535].")
             return False, "Invalid config: 'exporter-port'"

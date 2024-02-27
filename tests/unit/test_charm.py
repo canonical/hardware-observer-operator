@@ -13,7 +13,7 @@ from ops.model import ActiveStatus, BlockedStatus, ErrorStatus
 
 import charm
 from charm import HardwareObserverCharm
-from config import HWTool
+from config import EXPORTER_DEFAULT_PORT, HWTool
 
 
 class TestCharm(unittest.TestCase):
@@ -121,7 +121,7 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(self.harness.charm._stored.resource_installed)
 
         self.harness.charm.exporter.install.assert_called_with(
-            int(self.harness.charm.DEFAULT_EXPORTER_PORT), "INFO", {}
+            int(EXPORTER_DEFAULT_PORT), "INFO", {}
         )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
