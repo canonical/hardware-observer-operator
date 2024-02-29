@@ -120,6 +120,7 @@ class TestExporter(unittest.TestCase):
         self.harness.charm._stored.exporter_installed = True
         self.harness.add_relation_unit(rid, "grafana-agent/0")
         self.mock_systemd.service_start.assert_called_once()
+        self.mock_systemd.service_enable.assert_called_once()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=False)
     def test_21_start_failed(self, mock_service_not_installed):
@@ -128,6 +129,7 @@ class TestExporter(unittest.TestCase):
         self.harness.begin()
         self.harness.add_relation_unit(rid, "grafana-agent/0")
         self.mock_systemd.service_start.assert_not_called()
+        self.mock_systemd.service_enable.assert_not_called()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_22_start_defer_resource_not_ready(self, mock_service_installed):
@@ -138,6 +140,7 @@ class TestExporter(unittest.TestCase):
         self.harness.charm._stored.exporter_installed = True
         self.harness.add_relation_unit(rid, "grafana-agent/0")
         self.mock_systemd.service_start.assert_not_called()
+        self.mock_systemd.service_enable.assert_not_called()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_23_start_defer_exporter_not_ready(self, mock_service_installed):
@@ -148,6 +151,7 @@ class TestExporter(unittest.TestCase):
         self.harness.charm._stored.exporter_installed = False
         self.harness.add_relation_unit(rid, "grafana-agent/0")
         self.mock_systemd.service_start.assert_not_called()
+        self.mock_systemd.service_enable.assert_not_called()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_30_stop_okay(self, mock_service_installed):
@@ -159,6 +163,7 @@ class TestExporter(unittest.TestCase):
         self.harness.add_relation_unit(rid, "grafana-agent/0")
         self.harness.remove_relation_unit(rid, "grafana-agent/0")
         self.mock_systemd.service_stop.assert_called_once()
+        self.mock_systemd.service_disable.assert_called_once()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=False)
     def test_31_stop_failed(self, mock_service_not_installed):
@@ -170,6 +175,7 @@ class TestExporter(unittest.TestCase):
         self.harness.add_relation_unit(rid, "grafana-agent/0")
         self.harness.remove_relation_unit(rid, "grafana-agent/0")
         self.mock_systemd.service_stop.assert_not_called()
+        self.mock_systemd.service_disable.assert_not_called()
 
     @parameterized.expand(
         [

@@ -160,6 +160,16 @@ class Exporter:
         systemd.service_restart(EXPORTER_NAME)
 
     @check_installed
+    def enable(self) -> None:
+        """Enable the exporter service."""
+        systemd.service_enable(EXPORTER_NAME)
+
+    @check_installed
+    def disable(self) -> None:
+        """Restart the exporter service."""
+        systemd.service_disable(EXPORTER_NAME)
+
+    @check_installed
     def check_active(self) -> bool:
         """Check if the exporter is active or not."""
         return systemd.service_running(EXPORTER_NAME)
