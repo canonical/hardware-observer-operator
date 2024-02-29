@@ -1,6 +1,9 @@
 import logging
 
 import pytest
+from utils import RESOURCES_DIR, Resource
+
+from config import EXPORTER_COLLECTOR_MAPPING, TPR_RESOURCES, HWTool
 
 log = logging.getLogger(__name__)
 
@@ -49,14 +52,24 @@ def pytest_configure(config):
 
 def pytest_collection_modifyitems(config, items):
     if config.getoption("collectors"):
-        # --collectors provided, do not skip tests
-        return
-    skip_real_hw = pytest.mark.skip(
-        reason="Hardware dependent test. Provide collectors with the --collectors option."
-    )
-    for item in items:
-        if "realhw" in item.keywords:
-            item.add_marker(skip_real_hw)
+        # --collectors provided, skip hw independent tests
+        skip_hw_independent = pytest.mark.skip(
+            reason="Hardware independent tests are skipped since --collectors was provided."
+        )
+        for item in items:
+            # skip TestCharm tests where "realhw" marker is not present
+            # we don't want to skip test_setup_and_build even for hw independent tests
+            # so we also check for the skip_if_deployed marker
+            if "realhw" not in item.keywords and "skip_if_deployed" not in item.keywords:
+                item.add_marker(skip_hw_independent)
+    else:
+        # skip hw dependent tests in TestCharmWithHW marked with "realhw"
+        skip_hw_dependent = pytest.mark.skip(
+            reason="Hardware dependent test. Provide collectors with the --collectors option."
+        )
+        for item in items:
+            if "realhw" in item.keywords:
+                item.add_marker(skip_hw_dependent)
 
 
 @pytest.fixture()
@@ -67,3 +80,61 @@ def app(ops_test):
 @pytest.fixture()
 def unit(app):
     return app.units[0]
+
+
+@pytest.fixture()
+def resources() -> list[Resource]:
+    """Return list of Resource objects."""
+    return [
+        Resource(
+            resource_name=TPR_RESOURCES.get(HWTool.STORCLI),
+            file_name="storcli.deb",
+            collector_name=EXPORTER_COLLECTOR_MAPPING.get(HWTool.STORCLI)[0].replace(
+                "collector.", ""
+            ),
+            bin_name=HWTool.STORCLI.value,
+        ),
+        Resource(
+            resource_name=TPR_RESOURCES.get(HWTool.PERCCLI),
+            file_name="perccli.deb",
+            collector_name=EXPORTER_COLLECTOR_MAPPING.get(HWTool.PERCCLI)[0].replace(
+                "collector.", ""
+            ),
+            bin_name=HWTool.PERCCLI.value,
+        ),
+        Resource(
+            resource_name=TPR_RESOURCES.get(HWTool.SAS2IRCU),
+            file_name="sas2ircu",
+            collector_name=EXPORTER_COLLECTOR_MAPPING.get(HWTool.SAS2IRCU)[0].replace(
+                "collector.", ""
+            ),
+            bin_name=HWTool.SAS2IRCU.value,
+        ),
+        Resource(
+            resource_name=TPR_RESOURCES.get(HWTool.SAS3IRCU),
+            file_name="sas3ircu",
+            collector_name=EXPORTER_COLLECTOR_MAPPING.get(HWTool.SAS3IRCU)[0].replace(
+                "collector.", ""
+            ),
+            bin_name=HWTool.SAS3IRCU.value,
+        ),
+    ]
+
+
+@pytest.fixture()
+def required_resources(resources: list[Resource], provided_collectors: set) -> list[Resource]:
+    """Return list of required resources to be attached as per hardware availability.
+
+    Required resources will be empty if no collectors are provided.
+    """
+    collector_names = [r.collector_name for r in resources]
+    required_resources = []
+
+    for resource, collector_name in zip(resources, collector_names):
+        if collector_name in provided_collectors:
+            required_resources.append(resource)
+
+    for resource in required_resources:
+        resource.file_path = f"{RESOURCES_DIR}/{resource.file_name}"
+
+    return required_resources
