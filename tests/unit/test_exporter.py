@@ -327,7 +327,7 @@ class TestExporterTemplate(unittest.TestCase):
             self.template.render_config(
                 port="80",
                 level="info",
-                redfish_creds={},
+                redfish_creds={"enable": False},
             )
             mock_install.assert_called_with(
                 EXPORTER_CONFIG_PATH,
@@ -349,6 +349,7 @@ class TestExporterTemplate(unittest.TestCase):
                 port="80",
                 level="info",
                 redfish_creds={
+                    "enable": True,
                     "host": "127.0.0.1",
                     "username": "default_user",
                     "password": "default_pwd",

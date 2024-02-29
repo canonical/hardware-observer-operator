@@ -247,20 +247,20 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.info("Stop and disable exporter service")
         self._on_update_status(event)
 
-    def _get_redfish_creds(self) -> Dict[str, str]:
-        """Provide redfish config if redfish is available, else empty dict."""
+    def _get_redfish_creds(self) -> Dict[str, Any]:
+        """Provide redfish config if redfish is available."""
         bmc_tools = bmc_hw_verifier()
-        if HWTool.REDFISH in bmc_tools:
-            bmc_address = get_bmc_address()
-            redfish_creds = {
-                # Force to use https as default protocol
-                "host": f"https://{bmc_address}",
-                "username": self.model.config.get("redfish-username", ""),
-                "password": self.model.config.get("redfish-password", ""),
-            }
-        else:
-            redfish_creds = {}
-        return redfish_creds
+        if HWTool.REDFISH not in bmc_tools:
+            logger.warning(
+                "Redfish is not available, disregarding redfish credentials config options..."
+            )
+            return {"enable": False}
+        return {
+            "enable": True,
+            "host": f"https://{get_bmc_address()}",
+            "username": self.model.config.get("redfish-username", ""),
+            "password": self.model.config.get("redfish-password", ""),
+        }
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
