@@ -13,15 +13,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
+import requests
+import urllib3
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError, Resources
-from redfish import redfish_client
-from redfish.rest.v1 import (
-    InvalidCredentialsError,
-    RetriesExhaustedError,
-    ServerDownOrUnreachableError,
-    SessionCreationError,
-)
 
 import apt_helpers
 from checksum import (
@@ -33,7 +28,6 @@ from checksum import (
     validate_checksum,
 )
 from config import (
-    REDFISH_MAX_RETRY,
     REDFISH_TIMEOUT,
     SNAP_COMMON,
     TOOLS_DIR,
@@ -52,6 +46,10 @@ from hardware import (
 from keys import HP_KEYS
 
 logger = logging.getLogger(__name__)
+
+# We know what we are doing: this is only for verification purpose.
+# See `redfish_available` function.
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class ResourceFileSizeZeroError(Exception):
@@ -441,31 +439,25 @@ def raid_hw_verifier() -> List[HWTool]:
 def redfish_available() -> bool:
     """Check if redfish service is available."""
     bmc_address = get_bmc_address()
-    host = f"https://{bmc_address}"
+    health_check_enpoint = f"https://{bmc_address}:443/redfish/v1/"
     try:
-        # credentials can be empty because we're only checking if redfish service is accessible
-        redfish_obj = redfish_client(
-            base_url=host,
-            username="",
-            password="",
-            timeout=REDFISH_TIMEOUT,
-            max_retry=REDFISH_MAX_RETRY,
-        )
-        redfish_obj.login(auth="session")
-    except (RetriesExhaustedError, ServerDownOrUnreachableError):
-        # redfish not available
-        result = False
-    except (SessionCreationError, InvalidCredentialsError):
-        # redfish available, wrong credentials or not able to create a session
-        result = True
-    except Exception as e:  # pylint: disable=W0718
-        # mark redfish unavailable for any generic exception
+        response = requests.get(health_check_enpoint, verify=False, timeout=REDFISH_TIMEOUT)
+        response.raise_for_status()
+        data = response.json()
+        # only check if the data is empty dict or not
+        if not data:
+            raise ValueError("Invalid response")
+    except requests.exceptions.HTTPError as e:
         result = False
         logger.error("cannot connect to redfish: %s", str(e))
-    else:  # login succeeded with empty credentials
+    except requests.exceptions.Timeout as e:
+        result = False
+        logger.error("timed out connecting to redfish: %s", str(e))
+    except Exception as e:  # pylint: disable=W0718
+        result = False
+        logger.error("unexpected error occurs when connecting to redfish: %s", str(e))
+    else:
         result = True
-        redfish_obj.logout()
-
     return result
 
 
@@ -580,7 +572,7 @@ class HWToolHelper:
     def install(self, resources: Resources) -> Tuple[bool, str]:
         """Install tools."""
         hw_white_list: List[HWTool] = get_hw_tool_white_list()
-        logger.info("hw_tool_white_list: %s", hw_white_list)
+        logger.info("gw_white_list: %s", hw_white_list)
 
         fetch_tools: Dict[HWTool, Path] = self.fetch_tools(resources, hw_white_list)
 

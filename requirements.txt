@@ -6,4 +6,5 @@ distro
 ops >= 2.2.0, <2.10.0
 jinja2
 redfish
+requests
 git+https://github.com/canonical/prometheus-hardware-exporter.git

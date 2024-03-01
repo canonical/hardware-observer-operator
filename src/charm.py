@@ -12,11 +12,15 @@ import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus, StatusBase
+from redfish import redfish_client
+from redfish.rest.v1 import InvalidCredentialsError
 
 from config import (
     EXPORTER_DEFAULT_PORT,
     EXPORTER_HEALTH_RETRY_COUNT,
     EXPORTER_HEALTH_RETRY_TIMEOUT,
+    REDFISH_MAX_RETRY,
+    REDFISH_TIMEOUT,
     HWTool,
 )
 from hardware import get_bmc_address
@@ -88,7 +92,10 @@ class HardwareObserverCharm(ops.CharmBase):
 
         port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
         level = self.model.config.get("exporter-log-level", "INFO")
-        redfish_creds = self._get_redfish_creds()
+        redfish_creds = self.get_redfish_creds()
+        if not self.redfish_available():
+            logger.warning("Redfish unavailable, disregarding redfish config options...")
+            redfish_creds = {}
         success = self.exporter.install(port, level, redfish_creds)
         self._stored.exporter_installed = success
         if not success:
@@ -208,10 +215,15 @@ class HardwareObserverCharm(ops.CharmBase):
                 logger.info("Detected changes in exporter config.")
                 port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
                 level = self.model.config.get("exporter-log-level", "INFO")
+                redfish_creds = self.get_redfish_creds()
+                if not self.redfish_available():
+                    logger.warning("Redfish unavailable, disregarding redfish config options...")
+                    redfish_creds = {}
 
-                redfish_creds = self._get_redfish_creds()
                 success = self.exporter.template.render_config(
-                    port=port, level=level, redfish_creds=redfish_creds
+                    port=port,
+                    level=level,
+                    redfish_creds=redfish_creds,
                 )
                 if not success:
                     message = (
@@ -247,20 +259,43 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.info("Stop and disable exporter service")
         self._on_update_status(event)
 
-    def _get_redfish_creds(self) -> Dict[str, Any]:
-        """Provide redfish config if redfish is available."""
+    def redfish_available(self) -> bool:
+        """Check if redfish is available or not."""
         bmc_tools = bmc_hw_verifier()
         if HWTool.REDFISH not in bmc_tools:
-            logger.warning(
-                "Redfish is not available, disregarding redfish credentials config options..."
-            )
-            return {"enable": False}
+            return False
+        return True
+
+    def get_redfish_creds(self) -> Dict[str, Any]:
+        """Provide redfish config if redfish is available."""
         return {
-            "enable": True,
             "host": f"https://{get_bmc_address()}",
             "username": self.model.config.get("redfish-username", ""),
             "password": self.model.config.get("redfish-password", ""),
         }
+
+    def validate_redfish_creds(self, creds: Dict[str, str]) -> bool:
+        """Validate the redfish credentials used by the exporter."""
+        try:
+            redfish_obj = redfish_client(
+                base_url=creds.get("host", ""),
+                username=creds.get("username", ""),
+                password=creds.get("password", ""),
+                timeout=REDFISH_TIMEOUT,
+                max_retry=REDFISH_MAX_RETRY,
+            )
+            redfish_obj.login(auth="session")
+        except InvalidCredentialsError as e:
+            result = False
+            logger.error("invalid redfish credential: %s", str(e))
+        except Exception as e:  # pylint: disable=W0718
+            result = False
+            logger.error("cannot connect to redfish: %s", str(e))
+        else:
+            result = True
+            redfish_obj.logout()
+
+        return result
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
@@ -277,6 +312,12 @@ class HardwareObserverCharm(ops.CharmBase):
                 allowed_choices,
             )
             return False, "Invalid config: 'exporter-log-level'"
+
+        redfish_creds = self.get_redfish_creds()
+        redfish_creds_valid = self.validate_redfish_creds(redfish_creds)
+        if self.redfish_available() and not redfish_creds_valid:
+            logger.error("Invalid redfish credentials.")
+            return False, "Invalid config: 'redfish-username' or 'redfish-password'"
 
         return True, "Exporter config is valid."
 

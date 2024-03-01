@@ -89,8 +89,8 @@ class ExporterTemplate:
         content = self.config_template.render(
             PORT=port,
             LEVEL=level,
-            COLLECTORS=collectors,
-            REDFISH_ENABLE=redfish_creds.get("enable", False),
+            COLLECTORS=sorted(collectors),  # only sort this because of unittest
+            REDFISH_ENABLE=redfish_creds != {},
             REDFISH_HOST=redfish_creds.get("host", ""),
             REDFISH_USERNAME=redfish_creds.get("username", ""),
             REDFISH_PASSWORD=redfish_creds.get("password", ""),
