@@ -53,7 +53,7 @@ async def run_command_on_unit(ops_test, unit_name, command):
 @alru_cache
 async def get_metrics_output(ops_test, unit_name):
     """Return prometheus metric output from endpoint on unit."""
-    command = f"curl localhost:{EXPORTER_DEFAULT_PORT}"
+    command = f"curl -s localhost:{EXPORTER_DEFAULT_PORT}"
     results = await run_command_on_unit(ops_test, unit_name, command)
     return results
 
@@ -144,7 +144,7 @@ def parse_metrics(metrics_input: str) -> dict[str, list[Metric]]:
         elif name.startswith("ipmi_sel"):
             parsed_metrics["ipmi_sel"].append(metric)
         elif name.startswith("ipmi"):
-            parsed_metrics["ipmi_sensors"].append(metric)
+            parsed_metrics["ipmi_sensor"].append(metric)
         elif name.startswith("poweredgeraid"):
             parsed_metrics["poweredge_raid"].append(metric)
         elif name.startswith("megaraid") or name.startswith("storcli"):

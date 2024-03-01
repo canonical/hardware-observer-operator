@@ -4,3 +4,4 @@ pytest-operator
 # Keep protobuf < 4.0 until macaroonbakery solves its incompatibility
 # https://github.com/go-macaroon-bakery/py-macaroon-bakery/issues/94
 protobuf<4.0
+tenacity

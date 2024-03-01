@@ -13,6 +13,7 @@ from uuid import uuid4
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
+from tenacity import AsyncRetrying, RetryError, retry_if_result, stop_after_attempt, wait_fixed
 from utils import RESOURCES_DIR, get_metrics_output, parse_metrics, run_command_on_unit
 
 from config import TOOLS_DIR
@@ -203,7 +204,7 @@ class TestCharmWithHW:
         [
             "ipmi_dcmi",
             "ipmi_sel",
-            "ipmi_sensors",
+            "ipmi_sensor",
             "redfish",
             "poweredge_raid",
             "mega_raid",
@@ -319,6 +320,135 @@ class TestCharmWithHW:
                 apps=[PRINCIPAL_APP_NAME], status="active", timeout=TIMEOUT
             ),
         )
+
+    async def test_redfish_metrics(self, ops_test, app, unit, provided_collectors):  # noqa: C901
+        """Tests for redfish specific metrics."""
+        if "redfish" not in provided_collectors:
+            pytest.skip("redfish not in provided collectors, skipping test")
+
+        results = await get_metrics_output(ops_test, unit.name)
+        parsed_metrics = parse_metrics(results.get("stdout").strip())
+        for metric in parsed_metrics.get("redfish"):
+            if metric.name == "redfish_service_available":
+                assert metric.value == 1.0, f"{metric.name} value is incorrect"
+            elif metric.name == "redfish_call_success":
+                assert metric.value == 0.0, f"{metric.name} value is incorrect"
+
+        # fetch and configure redfish creds
+        logging.info("Setting Redfish credentials...")
+        username = os.getenv("REDFISH_USERNAME")
+        password = os.getenv("REDFISH_PASSWORD")
+        if username is None or password is None:
+            pytest.fail("Environment vars for redfish creds not set")
+        await asyncio.gather(
+            app.set_config({"redfish-username": username}),
+            app.set_config({"redfish-password": password}),
+            ops_test.model.wait_for_idle(apps=[APP_NAME]),
+        )
+
+        logging.info("Check metric after setting redfish credentials...")
+        try:
+            # retry metric endpoint check which takes some time to settle after config change
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_fixed(5),
+                retry=retry_if_result(lambda r: r != 0),
+            ):
+                with attempt:
+                    logging.info(f"Attempt #{attempt.retry_state.attempt_number}")
+                    get_metrics_output.cache_clear()  # don't hit cache, need new redfish metrics
+                    results = await get_metrics_output(ops_test, unit.name)
+                    await ops_test.model.wait_for_idle(apps=[APP_NAME])
+                if not attempt.retry_state.outcome.failed:
+                    attempt.retry_state.set_result(results["return-code"])
+        except RetryError:
+            pytest.fail("Not able to obtain metrics.")
+
+        parsed_metrics = parse_metrics(results.get("stdout").strip())
+        for metric in parsed_metrics.get("redfish"):
+            if metric.name == "redfish_call_success":
+                assert metric.value == 1.0, f"{metric.name} should be 1.0 after login."
+
+    async def test_poweredge_raid_metrics(self, ops_test, unit, provided_collectors):
+        """Tests for poweredge_raid specific metrics."""
+        if "poweredge_raid" not in provided_collectors:
+            pytest.skip("poweredge_raid not in provided collectors, skipping test")
+
+        results = await get_metrics_output(ops_test, unit.name)
+        parsed_metrics = parse_metrics(results.get("stdout").strip())
+        for metric in parsed_metrics.get("poweredge_raid"):
+            if metric.name == "perccli_command_success":
+                assert metric.value == 1.0, f"{metric.name} value is incorrect"
+            elif metric.name == "perccli_command_ctrl_success":
+                assert metric.value == 1.0, f"{metric.name} value is incorrect"
+
+    async def test_mega_raid_metrics(self, ops_test, unit, provided_collectors):
+        """Tests for mega_raid specific metrics."""
+        if "mega_raid" not in provided_collectors:
+            pytest.skip("mega_raid not in provided collectors, skipping test")
+
+        results = await get_metrics_output(ops_test, unit.name)
+        parsed_metrics = parse_metrics(results.get("stdout").strip())
+        for metric in parsed_metrics.get("mega_raid"):
+            if metric.name == "storcli_command_success":
+                assert metric.value == 1.0, f"{metric.name} value is incorrect"
+
+    async def test_ipmi_dcmi_metrics(self, ops_test, unit, provided_collectors):
+        """Tests for ipmi_dcmi specific metrics."""
+        if "ipmi_dcmi" not in provided_collectors:
+            pytest.skip("ipmi_dcmi not in provided collectors, skipping test")
+
+        results = await get_metrics_output(ops_test, unit.name)
+        parsed_metrics = parse_metrics(results.get("stdout").strip())
+        for metric in parsed_metrics.get("ipmi_dcmi"):
+            if metric.name == "ipmi_dcmi_command_success":
+                assert metric.value == 1.0, f"{metric.name} value is incorrect"
+
+    async def test_ipmi_sensor_metrics(self, ops_test, unit, provided_collectors):
+        """Tests for ipmi_sensor specific metrics."""
+        if "ipmi_sensor" not in provided_collectors:
+            pytest.skip("ipmi_sensor not in provided collectors, skipping test")
+
+        results = await get_metrics_output(ops_test, unit.name)
+        parsed_metrics = parse_metrics(results.get("stdout").strip())
+        for metric in parsed_metrics.get("ipmi_sensor"):
+            if metric.name == "ipmimonitoring_command_success":
+                assert metric.value == 1.0, f"{metric.name} value is incorrect"
+
+    async def test_ipmi_sel_metrics(self, ops_test, unit, provided_collectors):
+        """Tests for ipmi_sel specific metrics."""
+        if "ipmi_sel" not in provided_collectors:
+            pytest.skip("ipmi_sel not in provided collectors, skipping test")
+
+        results = await get_metrics_output(ops_test, unit.name)
+        parsed_metrics = parse_metrics(results.get("stdout").strip())
+        for metric in parsed_metrics.get("ipmi_sel"):
+            if metric.name == "ipmi_sel_command_success":
+                assert metric.value == 1.0, f"{metric.name} value is incorrect"
+
+    @pytest.mark.parametrize("version", ["1", "2"])
+    async def test_lsi_sas_metrics(self, ops_test, unit, provided_collectors, version):
+        """Tests for lsi_sas_{1,2} specific metrics."""
+        collector = f"lsi_sas_{version}"
+        if collector not in provided_collectors:
+            pytest.skip(f"{collector} not in provided collectors, skipping test")
+
+        results = await get_metrics_output(ops_test, unit.name)
+        parsed_metrics = parse_metrics(results.get("stdout").strip())
+        for metric in parsed_metrics.get(collector):
+            if metric.name == f"sas{version}ircu_command_success":
+                assert metric.value == 1.0, f"{metric.name} value is incorrect"
+
+    async def test_hpe_ssa_metrics(self, ops_test, unit, provided_collectors):
+        """Tests for hpe_ssa specific metrics."""
+        if "hpe_ssa" not in provided_collectors:
+            pytest.skip("hpe_ssa not in provided collectors, skipping test")
+
+        results = await get_metrics_output(ops_test, unit.name)
+        parsed_metrics = parse_metrics(results.get("stdout").strip())
+        for metric in parsed_metrics.get("hpe_ssa"):
+            if metric.name == "ssacli_command_success":
+                assert metric.value == 1.0, f"{metric.name} value is incorrect"
 
 
 class TestCharm:
