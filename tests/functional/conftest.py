@@ -127,14 +127,11 @@ def required_resources(resources: list[Resource], provided_collectors: set) -> l
 
     Required resources will be empty if no collectors are provided.
     """
-    collector_names = [r.collector_name for r in resources]
     required_resources = []
 
-    for resource, collector_name in zip(resources, collector_names):
-        if collector_name in provided_collectors:
+    for resource in resources:
+        if resource.collector_name in provided_collectors:
+            resource.file_path = f"{RESOURCES_DIR}/{resource.file_name}"
             required_resources.append(resource)
-
-    for resource in required_resources:
-        resource.file_path = f"{RESOURCES_DIR}/{resource.file_name}"
 
     return required_resources

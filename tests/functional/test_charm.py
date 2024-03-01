@@ -98,11 +98,10 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
         timeout=TIMEOUT,
     )
 
-    logging.info(
-        f"Required resources to attach with charm: {[r.resource_name for r in required_resources]}"
-    )
-
     if required_resources:
+        logging.info(
+            f"Required resources to attach: {[r.resource_name for r in required_resources]}"
+        )
         # check workload status for real hardware based tests requiring resources to be attached
         for unit in ops_test.model.applications[APP_NAME].units:
             assert AppStatus.MISSING_RESOURCES in unit.workload_status_message
@@ -115,11 +114,8 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
             resource.file_path = path
 
         resource_path_map = {r.resource_name: r.file_path for r in required_resources}
-        resource_cmd = " ".join(
-            f"{resource_name}={resource_path}"
-            for resource_name, resource_path in resource_path_map.items()
-        )
-        juju_cmd = ["attach-resource", APP_NAME, "-m", ops_test.model_full_name, resource_cmd]
+        resource_cmd = [f"{name}={path}" for name, path in resource_path_map.items()]
+        juju_cmd = ["attach-resource", APP_NAME, "-m", ops_test.model_full_name] + resource_cmd
 
         logging.info("Attaching resources...")
         rc, stdout, stderr = await ops_test.juju(*juju_cmd)
