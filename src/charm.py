@@ -127,11 +127,6 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus("Cannot relate to more than one grafana-agent")
             return
 
-        config_valied, confg_valid_message = self.validate_exporter_configs()
-        if not config_valied:
-            self.model.unit.status = BlockedStatus(confg_valid_message)
-            return
-
         hw_tool_ok, error_msg = self.hw_tool_helper.check_installed()
         if not hw_tool_ok:
             self.model.unit.status = BlockedStatus(error_msg)

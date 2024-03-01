@@ -251,8 +251,8 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_13_update_status_config_invalid(self, mock_hw_tool_helper, mock_exporter):
-        """Test update_status when everything is okay."""
+    def test_13_config_changed_config_invalid(self, mock_hw_tool_helper, mock_exporter):
+        """Test config changed hook when config is invalid."""
         self.mock_bmc_hw_verifier.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
@@ -269,7 +269,7 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.validate_exporter_configs = mock.MagicMock()
         self.harness.charm.validate_exporter_configs.return_value = (False, "config fail message")
 
-        self.harness.charm.on.update_status.emit()
+        self.harness.charm.on.config_changed.emit()
         self.assertEqual(self.harness.charm.unit.status, BlockedStatus("config fail message"))
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
