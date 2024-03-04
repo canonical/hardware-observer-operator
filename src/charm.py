@@ -276,6 +276,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def validate_redfish_creds(self, creds: Dict[str, str]) -> bool:
         """Validate the redfish credentials used by the exporter."""
+        redfish_obj = None
         try:
             redfish_obj = redfish_client(
                 base_url=creds.get("host", ""),
@@ -293,7 +294,10 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.error("cannot connect to redfish: %s", str(e))
         else:
             result = True
-            redfish_obj.logout()
+        finally:
+            # Make sure to close connection at the end
+            if redfish_obj:
+                redfish_obj.logout()
 
         return result
 
