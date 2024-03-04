@@ -37,18 +37,6 @@ groups:
               SENSOR_READING = {{ $labels.reading }}
               LABELS = {{ $labels }}
 
-      - alert: RedfishSensorHealthNotAvailable
-        expr: redfish_sensor_info{health="N/A"}
-        for: 0m
-        labels:
-          severity: warning
-        annotations:
-          summary: Redfish sensor health not available. (instance {{ $labels.instance }})
-          description: |
-            Redfish sensor health not available.
-              SENSOR_READING = {{ $labels.reading }}
-              LABELS = {{ $labels }}
-
       - alert: RedfishProcessorHealthNotOk
         expr: redfish_processor_info{health!~"OK|NA"}
         for: 0m
@@ -58,17 +46,6 @@ groups:
           summary: Redfish processor health not OK. (instance {{ $labels.instance }})
           description: |
             Redfish processor health not OK.
-              LABELS = {{ $labels }}
-
-      - alert: RedfishProcessorHealthNotAvailable
-        expr: redfish_processor_info{health="NA"}
-        for: 0m
-        labels:
-          severity: warning 
-        annotations:
-          summary: Redfish processor health not available. (instance {{ $labels.instance }})
-          description: |
-            Redfish processor health not available.
               LABELS = {{ $labels }}
 
       - alert: RedfishStorageControllerHealthNotOk
@@ -82,17 +59,6 @@ groups:
             Redfish storage controller health not OK.
               LABELS = {{ $labels }}
 
-      - alert: RedfishStorageControllerHealthNotAvailable
-        expr: redfish_storage_controller_info{health="NA"}
-        for: 0m
-        labels:
-          severity: warning
-        annotations:
-          summary: Redfish storage controller health not available. (instance {{ $labels.instance }})
-          description: |
-            Redfish storage controller health not available.
-              LABELS = {{ $labels }}
-
       - alert: RedfishChassisHealthNotOk
         expr: redfish_chassis_info{health!~"OK|NA"}
         for: 0m
@@ -102,17 +68,6 @@ groups:
           summary: Redfish chassis health not OK. (instance {{ $labels.instance }})
           description: |
             Redfish chassis health not OK.
-              LABELS = {{ $labels }}
-
-      - alert: RedfishChassisHealthNotAvailable
-        expr: redfish_chassis_info{health="NA"}
-        for: 0m
-        labels:
-          severity: warning
-        annotations:
-          summary: Redfish chassis health not available. (instance {{ $labels.instance }})
-          description: |
-            Redfish chassis health not available.
               LABELS = {{ $labels }}
 
       - alert: RedfishStorageDriveHealthNotOk
@@ -126,17 +81,6 @@ groups:
             Redfish storage drive health not OK.
               LABELS = {{ $labels }}
 
-      - alert: RedfishStorageDriveHealthNotAvailable
-        expr: redfish_storage_drive_info{health="NA"}
-        for: 0m
-        labels:
-          severity: warning
-        annotations:
-          summary: Redfish storage drive health not available. (instance {{ $labels.instance }})
-          description: |
-            Redfish storage drive health not available.
-              LABELS = {{ $labels }}
-
       - alert: RedfishMemoryDimmHealthNotOk
         expr: redfish_memory_dimm_info{health!~"OK|NA"}
         for: 0m
@@ -146,17 +90,6 @@ groups:
           summary: Redfish memory dimm health not OK. (instance {{ $labels.instance }})
           description: |
             Redfish memory dimm health not OK.
-              LABELS = {{ $labels }}
-
-      - alert: RedfishMemoryDimmHealthNotAvailable
-        expr: redfish_memory_dimm_info{health="NA"}
-        for: 0m
-        labels:
-          severity: warning
-        annotations:
-          summary: Redfish memory dimm health not available. (instance {{ $labels.instance }})
-          description: |
-            Redfish memory dimm health not available.
               LABELS = {{ $labels }}
 
       - alert: RedfishSmartStorageHealthNotOk

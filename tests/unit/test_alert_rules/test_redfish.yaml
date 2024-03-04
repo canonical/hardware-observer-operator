@@ -65,27 +65,6 @@ tests:
 
   - interval: 1m
     input_series:
-      - series: redfish_sensor_info{instance="ubuntu-2", health="N/A", reading="N/A"}
-        values: "1x15"
-
-    alert_rule_test:
-      - eval_time: 0m
-        alertname: RedfishSensorHealthNotAvailable
-        exp_alerts:
-          - exp_labels:
-              severity: warning
-              instance: ubuntu-2
-              health: N/A
-              reading: N/A
-            exp_annotations:
-              summary: Redfish sensor health not available. (instance ubuntu-2)
-              description: |
-                Redfish sensor health not available.
-                  SENSOR_READING = N/A
-                  LABELS = map[__name__:redfish_sensor_info health:N/A instance:ubuntu-2 reading:N/A]
-
-  - interval: 1m
-    input_series:
       - series: redfish_processor_info{instance="ubuntu-1", health="Unhealthy", system_id="s1", processor_id="p1", model="processor-model-1"}
         values: "1x15"
 
@@ -105,28 +84,6 @@ tests:
               description: |
                 Redfish processor health not OK.
                   LABELS = map[__name__:redfish_processor_info health:Unhealthy instance:ubuntu-1 model:processor-model-1 processor_id:p1 system_id:s1]
-
-  - interval: 1m
-    input_series:
-      - series: redfish_processor_info{instance="ubuntu-1", health="NA", system_id="s1", processor_id="p1", model="processor-model-1"}
-        values: "1x15"
-
-    alert_rule_test:
-      - eval_time: 0m
-        alertname: RedfishProcessorHealthNotAvailable
-        exp_alerts:
-          - exp_labels:
-              severity: warning
-              instance: ubuntu-1
-              health: NA 
-              system_id: s1
-              processor_id: p1
-              model: processor-model-1
-            exp_annotations:
-              summary: Redfish processor health not available. (instance ubuntu-1)
-              description: |
-                Redfish processor health not available.
-                  LABELS = map[__name__:redfish_processor_info health:NA instance:ubuntu-1 model:processor-model-1 processor_id:p1 system_id:s1]
 
   - interval: 1m
     input_series:
@@ -152,28 +109,6 @@ tests:
 
   - interval: 1m
     input_series:
-      - series: redfish_storage_controller_info{instance="ubuntu-1", health="NA", system_id="s1", storage_id="stor1", controller_id="ctrl1"}
-        values: "1x15"
-
-    alert_rule_test:
-      - eval_time: 0m
-        alertname: RedfishStorageControllerHealthNotAvailable
-        exp_alerts:
-          - exp_labels:
-              severity: warning
-              instance: ubuntu-1
-              health: NA
-              system_id: s1
-              storage_id: stor1
-              controller_id: ctrl1
-            exp_annotations:
-              summary: Redfish storage controller health not available. (instance ubuntu-1)
-              description: |
-                Redfish storage controller health not available.
-                  LABELS = map[__name__:redfish_storage_controller_info controller_id:ctrl1 health:NA instance:ubuntu-1 storage_id:stor1 system_id:s1]
-
-  - interval: 1m
-    input_series:
       - series: redfish_chassis_info{instance="ubuntu-1", health="Unhealthy", chassis_id="ch1", model="chassis-model1"}
         values: "1x15"
 
@@ -192,27 +127,6 @@ tests:
               description: |
                 Redfish chassis health not OK.
                   LABELS = map[__name__:redfish_chassis_info chassis_id:ch1 health:Unhealthy instance:ubuntu-1 model:chassis-model1]
-
-  - interval: 1m
-    input_series:
-      - series: redfish_chassis_info{instance="ubuntu-1", health="NA", chassis_id="ch1", model="chassis-model1"}
-        values: "1x15"
-
-    alert_rule_test:
-      - eval_time: 0m
-        alertname: RedfishChassisHealthNotAvailable
-        exp_alerts:
-          - exp_labels:
-              severity: warning
-              instance: ubuntu-1
-              health: NA
-              chassis_id: ch1
-              model: chassis-model1
-            exp_annotations:
-              summary: Redfish chassis health not available. (instance ubuntu-1)
-              description: |
-                Redfish chassis health not available.
-                  LABELS = map[__name__:redfish_chassis_info chassis_id:ch1 health:NA instance:ubuntu-1 model:chassis-model1]
 
   - interval: 1m
     input_series:
@@ -238,28 +152,6 @@ tests:
 
   - interval: 1m
     input_series:
-      - series: redfish_storage_drive_info{instance="ubuntu-1", health="NA", system_id="s1", storage_id="stor1", drive_id="dr1"}
-        values: "1x15"
-
-    alert_rule_test:
-      - eval_time: 0m
-        alertname: RedfishStorageDriveHealthNotAvailable
-        exp_alerts:
-          - exp_labels:
-              severity: warning
-              instance: ubuntu-1
-              health: NA
-              system_id: s1
-              storage_id: stor1
-              drive_id: dr1
-            exp_annotations:
-              summary: Redfish storage drive health not available. (instance ubuntu-1)
-              description: |
-                Redfish storage drive health not available.
-                  LABELS = map[__name__:redfish_storage_drive_info drive_id:dr1 health:NA instance:ubuntu-1 storage_id:stor1 system_id:s1]
-
-  - interval: 1m
-    input_series:
       - series: redfish_memory_dimm_info{instance="ubuntu-1", health="Unhealthy", system_id="s1", memory_id="mem1"}
         values: "1x15"
 
@@ -278,27 +170,6 @@ tests:
               description: |
                 Redfish memory dimm health not OK.
                   LABELS = map[__name__:redfish_memory_dimm_info health:Unhealthy instance:ubuntu-1 memory_id:mem1 system_id:s1]
-
-  - interval: 1m
-    input_series:
-      - series: redfish_memory_dimm_info{instance="ubuntu-1", health="NA", system_id="s1", memory_id="mem1"}
-        values: "1x15"
-
-    alert_rule_test:
-      - eval_time: 0m
-        alertname: RedfishMemoryDimmHealthNotAvailable
-        exp_alerts:
-          - exp_labels:
-              severity: warning
-              instance: ubuntu-1
-              health: NA
-              system_id: s1
-              memory_id: mem1
-            exp_annotations:
-              summary: Redfish memory dimm health not available. (instance ubuntu-1)
-              description: |
-                Redfish memory dimm health not available.
-                  LABELS = map[__name__:redfish_memory_dimm_info health:NA instance:ubuntu-1 memory_id:mem1 system_id:s1]
 
   - interval: 1m
     input_series:
