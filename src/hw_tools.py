@@ -439,9 +439,9 @@ def raid_hw_verifier() -> List[HWTool]:
 def redfish_available() -> bool:
     """Check if redfish service is available."""
     bmc_address = get_bmc_address()
-    health_check_enpoint = f"https://{bmc_address}:443/redfish/v1/"
+    health_check_endpoint = f"https://{bmc_address}:443/redfish/v1/"
     try:
-        response = requests.get(health_check_enpoint, verify=False, timeout=REDFISH_TIMEOUT)
+        response = requests.get(health_check_endpoint, verify=False, timeout=REDFISH_TIMEOUT)
         response.raise_for_status()
         data = response.json()
         # only check if the data is empty dict or not
@@ -572,7 +572,7 @@ class HWToolHelper:
     def install(self, resources: Resources) -> Tuple[bool, str]:
         """Install tools."""
         hw_white_list: List[HWTool] = get_hw_tool_white_list()
-        logger.info("gw_white_list: %s", hw_white_list)
+        logger.info("hw_white_list: %s", hw_white_list)
 
         fetch_tools: Dict[HWTool, Path] = self.fetch_tools(resources, hw_white_list)
 
