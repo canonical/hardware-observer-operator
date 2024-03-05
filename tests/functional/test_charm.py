@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
-from utils import get_metrics_output, parse_metrics, run_command_on_unit
+from utils import RESOURCES_DIR, get_metrics_output, parse_metrics, run_command_on_unit
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +43,13 @@ class AppStatus(str, Enum):
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_build_and_deploy(ops_test: OpsTest, series):
+async def test_build_and_deploy(  # noqa: C901, function is too complex
+    ops_test: OpsTest, series, provided_collectors, required_resources
+):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
+    Optionally attach required resources when testing with real hardware.
     """
     # Build and deploy charm from local source folder
     charm = await ops_test.build_charm(".")
@@ -66,8 +69,15 @@ async def test_build_and_deploy(ops_test: OpsTest, series):
             "sas3ircu-bin": "empty-resource",
         },
     )
+
     juju_cmd = ["deploy", "-m", ops_test.model_full_name, str(bundle)]
 
+    # deploy bundle to already added machine instead of provisioning new one
+    # when testing with real hardware
+    if provided_collectors:
+        juju_cmd.append("--map-machines=existing")
+
+    logging.info("Deploying bundle...")
     rc, stdout, stderr = await ops_test.juju(*juju_cmd)
     assert rc == 0, f"Bundle deploy failed: {(stderr or stdout).strip()}"
 
@@ -88,7 +98,38 @@ async def test_build_and_deploy(ops_test: OpsTest, series):
         timeout=TIMEOUT,
     )
 
-    # Test initial workload status
+    if required_resources:
+        logging.info(
+            f"Required resources to attach: {[r.resource_name for r in required_resources]}"
+        )
+        # check workload status for real hardware based tests requiring resources to be attached
+        for unit in ops_test.model.applications[APP_NAME].units:
+            assert AppStatus.MISSING_RESOURCES in unit.workload_status_message
+
+        # NOTE: resource files need to be manually placed into the resources directory
+        for resource in required_resources:
+            path = f"{RESOURCES_DIR}/{resource.file_name}"
+            if not Path(path).exists():
+                pytest.fail(f"{path} not provided. Add resource into {RESOURCES_DIR} directory")
+            resource.file_path = path
+
+        resource_path_map = {r.resource_name: r.file_path for r in required_resources}
+        resource_cmd = [f"{name}={path}" for name, path in resource_path_map.items()]
+        juju_cmd = ["attach-resource", APP_NAME, "-m", ops_test.model_full_name] + resource_cmd
+
+        logging.info("Attaching resources...")
+        rc, stdout, stderr = await ops_test.juju(*juju_cmd)
+        assert rc == 0, f"Attaching resources failed: {(stderr or stdout).strip()}"
+
+        # still blocked since cos-agent relation has not been added
+        await ops_test.model.wait_for_idle(
+            apps=[APP_NAME],
+            status="blocked",
+            timeout=TIMEOUT,
+        )
+
+    # Test workload status with no real hardware or
+    # when real hardware doesn't require any resource to be attached
     for unit in ops_test.model.applications[APP_NAME].units:
         assert AppStatus.MISSING_RESOURCES not in unit.workload_status_message
         assert unit.workload_status_message == AppStatus.MISSING_RELATION
@@ -101,12 +142,14 @@ async def test_build_and_deploy(ops_test: OpsTest, series):
     check_active_cmd = "systemctl is-active hardware-exporter"
 
     # Test without cos-agent relation
+    logging.info("Check whether hardware-exporter is inactive before creating relation.")
     for unit in ops_test.model.applications[APP_NAME].units:
         results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
         assert results.get("return-code") > 0
         assert results.get("stdout").strip() == "inactive"
 
     # Add cos-agent relation
+    logging.info("Adding cos-agent relation.")
     await asyncio.gather(
         ops_test.model.add_relation(
             f"{APP_NAME}:cos-agent", f"{GRAFANA_AGENT_APP_NAME}:cos-agent"
@@ -119,6 +162,7 @@ async def test_build_and_deploy(ops_test: OpsTest, series):
     )
 
     # Test with cos-agent relation
+    logging.info("Check whether hardware-exporter is active after creating relation.")
     for unit in ops_test.model.applications[APP_NAME].units:
         results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
         assert results.get("return-code") == 0

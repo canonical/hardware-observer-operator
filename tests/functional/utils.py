@@ -3,11 +3,41 @@
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 from async_lru import alru_cache
 
 from config import EXPORTER_DEFAULT_PORT
+
+RESOURCES_DIR = Path("./resources/")
+
+
+@dataclass
+class Metric:
+    """Class for metric data."""
+
+    name: str
+    labels: Optional[str]
+    value: float
+
+
+@dataclass
+class Resource:
+    """Class for resource data.
+
+    resource_name: Name of juju resource for charm
+    file_name: file name for resource
+    collector_name: Associated collector name for resource
+    bin_name: Name of the binary after installing resource
+    file_path: Path to resource file to be attached (None by default)
+    """
+
+    resource_name: str
+    file_name: str
+    collector_name: str
+    bin_name: str
+    file_path: Optional[str] = None
 
 
 async def run_command_on_unit(ops_test, unit_name, command):
@@ -26,15 +56,6 @@ async def get_metrics_output(ops_test, unit_name):
     command = f"curl localhost:{EXPORTER_DEFAULT_PORT}"
     results = await run_command_on_unit(ops_test, unit_name, command)
     return results
-
-
-@dataclass
-class Metric:
-    """Class for metric data."""
-
-    name: str
-    labels: Optional[str]
-    value: float
 
 
 def _parse_single_metric(metric: str) -> Optional[Metric]:
