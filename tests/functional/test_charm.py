@@ -8,11 +8,14 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 from utils import RESOURCES_DIR, get_metrics_output, parse_metrics, run_command_on_unit
+
+from config import TOOLS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +41,7 @@ class AppStatus(str, Enum):
     MISSING_RELATION = "Missing relation: [cos-agent]"
     NOT_RUNNING = "Exporter is not running"
     MISSING_RESOURCES = "Missing resources:"
+    CHECKSUM_ERROR = "Fail strategies: "
     INVALID_CONFIG_EXPORTER_LOG_LEVEL = "Invalid config: 'exporter-log-level'"
 
 
@@ -218,6 +222,103 @@ class TestCharmWithHW:
         results = await get_metrics_output(ops_test, unit.name)
         parsed_metrics = parse_metrics(results.get("stdout").strip())
         assert parsed_metrics.get(collector), f"{collector} specific metrics are not available."
+
+    async def test_resource_in_correct_location(self, ops_test, unit, required_resources):
+        """Test if attached resource is added to correctly specified location."""
+        # by default, TOOLS_DIR = Path("/usr/sbin")
+        for resource in required_resources:
+            symlink_bin = TOOLS_DIR / resource.bin_name
+            # checks whether symlink points correctly resource binary
+            check_resource_cmd = f"ls -L {symlink_bin}"
+            results = await run_command_on_unit(ops_test, unit.name, check_resource_cmd)
+            assert results.get("return-code") == 0, f"{symlink_bin} resource doesn't exist"
+
+    async def test_wrong_resource_attached(self, ops_test, unit, required_resources, tmp_path):
+        """Test charm when wrong resource file for collector has been attached."""
+        for resource in required_resources:
+            # resource file names require the right extensions
+            if resource.resource_name in ["storcli-deb", "perccli-deb"]:
+                tmp_resource_file = tmp_path / "resource.deb"
+            else:
+                tmp_resource_file = tmp_path / "resource"
+
+            # write random data into file
+            with open(tmp_resource_file, "w") as file:
+                file.write(str(uuid4()))
+
+            logging.info(f"Testing wrong resource for: {resource.resource_name}")
+            juju_cmd = [
+                "attach-resource",
+                APP_NAME,
+                "-m",
+                ops_test.model_full_name,
+                f"{resource.resource_name}={tmp_resource_file}",
+            ]
+            rc, stdout, stderr = await ops_test.juju(*juju_cmd)
+            assert rc == 0, f"Attaching resource failed: {(stderr or stdout).strip()}"
+
+            await ops_test.model.wait_for_idle(
+                apps=[APP_NAME],
+                status="blocked",
+                timeout=TIMEOUT,
+            )
+            assert AppStatus.CHECKSUM_ERROR in unit.workload_status_message
+
+            resource_path = f"{RESOURCES_DIR}/{resource.file_name}"
+            if not Path(resource_path).exists():
+                pytest.fail(f"{resource_path} doesn't exist.")
+
+            # reset test environment by reattaching correct resource
+            logging.info("Re-attaching correct resource...")
+            juju_cmd = [
+                "attach-resource",
+                APP_NAME,
+                "-m",
+                ops_test.model_full_name,
+                f"{resource.resource_name}={resource_path}",
+            ]
+            # check if attaching resource failed so that it doesn't impact the test for the
+            # next resource
+            rc, stdout, stderr = await ops_test.juju(*juju_cmd)
+            assert rc == 0, f"Attaching resource failed: {(stderr or stdout).strip()}"
+
+            await ops_test.model.wait_for_idle(
+                apps=[APP_NAME],
+                status="active",
+                timeout=TIMEOUT,
+            )
+            assert AppStatus.MISSING_RESOURCES not in unit.workload_status_message
+
+    async def test_resource_clean_up(self, ops_test, app, unit, required_resources):
+        """Test resource clean up behaviour when relation with principal charm is removed."""
+        await asyncio.gather(
+            app.remove_relation(f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"),
+            ops_test.model.wait_for_idle(
+                apps=[PRINCIPAL_APP_NAME], status="active", timeout=TIMEOUT
+            ),
+        )
+        principal_unit = ops_test.model.applications[PRINCIPAL_APP_NAME].units[0]
+
+        # Wait for cleanup activities to finish
+        await ops_test.model.block_until(
+            lambda: ops_test.model.applications[APP_NAME].status == "unknown"
+        )
+
+        for resource in required_resources:
+            symlink_bin = TOOLS_DIR / resource.bin_name
+            check_resource_cmd = f"ls -L {symlink_bin}"
+            results = await run_command_on_unit(ops_test, principal_unit.name, check_resource_cmd)
+            assert results.get("return-code") > 0, f"{symlink_bin} resource has not been removed"
+
+        # reset test environment by adding ubuntu:juju-info relation again
+        await asyncio.gather(
+            ops_test.model.add_relation(
+                f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"
+            ),
+            ops_test.model.wait_for_idle(
+                apps=[PRINCIPAL_APP_NAME], status="active", timeout=TIMEOUT
+            ),
+        )
 
 
 class TestCharm:
