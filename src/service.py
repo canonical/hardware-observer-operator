@@ -78,7 +78,7 @@ class ExporterTemplate:
             logger.info("Removing file '%s' - Done.", path)
         return success
 
-    def render_config(self, port: str, level: str, redfish_creds: dict) -> bool:
+    def render_config(self, port: str, level: str, redfish_conn_params: dict) -> bool:
         """Render and install exporter config file."""
         hw_tools = get_hw_tool_white_list()
         collectors = []
@@ -89,11 +89,11 @@ class ExporterTemplate:
         content = self.config_template.render(
             PORT=port,
             LEVEL=level,
-            COLLECTORS=sorted(collectors),  # only sort this because of unittest
-            REDFISH_ENABLE=redfish_creds != {},
-            REDFISH_HOST=redfish_creds.get("host", ""),
-            REDFISH_USERNAME=redfish_creds.get("username", ""),
-            REDFISH_PASSWORD=redfish_creds.get("password", ""),
+            COLLECTORS=collectors,
+            REDFISH_ENABLE=redfish_conn_params != {},
+            REDFISH_HOST=redfish_conn_params.get("host", ""),
+            REDFISH_USERNAME=redfish_conn_params.get("username", ""),
+            REDFISH_PASSWORD=redfish_conn_params.get("password", ""),
         )
         return self._install(EXPORTER_CONFIG_PATH, content)
 
@@ -119,10 +119,12 @@ class Exporter:
         self.charm_dir = charm_dir
         self.template = ExporterTemplate(charm_dir)
 
-    def install(self, port: str, level: str, redfish_creds: dict) -> bool:
+    def install(self, port: str, level: str, redfish_conn_params: dict) -> bool:
         """Install the exporter."""
         logger.info("Installing %s.", EXPORTER_NAME)
-        success = self.template.render_config(port=port, level=level, redfish_creds=redfish_creds)
+        success = self.template.render_config(
+            port=port, level=level, redfish_conn_params=redfish_conn_params
+        )
         success = self.template.render_service(str(self.charm_dir), str(EXPORTER_CONFIG_PATH))
         if not success:
             logger.error("Failed to install %s.", EXPORTER_NAME)

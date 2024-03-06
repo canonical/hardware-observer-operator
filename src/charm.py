@@ -92,8 +92,8 @@ class HardwareObserverCharm(ops.CharmBase):
 
         port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
         level = self.model.config.get("exporter-log-level", "INFO")
-        redfish_creds = self.get_redfish_creds()
-        success = self.exporter.install(port, level, redfish_creds)
+        redfish_conn_params = self.get_redfish_conn_params()
+        success = self.exporter.install(port, level, redfish_conn_params)
         self._stored.exporter_installed = success
         if not success:
             msg = "Failed to install exporter, please refer to `juju debug-log`"
@@ -212,11 +212,11 @@ class HardwareObserverCharm(ops.CharmBase):
                 logger.info("Detected changes in exporter config.")
                 port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
                 level = self.model.config.get("exporter-log-level", "INFO")
-                redfish_creds = self.get_redfish_creds()
+                redfish_conn_params = self.get_redfish_conn_params()
                 success = self.exporter.template.render_config(
                     port=port,
                     level=level,
-                    redfish_creds=redfish_creds,
+                    redfish_conn_params=redfish_conn_params,
                 )
                 if not success:
                     message = (
@@ -252,8 +252,8 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.info("Stop and disable exporter service")
         self._on_update_status(event)
 
-    def get_redfish_creds(self) -> Dict[str, Any]:
-        """Provide redfish config if redfish is available."""
+    def get_redfish_conn_params(self) -> Dict[str, Any]:
+        """Get redfish connection parameters if redfish is available."""
         bmc_tools = bmc_hw_verifier()
         if HWTool.REDFISH not in bmc_tools:
             logger.warning("Redfish unavailable, disregarding redfish config options...")
@@ -264,14 +264,64 @@ class HardwareObserverCharm(ops.CharmBase):
             "password": self.model.config.get("redfish-password", ""),
         }
 
-    def validate_redfish_creds(self, creds: Dict[str, str]) -> bool:
-        """Validate the redfish credentials used by the exporter."""
+    def validate_exporter_configs(self) -> Tuple[bool, str]:
+        """Validate the static and runtime config options for the exporter."""
+        port = int(self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT))
+        if not 1 <= port <= 65535:
+            logger.error("Invalid exporter-port: port must be in [1, 65535].")
+            return False, "Invalid config: 'exporter-port'"
+
+        level = self.model.config.get("exporter-log-level", "")
+        allowed_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        if level.upper() not in allowed_choices:
+            logger.error(
+                "Invalid exporter-log-level: level must be in %s (case-insensitive).",
+                allowed_choices,
+            )
+            return False, "Invalid config: 'exporter-log-level'"
+
+        # Note we need to use `is False` because `None` means redfish is not
+        # available.
+        if self.redfish_conn_params_valid is False:
+            logger.error("Invalid redfish credentials.")
+            return False, "Invalid config: 'redfish-username' or 'redfish-password'"
+
+        return True, "Exporter config is valid."
+
+    def get_num_cos_agent_relations(self, relation_name: str) -> int:
+        """Get the number of relation given a relation_name."""
+        relations = self.model.relations.get(relation_name, [])
+        return len(relations)
+
+    @property
+    def exporter_enabled(self) -> bool:
+        """Return True if cos-agent relation is present."""
+        return self.num_cos_agent_relations != 0
+
+    @property
+    def too_many_cos_agent_relations(self) -> bool:
+        """Return True if there're more than one cos-agent relation."""
+        return self.num_cos_agent_relations > 1
+
+    @property
+    def redfish_conn_params_valid(self) -> Optional[bool]:
+        """Check if redfish connections parameters is valid or not.
+
+        If the redfish connection params is not available this property returns
+        None. Otherwise, it verifies the connection parameters. If the redfish
+        connection parameters are valid, it returns True; if not valid, it
+        returns False.
+        """
+        redfish_conn_params = self.get_redfish_conn_params()
+        if not redfish_conn_params:
+            return None
+
         redfish_obj = None
         try:
             redfish_obj = redfish_client(
-                base_url=creds.get("host", ""),
-                username=creds.get("username", ""),
-                password=creds.get("password", ""),
+                base_url=redfish_conn_params.get("host", ""),
+                username=redfish_conn_params.get("username", ""),
+                password=redfish_conn_params.get("password", ""),
                 timeout=REDFISH_TIMEOUT,
                 max_retry=REDFISH_MAX_RETRY,
             )
@@ -290,46 +340,6 @@ class HardwareObserverCharm(ops.CharmBase):
                 redfish_obj.logout()
 
         return result
-
-    def validate_exporter_configs(self) -> Tuple[bool, str]:
-        """Validate the static and runtime config options for the exporter."""
-        port = int(self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT))
-        if not 1 <= port <= 65535:
-            logger.error("Invalid exporter-port: port must be in [1, 65535].")
-            return False, "Invalid config: 'exporter-port'"
-
-        level = self.model.config.get("exporter-log-level", "")
-        allowed_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-        if level.upper() not in allowed_choices:
-            logger.error(
-                "Invalid exporter-log-level: level must be in %s (case-insensitive).",
-                allowed_choices,
-            )
-            return False, "Invalid config: 'exporter-log-level'"
-
-        redfish_creds = self.get_redfish_creds()
-        if redfish_creds:
-            redfish_creds_valid = self.validate_redfish_creds(redfish_creds)
-            if not redfish_creds_valid:
-                logger.error("Invalid redfish credentials.")
-                return False, "Invalid config: 'redfish-username' or 'redfish-password'"
-
-        return True, "Exporter config is valid."
-
-    def get_num_cos_agent_relations(self, relation_name: str) -> int:
-        """Get the number of relation given a relation_name."""
-        relations = self.model.relations.get(relation_name, [])
-        return len(relations)
-
-    @property
-    def exporter_enabled(self) -> bool:
-        """Return True if cos-agent relation is present."""
-        return self.num_cos_agent_relations != 0
-
-    @property
-    def too_many_cos_agent_relations(self) -> bool:
-        """Return True if there're more than one cos-agent relation."""
-        return self.num_cos_agent_relations > 1
 
 
 if __name__ == "__main__":  # pragma: nocover

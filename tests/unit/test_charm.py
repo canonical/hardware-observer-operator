@@ -373,7 +373,7 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(self.harness.charm._stored.resource_installed)
 
         self.harness.charm.exporter.install.assert_called_with(
-            int(EXPORTER_DEFAULT_PORT), "INFO", self.harness.charm.get_redfish_creds()
+            int(EXPORTER_DEFAULT_PORT), "INFO", self.harness.charm.get_redfish_conn_params()
         )
 
     @parameterized.expand([(InvalidCredentialsError), (Exception)])
@@ -407,14 +407,13 @@ class TestCharm(unittest.TestCase):
     def test_18_config_changed_redfish_enabled_with_incorrect_credential(
         self, test_exception, mock_redfish_client, mock_hw_tool_helper, mock_exporter
     ) -> None:
-        """Test event install when redfish is available but credential is wrong."""
+        """Test event config changed when redfish is available but credential is wrong."""
         self.mock_bmc_hw_verifier.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
             HWTool.REDFISH,
         ]
-        mock_redfish_client.side_effect = test_exception()
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
@@ -422,6 +421,7 @@ class TestCharm(unittest.TestCase):
         self.harness.begin()
         self.harness.add_relation_unit(rid, "grafana-agent/0")
 
+        mock_redfish_client.side_effect = test_exception()
         new_config = {
             "exporter-port": 80,
             "exporter-log-level": "DEBUG",
