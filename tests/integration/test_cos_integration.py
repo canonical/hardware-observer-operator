@@ -6,7 +6,6 @@ import asyncio
 import inspect
 import logging
 import os
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -53,22 +52,17 @@ async def test_setup_and_deploy(ops_test: OpsTest, series, channel):
 
 
 async def _deploy_cos(ops_test, series, channel, k8s_ctl, k8s_mdl):
-    cmd = [
-        "juju",
-        "deploy",
+    """Deploy COS on the existing k8s cloud."""
+    await k8s_mdl.deploy(
         "cos-lite",
-        "--channel",
-        channel,
-        "--trust",
-        "-m",
-        f"{k8s_ctl.controller_name}:{k8s_mdl.name}",
-        "--overlay",
-        str(get_this_script_dir() / "offers-overlay.yaml"),
-    ]
-    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        channel=channel,
+        trust=True,
+        overlays=[str(get_this_script_dir() / "offers-overlay.yaml")],
+    )
 
 
 async def _deploy_hardware_observer(ops_test, series, channel, lxd_mdl):
+    """Deploy Hardware Observer and Grafana Agent on the existing lxd cloud."""
     await asyncio.gather(
         # Principal Ubuntu
         lxd_mdl.deploy(
@@ -95,6 +89,7 @@ async def _deploy_hardware_observer(ops_test, series, channel, lxd_mdl):
 
 
 async def _add_cross_controller_relations(ops_test, series, channel, k8s_ctl, k8s_mdl, lxd_mdl):
+    """Add relations between Grafana Agent and COS."""
     # The consumed endpoint names must match offers-overlay.yaml.
     await asyncio.gather(
         lxd_mdl.consume(

@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 async def get_or_add_model(ops_test: OpsTest, controller: Controller, model_name: str) -> Model:
+    # Pytest Operator provides a --model option. If provided, model with that name will be used.
+    # So, we need to check if it already exists.
     if model_name not in await controller.get_models():
         await controller.add_model(model_name)
         ctl_name = controller.controller_name
