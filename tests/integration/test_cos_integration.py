@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 
 import asyncio
-import inspect
 import logging
 import os
 import subprocess
@@ -20,12 +19,6 @@ LXD_CTL_NAME = os.environ.get("LXD_CONTROLLER")
 K8S_CTL_NAME = os.environ.get("K8S_CONTROLLER")
 
 MODEL_CONFIG = {"logging-config": "<root>=WARNING; unit=DEBUG"}
-
-
-def get_this_script_dir() -> Path:
-    filename = inspect.getframeinfo(inspect.currentframe()).filename  # type: ignore[arg-type]
-    path = os.path.dirname(os.path.abspath(filename))
-    return Path(path)
 
 
 @pytest.mark.abort_on_fail
@@ -66,7 +59,7 @@ async def _deploy_cos(channel, model):
         "cos-lite",
         channel=channel,
         trust=True,
-        overlays=[str(get_this_script_dir() / "offers-overlay.yaml")],
+        overlays=[str(Path(__file__).parent.resolve() / "offers-overlay.yaml")],
     )
 
 
