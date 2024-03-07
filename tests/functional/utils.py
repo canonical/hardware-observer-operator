@@ -40,6 +40,12 @@ class Resource:
     file_path: Optional[str] = None
 
 
+class MetricsFetchError(Exception):
+    """Raise if something goes wrong when fetching metrics from endpoint."""
+
+    pass
+
+
 async def run_command_on_unit(ops_test, unit_name, command):
     complete_command = ["exec", "--unit", unit_name, "--", *command.split()]
     return_code, stdout, _ = await ops_test.juju(*complete_command)
@@ -51,11 +57,34 @@ async def run_command_on_unit(ops_test, unit_name, command):
 
 
 @alru_cache
-async def get_metrics_output(ops_test, unit_name):
-    """Return prometheus metric output from endpoint on unit."""
+async def get_metrics_output(ops_test, unit_name) -> Optional[dict[str, list[Metric]]]:
+    """Return parsed prometheus metric output from endpoint on unit.
+
+    Raises MetricsFetchError if command to fetch metrics didn't execute successfully.
+    """
     command = f"curl -s localhost:{EXPORTER_DEFAULT_PORT}"
     results = await run_command_on_unit(ops_test, unit_name, command)
-    return results
+    if results.get("return-code") > 0:
+        raise MetricsFetchError
+    parsed_metrics = parse_metrics(results.get("stdout").strip())
+    return parsed_metrics
+
+
+def assert_metrics(metrics: list[Metric], expected_metric_values_map: dict[str, float]) -> bool:
+    """Assert whether values in obtained list of metrics for a collector are as expected.
+
+    Returns False if all expected metrics are not found in the list of provided metrics.
+    Otherwise returns True.
+    """
+    seen_metrics = 0
+    for metric in metrics:
+        if metric.name in expected_metric_values_map:
+            assert metric.value == expected_metric_values_map.get(
+                metric.name
+            ), f"{metric.name} value is incorrect"
+            seen_metrics += 1
+
+    return False if seen_metrics != len(expected_metric_values_map) else True
 
 
 def _parse_single_metric(metric: str) -> Optional[Metric]:
