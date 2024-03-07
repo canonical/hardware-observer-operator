@@ -1,4 +1,4 @@
 jinja2
-juju
+juju~=3.3.0  # must be compatible with the juju CLI version installed by CI
 pytest
 pytest-operator

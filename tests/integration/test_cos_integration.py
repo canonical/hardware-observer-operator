@@ -6,6 +6,7 @@ import asyncio
 import inspect
 import logging
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -44,16 +45,16 @@ async def test_setup_and_deploy(ops_test: OpsTest, series, channel):
     k8s_mdl = await get_or_add_model(ops_test, k8s_ctl, k8s_mdl_name)
     await k8s_mdl.set_config({"logging-config": "<root>=WARNING; unit=DEBUG"})
 
-    await _deploy_cos(ops_test, series, channel, k8s_ctl, k8s_mdl)
+    await _deploy_cos(channel, k8s_mdl)
 
-    await _deploy_hardware_observer(ops_test, series, channel, lxd_mdl)
+    await _deploy_hardware_observer(series, channel, lxd_mdl)
 
-    await _add_cross_controller_relations(ops_test, series, channel, k8s_ctl, k8s_mdl, lxd_mdl)
+    await _add_cross_controller_relations(k8s_ctl, lxd_ctl, k8s_mdl, lxd_mdl)
 
 
-async def _deploy_cos(ops_test, series, channel, k8s_ctl, k8s_mdl):
+async def _deploy_cos(channel, model):
     """Deploy COS on the existing k8s cloud."""
-    await k8s_mdl.deploy(
+    await model.deploy(
         "cos-lite",
         channel=channel,
         trust=True,
@@ -61,20 +62,20 @@ async def _deploy_cos(ops_test, series, channel, k8s_ctl, k8s_mdl):
     )
 
 
-async def _deploy_hardware_observer(ops_test, series, channel, lxd_mdl):
+async def _deploy_hardware_observer(series, channel, model):
     """Deploy Hardware Observer and Grafana Agent on the existing lxd cloud."""
     await asyncio.gather(
         # Principal Ubuntu
-        lxd_mdl.deploy(
+        model.deploy(
             "ubuntu",
             num_units=1,
             series=series,
             channel=channel,
         ),
         # Hardware Observer
-        lxd_mdl.deploy("hardware-observer", series=series, num_units=0, channel=channel),
+        model.deploy("hardware-observer", series=series, num_units=0, channel=channel),
         # Grafana Agent
-        lxd_mdl.deploy(
+        model.deploy(
             "grafana-agent",
             num_units=0,
             series=series,
@@ -82,38 +83,27 @@ async def _deploy_hardware_observer(ops_test, series, channel, lxd_mdl):
         ),
     )
 
-    await lxd_mdl.add_relation("ubuntu:juju-info", "hardware-observer:general-info")
-    await lxd_mdl.add_relation("hardware-observer:cos-agent", "grafana-agent:cos-agent")
-    await lxd_mdl.add_relation("ubuntu:juju-info", "grafana-agent:juju-info")
-    await lxd_mdl.block_until(lambda: len(lxd_mdl.applications["hardware-observer"].units) > 0)
+    await model.add_relation("ubuntu:juju-info", "hardware-observer:general-info")
+    await model.add_relation("hardware-observer:cos-agent", "grafana-agent:cos-agent")
+    await model.add_relation("ubuntu:juju-info", "grafana-agent:juju-info")
+    await model.block_until(lambda: len(model.applications["hardware-observer"].units) > 0)
 
 
-async def _add_cross_controller_relations(ops_test, series, channel, k8s_ctl, k8s_mdl, lxd_mdl):
+async def _add_cross_controller_relations(k8s_ctl, lxd_ctl, k8s_mdl, lxd_mdl):
     """Add relations between Grafana Agent and COS."""
-    # The consumed endpoint names must match offers-overlay.yaml.
-    await asyncio.gather(
-        lxd_mdl.consume(
-            f"admin/{k8s_mdl.name}.prometheus-receive-remote-write",
-            application_alias="prometheus",
-            controller_name=k8s_ctl.controller_name,
-        ),
-        lxd_mdl.consume(
-            f"admin/{k8s_mdl.name}.loki-logging",
-            application_alias="loki",
-            controller_name=k8s_ctl.controller_name,
-        ),
-        lxd_mdl.consume(
-            f"admin/{k8s_mdl.name}.grafana-dashboards",
-            application_alias="grafana",
-            controller_name=k8s_ctl.controller_name,
-        ),
-    )
-
-    await asyncio.gather(
-        lxd_mdl.add_relation("grafana-agent", "prometheus"),
-        lxd_mdl.add_relation("grafana-agent", "loki"),
-        lxd_mdl.add_relation("grafana-agent", "grafana"),
-    )
+    cos_saas_names = ["prometheus-receive-remote-write", "loki-logging", "grafana-dashboards"]
+    for saas in cos_saas_names:
+        # Using juju cli since Model.consume() from libjuju causes error.
+        # https://github.com/juju/python-libjuju/issues/1031
+        cmd = [
+            "juju",
+            "consume",
+            "--model",
+            f"{lxd_ctl.controller_name}:{k8s_mdl.name}",
+            f"{k8s_ctl.controller_name}:admin/{k8s_mdl.name}.{saas}",
+        ]
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        await lxd_mdl.add_relation("grafana-agent", saas),
 
     # `idle_period` needs to be greater than the scrape interval to make sure metrics ingested.
     await asyncio.gather(
