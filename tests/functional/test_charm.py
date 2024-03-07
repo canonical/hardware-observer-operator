@@ -13,7 +13,14 @@ from uuid import uuid4
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
-from utils import RESOURCES_DIR, get_metrics_output, parse_metrics, run_command_on_unit
+from tenacity import AsyncRetrying, RetryError, stop_after_attempt, wait_fixed
+from utils import (
+    RESOURCES_DIR,
+    MetricsFetchError,
+    assert_metrics,
+    get_metrics_output,
+    run_command_on_unit,
+)
 
 from config import TOOLS_DIR
 
@@ -195,15 +202,19 @@ class TestCharmWithHW:
 
     async def test_metrics_available(self, app, unit, ops_test):
         """Test if metrics are available at the expected endpoint on unit."""
-        results = await get_metrics_output(ops_test, unit.name)
-        assert results.get("return-code") == 0, "Metrics output not available"
+        try:
+            metrics = await get_metrics_output(ops_test, unit.name)
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        assert metrics, "Metrics result should not be empty"
 
     @pytest.mark.parametrize(
         "collector",
         [
             "ipmi_dcmi",
             "ipmi_sel",
-            "ipmi_sensors",
+            "ipmi_sensor",
             "redfish",
             "poweredge_raid",
             "mega_raid",
@@ -219,9 +230,12 @@ class TestCharmWithHW:
             pytest.skip(f"{collector} not in provided collectors, skipping test")
 
         # collector is available, proceed to run collector specific tests
-        results = await get_metrics_output(ops_test, unit.name)
-        parsed_metrics = parse_metrics(results.get("stdout").strip())
-        assert parsed_metrics.get(collector), f"{collector} specific metrics are not available."
+        try:
+            metrics = await get_metrics_output(ops_test, unit.name)
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        assert metrics.get(collector), f"{collector} specific metrics are not available."
 
     async def test_resource_in_correct_location(self, ops_test, unit, required_resources):
         """Test if attached resource is added to correctly specified location."""
@@ -319,6 +333,173 @@ class TestCharmWithHW:
                 apps=[PRINCIPAL_APP_NAME], status="active", timeout=TIMEOUT
             ),
         )
+
+    async def test_redfish_metrics(self, ops_test, app, unit, provided_collectors):  # noqa: C901
+        """Tests for redfish specific metrics."""
+        if "redfish" not in provided_collectors:
+            pytest.skip("redfish not in provided collectors, skipping test")
+
+        try:
+            metrics = await get_metrics_output(ops_test, unit.name)
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        # mapping of metric names with their expected values
+        expected_metric_values = {
+            "redfish_service_available": 1.0,
+            "redfish_call_success": 0.0,
+        }
+        if not assert_metrics(metrics.get("redfish"), expected_metric_values):
+            pytest.fail("Expected metrics not present!")
+
+        # fetch and configure redfish creds
+        logging.info("Setting Redfish credentials...")
+        username = os.getenv("REDFISH_USERNAME")
+        password = os.getenv("REDFISH_PASSWORD")
+        if username is None or password is None:
+            pytest.fail("Environment vars for redfish creds not set")
+        await asyncio.gather(
+            app.set_config({"redfish-username": username}),
+            app.set_config({"redfish-password": password}),
+            ops_test.model.wait_for_idle(apps=[APP_NAME]),
+        )
+
+        logging.info("Check metric after setting redfish credentials...")
+        try:
+            # retry metric endpoint check which takes some time to settle after config change
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_fixed(5),
+            ):
+                with attempt:
+                    logging.info(f"Attempt #{attempt.retry_state.attempt_number}")
+                    get_metrics_output.cache_clear()  # don't hit cache, need new redfish metrics
+                    metrics = await get_metrics_output(ops_test, unit.name)
+                    await ops_test.model.wait_for_idle(apps=[APP_NAME])
+        except RetryError:
+            pytest.fail("Not able to obtain metrics.")
+
+        expected_metric_values = {
+            "redfish_service_available": 1.0,
+            "redfish_call_success": 1.0,
+        }
+        if not assert_metrics(metrics.get("redfish"), expected_metric_values):
+            pytest.fail("Expected metrics not present!")
+
+    async def test_poweredge_raid_metrics(self, ops_test, unit, provided_collectors):
+        """Tests for poweredge_raid specific metrics."""
+        if "poweredge_raid" not in provided_collectors:
+            pytest.skip("poweredge_raid not in provided collectors, skipping test")
+
+        try:
+            metrics = await get_metrics_output(ops_test, unit.name)
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        expected_metric_values = {
+            "perccli_command_success": 1.0,
+            "perccli_command_ctrl_success": 1.0,
+        }
+        if not assert_metrics(metrics.get("poweredge_raid"), expected_metric_values):
+            pytest.fail("Expected metrics not present!")
+
+    async def test_mega_raid_metrics(self, ops_test, unit, provided_collectors):
+        """Tests for mega_raid specific metrics."""
+        if "mega_raid" not in provided_collectors:
+            pytest.skip("mega_raid not in provided collectors, skipping test")
+
+        try:
+            metrics = await get_metrics_output(ops_test, unit.name)
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        expected_metric_values = {
+            "storcli_command_success": 1.0,
+        }
+        if not assert_metrics(metrics.get("mega_raid"), expected_metric_values):
+            pytest.fail("Expected metrics not present!")
+
+    async def test_ipmi_dcmi_metrics(self, ops_test, unit, provided_collectors):
+        """Tests for ipmi_dcmi specific metrics."""
+        if "ipmi_dcmi" not in provided_collectors:
+            pytest.skip("ipmi_dcmi not in provided collectors, skipping test")
+
+        try:
+            metrics = await get_metrics_output(ops_test, unit.name)
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        expected_metric_values = {
+            "ipmi_dcmi_command_success": 1.0,
+        }
+        if not assert_metrics(metrics.get("ipmi_dcmi"), expected_metric_values):
+            pytest.fail("Expected metrics not present!")
+
+    async def test_ipmi_sensor_metrics(self, ops_test, unit, provided_collectors):
+        """Tests for ipmi_sensor specific metrics."""
+        if "ipmi_sensor" not in provided_collectors:
+            pytest.skip("ipmi_sensor not in provided collectors, skipping test")
+
+        try:
+            metrics = await get_metrics_output(ops_test, unit.name)
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        expected_metric_values = {
+            "ipmimonitoring_command_success": 1.0,
+        }
+        if not assert_metrics(metrics.get("ipmi_sensor"), expected_metric_values):
+            pytest.fail("Expected metrics not present!")
+
+    async def test_ipmi_sel_metrics(self, ops_test, unit, provided_collectors):
+        """Tests for ipmi_sel specific metrics."""
+        if "ipmi_sel" not in provided_collectors:
+            pytest.skip("ipmi_sel not in provided collectors, skipping test")
+
+        try:
+            metrics = await get_metrics_output(ops_test, unit.name)
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        expected_metric_values = {
+            "ipmi_sel_command_success": 1.0,
+        }
+        if not assert_metrics(metrics.get("ipmi_sel"), expected_metric_values):
+            pytest.fail("Expected metrics not present!")
+
+    @pytest.mark.parametrize("version", ["1", "2"])
+    async def test_lsi_sas_metrics(self, ops_test, unit, provided_collectors, version):
+        """Tests for lsi_sas_{1,2} specific metrics."""
+        collector = f"lsi_sas_{version}"
+        if collector not in provided_collectors:
+            pytest.skip(f"{collector} not in provided collectors, skipping test")
+
+        try:
+            metrics = await get_metrics_output(ops_test, unit.name)
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        expected_metric_values = {
+            f"sas{version}ircu_command_success": 1.0,
+        }
+        if not assert_metrics(metrics.get(collector), expected_metric_values):
+            pytest.fail("Expected metrics not present!")
+
+    async def test_hpe_ssa_metrics(self, ops_test, unit, provided_collectors):
+        """Tests for hpe_ssa specific metrics."""
+        if "hpe_ssa" not in provided_collectors:
+            pytest.skip("hpe_ssa not in provided collectors, skipping test")
+
+        try:
+            metrics = await get_metrics_output(ops_test, unit.name)
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        expected_metric_values = {
+            "ssacli_command_success": 1.0,
+        }
+        if not assert_metrics(metrics.get("hpe_ssa"), expected_metric_values):
+            pytest.fail("Expected metrics not present!")
 
 
 class TestCharm:
