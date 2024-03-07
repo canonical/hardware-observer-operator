@@ -1,0 +1,21 @@
+applications:
+  alertmanager:
+    offers:
+      alertmanager-karma-dashboard:
+        endpoints:
+          - karma-dashboard
+  grafana:
+    offers:
+      grafana-dashboards:
+        endpoints:
+          - grafana-dashboard
+  loki:
+    offers:
+      loki-logging:
+        endpoints:
+        - logging
+  prometheus:
+    offers:
+      prometheus-receive-remote-write:
+        endpoints:
+        - receive-remote-write
