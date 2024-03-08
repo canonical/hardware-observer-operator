@@ -5,5 +5,5 @@ distro
 # caused due to this change: https://github.com/canonical/operator/pull/1107
 ops >= 2.2.0, <2.10.0
 jinja2
-redfish
+redfish  # requests is included in this
 git+https://github.com/canonical/prometheus-hardware-exporter.git

@@ -53,6 +53,10 @@ class TestExporter(unittest.TestCase):
         bmc_hw_verifier_patcher.start()
         self.addCleanup(bmc_hw_verifier_patcher.stop)
 
+        redfish_client_patcher = mock.patch("charm.redfish_client")
+        redfish_client_patcher.start()
+        self.addCleanup(redfish_client_patcher.stop)
+
     @classmethod
     def setUpClass(cls):
         exporter_health_retry_count_patcher = mock.patch("charm.EXPORTER_HEALTH_RETRY_COUNT", 1)
@@ -327,7 +331,7 @@ class TestExporterTemplate(unittest.TestCase):
             self.template.render_config(
                 port="80",
                 level="info",
-                redfish_creds={"enable": False},
+                redfish_conn_params={},
             )
             mock_install.assert_called_with(
                 EXPORTER_CONFIG_PATH,
@@ -336,6 +340,9 @@ class TestExporterTemplate(unittest.TestCase):
                     LEVEL="info",
                     COLLECTORS=["collector.mega_raid", "collector.hpe_ssa"],
                     REDFISH_ENABLE=False,
+                    REDFISH_HOST="",
+                    REDFISH_PASSWORD="",
+                    REDFISH_USERNAME="",
                 ),
             )
 
@@ -348,8 +355,7 @@ class TestExporterTemplate(unittest.TestCase):
             self.template.render_config(
                 port="80",
                 level="info",
-                redfish_creds={
-                    "enable": True,
+                redfish_conn_params={
                     "host": "127.0.0.1",
                     "username": "default_user",
                     "password": "default_pwd",

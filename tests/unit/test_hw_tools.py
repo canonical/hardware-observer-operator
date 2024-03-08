@@ -7,8 +7,10 @@ from unittest import mock
 import ops
 import ops.testing
 import pytest
+import requests
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ModelError
+from parameterized import parameterized
 
 from charm import HardwareObserverCharm
 from checksum import (
@@ -21,17 +23,14 @@ from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor,
 from hw_tools import (
     APTStrategyABC,
     HWToolHelper,
-    InvalidCredentialsError,
     IPMIDCMIStrategy,
     IPMISELStrategy,
     IPMISENSORStrategy,
     PercCLIStrategy,
     ResourceChecksumError,
     ResourceFileSizeZeroError,
-    RetriesExhaustedError,
     SAS2IRCUStrategy,
     SAS3IRCUStrategy,
-    SessionCreationError,
     SSACLIStrategy,
     StorCLIStrategy,
     StrategyABC,
@@ -287,7 +286,8 @@ class TestHWToolHelper(unittest.TestCase):
         mock_resources = self.harness.charm.model.resources
         ok, msg = self.hw_tool_helper.install(mock_resources)
         self.assertFalse(ok)
-        self.assertEqual(msg, "Missing resources: ['storcli-deb', 'perccli-deb']")
+        self.assertTrue("storcli-deb" in msg)
+        self.assertTrue("perccli-deb" in msg)
         self.assertFalse(self.harness.charm._stored.resource_installed)
 
     @mock.patch(
@@ -862,66 +862,48 @@ def test_raid_hw_verifier_hwinfo(mock_hwinfo, hwinfo_output, expect):
 
 
 class TestIPMIHWVerifier(unittest.TestCase):
-    @mock.patch("hw_tools.redfish_client")
+    @mock.patch("hw_tools.requests.get")
     @mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
-    def test_redfish_not_available(self, mock_bmc_address, mock_redfish_client):
-        mock_redfish_obj = mock.Mock()
-        mock_redfish_client.return_value = mock_redfish_obj
-        mock_redfish_obj.login.side_effect = RetriesExhaustedError()
-
+    def test_redfish_available(self, mock_bmc_address, mock_requests_get):
         redfish_available.cache_clear()
+        mock_response = mock.Mock()
+        mock_response.json.return_value = {"some_key": "some_value"}
+        mock_requests_get.return_value = mock_response
+
         result = redfish_available()
-
-        self.assertEqual(result, False)
-        mock_bmc_address.assert_called_once()
-        mock_redfish_client.assert_called_once()
-        mock_redfish_obj.login.assert_called_once()
-
-    @mock.patch("hw_tools.redfish_client")
-    @mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
-    def test_redfish_not_available_generic(self, mock_bmc_address, mock_redfish_client):
-        mock_redfish_obj = mock.Mock()
-        mock_redfish_client.return_value = mock_redfish_obj
-        mock_redfish_obj.login.side_effect = Exception()
-
-        redfish_available.cache_clear()
-        result = redfish_available()
-
-        self.assertEqual(result, False)
-        mock_bmc_address.assert_called_once()
-        mock_redfish_client.assert_called_once()
-        mock_redfish_obj.login.assert_called_once()
-
-    @mock.patch("hw_tools.redfish_client")
-    @mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
-    def test_redfish_available(self, mock_bmc_address, mock_redfish_client):
-        mock_redfish_obj = mock.Mock()
-        mock_redfish_client.return_value = mock_redfish_obj
-
-        for exc in [SessionCreationError, InvalidCredentialsError]:
-            mock_redfish_obj.login.side_effect = exc
-            result = redfish_available()
-            self.assertEqual(result, True)
-
-        mock_bmc_address.assert_called()
-        mock_redfish_client.assert_called()
-        mock_redfish_obj.login.assert_called()
-
-    @mock.patch("hw_tools.redfish_client")
-    @mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
-    def test_redfish_available_and_login_success(self, mock_bmc_address, mock_redfish_client):
-        mock_redfish_obj = mock.Mock()
-        mock_redfish_client.return_value = mock_redfish_obj
-
-        redfish_available.cache_clear()
-        result = redfish_available()
-
         self.assertEqual(result, True)
+        mock_bmc_address.assert_called()
 
+    @parameterized.expand(
+        [
+            (requests.exceptions.HTTPError),
+            (requests.exceptions.Timeout),
+            (Exception),
+        ]
+    )
+    @mock.patch("hw_tools.requests.get")
+    @mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
+    def test_redfish_not_available(self, test_except_class, mock_bmc_address, mock_requests_get):
+        redfish_available.cache_clear()
+        mock_response = mock.Mock()
+        mock_response.raise_for_status.side_effect = test_except_class()
+        mock_requests_get.return_value = mock_response
+
+        result = redfish_available()
+        self.assertEqual(result, False)
         mock_bmc_address.assert_called_once()
-        mock_redfish_client.assert_called_once()
-        mock_redfish_obj.login.assert_called_once()
-        mock_redfish_obj.logout.assert_called_once()
+
+    @mock.patch("hw_tools.requests.get")
+    @mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
+    def test_redfish_not_available_bad_response(self, mock_bmc_address, mock_requests_get):
+        redfish_available.cache_clear()
+        mock_response = mock.Mock()
+        mock_response.json.return_value = {}
+        mock_requests_get.return_value = mock_response
+
+        result = redfish_available()
+        self.assertEqual(result, False)
+        mock_bmc_address.assert_called_once()
 
     @mock.patch("hw_tools.redfish_available", return_value=True)
     @mock.patch("hw_tools.subprocess")

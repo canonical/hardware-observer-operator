@@ -10,6 +10,8 @@ from unittest import mock
 import ops
 import ops.testing
 from ops.model import ActiveStatus, BlockedStatus, ErrorStatus
+from parameterized import parameterized
+from redfish.rest.v1 import InvalidCredentialsError
 
 import charm
 from charm import HardwareObserverCharm
@@ -35,6 +37,14 @@ class TestCharm(unittest.TestCase):
             HWTool.REDFISH,
         ]
         self.addCleanup(bmc_hw_verifier_patcher.stop)
+
+        redfish_client_patcher = mock.patch("charm.redfish_client")
+        redfish_client_patcher.start()
+        self.addCleanup(redfish_client_patcher.stop)
+
+        requests_patcher = mock.patch("hw_tools.requests")
+        requests_patcher.start()
+        self.addCleanup(requests_patcher.stop)
 
     @classmethod
     def setUpClass(cls):
@@ -121,7 +131,9 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(self.harness.charm._stored.resource_installed)
 
         self.harness.charm.exporter.install.assert_called_with(
-            int(EXPORTER_DEFAULT_PORT), "INFO", {"enable": False}
+            int(EXPORTER_DEFAULT_PORT),
+            "INFO",
+            {},
         )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
@@ -343,3 +355,82 @@ class TestCharm(unittest.TestCase):
         )
         self.assertEqual(updated_metrics_alert_rules, fake_metrics_alert_rules)
         self.assertNotEqual(updated_metrics_alert_rules, metrics_alert_rules)
+
+    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
+    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
+    def test_16_install_redfish_enabled_with_correct_credential(
+        self, mock_hw_tool_helper, mock_exporter
+    ) -> None:
+        """Test event install when redfish is available and credential is correct."""
+        self.mock_bmc_hw_verifier.return_value = [
+            HWTool.REDFISH,
+        ]
+        mock_hw_tool_helper.return_value.install.return_value = (True, "")
+        mock_exporter.return_value.install.return_value = True
+        self.harness.begin()
+        self.harness.charm.on.install.emit()
+
+        self.assertTrue(self.harness.charm._stored.resource_installed)
+
+        self.harness.charm.exporter.install.assert_called_with(
+            int(EXPORTER_DEFAULT_PORT), "INFO", self.harness.charm.get_redfish_conn_params()
+        )
+
+    @parameterized.expand([(InvalidCredentialsError), (Exception)])
+    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
+    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
+    @mock.patch("charm.redfish_client", return_value=mock.MagicMock())
+    def test_17_install_redfish_enabled_with_incorrect_credential(
+        self, test_exception, mock_redfish_client, mock_hw_tool_helper, mock_exporter
+    ) -> None:
+        """Test event install when redfish is available but credential is wrong."""
+        self.mock_bmc_hw_verifier.return_value = [
+            HWTool.REDFISH,
+        ]
+        mock_redfish_client.side_effect = test_exception()
+        mock_hw_tool_helper.return_value.install.return_value = (True, "")
+        mock_exporter.return_value.install.return_value = True
+        self.harness.begin()
+        self.harness.charm.on.install.emit()
+
+        self.assertTrue(self.harness.charm._stored.resource_installed)
+
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            BlockedStatus("Invalid config: 'redfish-username' or 'redfish-password'"),
+        )
+
+    @parameterized.expand([(InvalidCredentialsError), (Exception)])
+    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
+    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
+    @mock.patch("charm.redfish_client", return_value=mock.MagicMock())
+    def test_18_config_changed_redfish_enabled_with_incorrect_credential(
+        self, test_exception, mock_redfish_client, mock_hw_tool_helper, mock_exporter
+    ) -> None:
+        """Test event config changed when redfish is available but credential is wrong."""
+        self.mock_bmc_hw_verifier.return_value = [
+            HWTool.IPMI_SENSOR,
+            HWTool.IPMI_SEL,
+            HWTool.IPMI_DCMI,
+            HWTool.REDFISH,
+        ]
+        mock_hw_tool_helper.return_value.install.return_value = (True, "")
+        mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
+        mock_exporter.return_value.install.return_value = True
+        rid = self.harness.add_relation("cos-agent", "grafana-agent")
+        self.harness.begin()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
+
+        mock_redfish_client.side_effect = test_exception()
+        new_config = {
+            "exporter-port": 80,
+            "exporter-log-level": "DEBUG",
+            "redfish-username": "redfish",
+            "redfish-password": "redfish",
+        }
+        self.harness.update_config(new_config)
+        self.harness.charm.on.config_changed.emit()
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            BlockedStatus("Invalid config: 'redfish-username' or 'redfish-password'"),
+        )

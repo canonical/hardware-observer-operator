@@ -12,11 +12,15 @@ import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus, StatusBase
+from redfish import redfish_client
+from redfish.rest.v1 import InvalidCredentialsError
 
 from config import (
     EXPORTER_DEFAULT_PORT,
     EXPORTER_HEALTH_RETRY_COUNT,
     EXPORTER_HEALTH_RETRY_TIMEOUT,
+    REDFISH_MAX_RETRY,
+    REDFISH_TIMEOUT,
     HWTool,
 )
 from hardware import get_bmc_address
@@ -88,8 +92,8 @@ class HardwareObserverCharm(ops.CharmBase):
 
         port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
         level = self.model.config.get("exporter-log-level", "INFO")
-        redfish_creds = self._get_redfish_creds()
-        success = self.exporter.install(port, level, redfish_creds)
+        redfish_conn_params = self.get_redfish_conn_params()
+        success = self.exporter.install(port, level, redfish_conn_params)
         self._stored.exporter_installed = success
         if not success:
             msg = "Failed to install exporter, please refer to `juju debug-log`"
@@ -208,10 +212,11 @@ class HardwareObserverCharm(ops.CharmBase):
                 logger.info("Detected changes in exporter config.")
                 port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
                 level = self.model.config.get("exporter-log-level", "INFO")
-
-                redfish_creds = self._get_redfish_creds()
+                redfish_conn_params = self.get_redfish_conn_params()
                 success = self.exporter.template.render_config(
-                    port=port, level=level, redfish_creds=redfish_creds
+                    port=port,
+                    level=level,
+                    redfish_conn_params=redfish_conn_params,
                 )
                 if not success:
                     message = (
@@ -247,16 +252,13 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.info("Stop and disable exporter service")
         self._on_update_status(event)
 
-    def _get_redfish_creds(self) -> Dict[str, Any]:
-        """Provide redfish config if redfish is available."""
+    def get_redfish_conn_params(self) -> Dict[str, Any]:
+        """Get redfish connection parameters if redfish is available."""
         bmc_tools = bmc_hw_verifier()
         if HWTool.REDFISH not in bmc_tools:
-            logger.warning(
-                "Redfish is not available, disregarding redfish credentials config options..."
-            )
-            return {"enable": False}
+            logger.warning("Redfish unavailable, disregarding redfish config options...")
+            return {}
         return {
-            "enable": True,
             "host": f"https://{get_bmc_address()}",
             "username": self.model.config.get("redfish-username", ""),
             "password": self.model.config.get("redfish-password", ""),
@@ -278,6 +280,12 @@ class HardwareObserverCharm(ops.CharmBase):
             )
             return False, "Invalid config: 'exporter-log-level'"
 
+        # Note we need to use `is False` because `None` means redfish is not
+        # available.
+        if self.redfish_conn_params_valid is False:
+            logger.error("Invalid redfish credentials.")
+            return False, "Invalid config: 'redfish-username' or 'redfish-password'"
+
         return True, "Exporter config is valid."
 
     def get_num_cos_agent_relations(self, relation_name: str) -> int:
@@ -294,6 +302,44 @@ class HardwareObserverCharm(ops.CharmBase):
     def too_many_cos_agent_relations(self) -> bool:
         """Return True if there're more than one cos-agent relation."""
         return self.num_cos_agent_relations > 1
+
+    @property
+    def redfish_conn_params_valid(self) -> Optional[bool]:
+        """Check if redfish connections parameters is valid or not.
+
+        If the redfish connection params is not available this property returns
+        None. Otherwise, it verifies the connection parameters. If the redfish
+        connection parameters are valid, it returns True; if not valid, it
+        returns False.
+        """
+        redfish_conn_params = self.get_redfish_conn_params()
+        if not redfish_conn_params:
+            return None
+
+        redfish_obj = None
+        try:
+            redfish_obj = redfish_client(
+                base_url=redfish_conn_params.get("host", ""),
+                username=redfish_conn_params.get("username", ""),
+                password=redfish_conn_params.get("password", ""),
+                timeout=REDFISH_TIMEOUT,
+                max_retry=REDFISH_MAX_RETRY,
+            )
+            redfish_obj.login(auth="session")
+        except InvalidCredentialsError as e:
+            result = False
+            logger.error("invalid redfish credential: %s", str(e))
+        except Exception as e:  # pylint: disable=W0718
+            result = False
+            logger.error("cannot connect to redfish: %s", str(e))
+        else:
+            result = True
+        finally:
+            # Make sure to close connection at the end
+            if redfish_obj:
+                redfish_obj.logout()
+
+        return result
 
 
 if __name__ == "__main__":  # pragma: nocover
