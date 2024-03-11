@@ -6,7 +6,7 @@
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners#example-of-a-codeowners-file
 
 # These owners will be the default owners for everything in the repo. Unless a
-# later match takes precedence, @canonical/bootstack will be requested for
+# later match takes precedence, @canonical/soleng-reviewers will be requested for
 # review when someone opens a pull request.
-*       @canonical/bootstack-reviewers
+*       @canonical/soleng-reviewers
 
