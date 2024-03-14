@@ -3,4 +3,5 @@ juju~=3.3.0  # must be compatible with the juju CLI version installed by CI
 pytest
 pytest-operator
 prometheus-client
-pyinstaller
+pyinstaller # required to bundle export_mock_metrics script to send it to hw-oberver unit
+tenacity
