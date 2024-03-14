@@ -16,8 +16,6 @@ from utils import Alert
 
 logger = logging.getLogger(__name__)
 
-MODEL_CONFIG = {"logging-config": "<root>=WARNING; unit=DEBUG"}
-
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed

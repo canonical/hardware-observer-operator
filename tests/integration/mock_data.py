@@ -22,7 +22,7 @@ SAMPLE_METRICS = [
 
 
 # Expected alerts based on above metrics
-SAMPLE_ALERTS = [
+EXPECTED_ALERTS = [
     {
         "labels": {
             "alertname": "IPMIDCMICommandFailed",
