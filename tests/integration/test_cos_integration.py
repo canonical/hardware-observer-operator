@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 @pytest.mark.skip_if_deployed
 async def test_setup_and_deploy(series, channel, lxd_ctl, k8s_ctl, lxd_model, k8s_model):
     """Setup models and then deploy Hardware Observer and COS."""
-    await _deploy_cos(channel, k8s_model)
+    await _deploy_cos(channel, k8s_ctl, k8s_model)
 
     await _deploy_hardware_observer(series, channel, lxd_model)
 
@@ -122,14 +122,22 @@ async def _export_mock_metrics(lxd_model):
     await hardware_observer_unit.run(run_export_mock_metrics_cmd)
 
 
-async def _deploy_cos(channel, model):
+async def _deploy_cos(channel, ctl, model):
     """Deploy COS on the existing k8s cloud."""
-    await model.deploy(
+    # Deploying via CLI because of https://github.com/juju/python-libjuju/issues/1032.
+    cmd = [
+        "juju",
+        "deploy",
         "cos-lite",
-        channel=channel,
-        trust=True,
-        overlays=[str(Path(__file__).parent.resolve() / "offers-overlay.yaml")],
-    )
+        "--channel",
+        channel,
+        "--trust",
+        "-m",
+        f"{ctl.controller_name}:{model.name}",
+        "--overlay",
+        str(Path(__file__).parent.resolve() / "offers-overlay.yaml"),
+    ]
+    subprocess.run(cmd, check=True)
 
 
 async def _deploy_hardware_observer(series, channel, model):
