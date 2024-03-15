@@ -34,9 +34,7 @@ class Alert:
 
     def __eq__(self, other) -> bool:
         """Implement equals based only on relevant fields."""
-        if self.state != other.state:
-            return False
-        if self.value != other.value:
+        if self.state != other.state or self.value != other.value:
             return False
         for key, value in self.labels.items():
             if other.labels.get(key) != value:

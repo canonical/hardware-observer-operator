@@ -54,7 +54,7 @@ async def lxd_ctl():
 
 @pytest_asyncio.fixture()
 async def k8s_ctl():
-    """Get the controller object referring the lxd controller."""
+    """Get the controller object referring the k8s controller."""
     if K8S_CTL_NAME is None:
         pytest.fail("K8S_CONTROLLER env variable should be provided")
     k8s_ctl = Controller()
