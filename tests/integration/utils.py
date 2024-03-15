@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 import logging
+from dataclasses import dataclass
 
 from juju.controller import Controller
 from juju.model import Model
@@ -21,3 +22,21 @@ async def get_or_add_model(ops_test: OpsTest, controller: Controller, model_name
         )
 
     return await controller.get_model(model_name)
+
+
+@dataclass
+class Alert:
+    """Alert data wrapper."""
+
+    state: str
+    value: float
+    labels: dict
+
+    def __eq__(self, other) -> bool:
+        """Implement equals based only on relevant fields."""
+        if self.state != other.state or self.value != other.value:
+            return False
+        for key, value in self.labels.items():
+            if other.labels.get(key) != value:
+                return False
+        return True
