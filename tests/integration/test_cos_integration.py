@@ -58,28 +58,32 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
 
                 alerts = json.loads(alerts_response)["data"]["alerts"]
 
-                received_alert_objects = [
-                    _get_alert_object(received_alert) for received_alert in alerts
+                received_alerts = [
+                    Alert(
+                        state=received_alert["state"],
+                        value=float(received_alert["value"]),
+                        labels=received_alert["labels"],
+                    )
+                    for received_alert in alerts
                 ]
-                expected_alert_objects = [
-                    _get_alert_object(expected_alert) for expected_alert in EXPECTED_ALERTS
+                expected_alerts = [
+                    Alert(
+                        state=expected_alert["state"],
+                        value=float(expected_alert["value"]),
+                        labels=expected_alert["labels"],
+                    )
+                    for expected_alert in EXPECTED_ALERTS
                 ]
 
-                for expected_alert_object in expected_alert_objects:
+                for expected_alert in expected_alerts:
                     assert any(
-                        expected_alert_object == received_alert_object
-                        for received_alert_object in received_alert_objects
+                        # Comparing using custom __eq__ based only on relevant fields
+                        expected_alert == received_alert
+                        for received_alert in received_alerts
                     )
 
     except RetryError:
         pytest.fail("Expected alerts not found in COS.")
-
-
-def _get_alert_object(alert_dict):
-    """Convert alert dictionary received from prometheus to alert data object."""
-    return Alert(
-        state=alert_dict["state"], value=float(alert_dict["value"]), labels=alert_dict["labels"]
-    )
 
 
 async def _disable_hardware_exporter(ops_test: OpsTest, lxd_model):
