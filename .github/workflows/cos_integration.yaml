@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Get prefsrc
+      - name: Get IP address of the host
         run: |
           # Finding preferred source ip address by trying to reach destination 2.2.2.2
           # This ip address will be used while enabling metallb
