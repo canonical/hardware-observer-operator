@@ -44,7 +44,7 @@ jobs:
       - name: Update python-libjuju dependency to match juju
         run: sed -E -i 's/^\s*juju\s*~=.+/    juju~=3.1.0/g' tests/integration/requirements.txt
       - name: Run integration tests
-        run: tox -e integration
+        run: make integration
         env:
           K8S_CONTROLLER: ${{ steps.k8s-controller.outputs.name }}
           LXD_CONTROLLER: ${{ steps.lxd-controller.outputs.name }}
