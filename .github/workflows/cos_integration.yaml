@@ -1,0 +1,59 @@
+name: Integration tests with COS
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  integration-tests-with-cos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Get IP address of the host
+        run: |
+          # Finding preferred source ip address by trying to reach destination 2.2.2.2
+          # This ip address will be used while enabling metallb
+          echo "IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')" >> $GITHUB_ENV
+      - name: Setup lxd controller
+        uses: charmed-kubernetes/actions-operator@main
+        with:
+          # The juju version can be any stable version, as long as it is the same as libjuju version used.
+          # Currently, 3.1 is used to keep the version consistent with functional tests (func31)
+          # If, for example, 3.5/stable is used here in the future, the `update python-libjuju dependancy..`
+          # step below should also specify `...3.5.x/g'..` so it updates requirements.txt with the correct version.
+          juju-channel: 3.1/stable
+          provider: lxd
+      - name: Save lxd controller name
+        id: lxd-controller
+        # The `CONTROLLER_NAME` envvar is set by the actions-operator action
+        run: echo "name=$CONTROLLER_NAME" >> $GITHUB_OUTPUT
+      - name: Setup k8s controller
+        uses: charmed-kubernetes/actions-operator@main
+        with:
+          juju-channel: 3.1/stable
+          provider: microk8s
+          channel: 1.28-strict/stable
+          microk8s-addons: "hostpath-storage dns metallb:${{ env.IPADDR }}-${{ env.IPADDR }}"
+      - name: Save k8s controller name
+        id: k8s-controller
+        # The `CONTROLLER_NAME` envvar is set by the actions-operator action
+        run: echo "name=$CONTROLLER_NAME" >> $GITHUB_OUTPUT
+      - name: Fix microk8s permissions
+        run: |
+          chmod -R ugo+rwX ~/.kube
+      - name: Update python-libjuju dependency to match juju
+        # The juju CLI version and libjuju version(specified in requirements.txt) should be compatible.
+        # This replaces the libjuju version in requirements.txt and
+        # makes sure the same version is used, even if it has a different/incompatible version.
+        run: sed -E -i 's/^\s*juju\s*~=.+/    juju~=3.1.0/g' tests/integration/requirements.txt
+      - name: Run integration tests
+        run: make integration
+        env:
+          K8S_CONTROLLER: ${{ steps.k8s-controller.outputs.name }}
+          LXD_CONTROLLER: ${{ steps.lxd-controller.outputs.name }}
+      - name: Dump debug log
+        if: failure()
+        run: for ctl in $(juju controllers --format json | jq -r '.controllers | keys[]'); do for mdl in $(juju models --format json | jq -r '.models[].name' | grep -v "admin/controller"); do juju debug-log -m $ctl:$mdl --replay --ms --no-tail; done; done || true
+        shell: bash
