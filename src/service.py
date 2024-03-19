@@ -39,6 +39,10 @@ def check_installed(func: Callable) -> Callable:
     return wrapper
 
 
+class ExporterError(Exception):
+    """Custom exception for exporter errors."""
+
+
 class ExporterTemplate:
     """Jinja template helper class for exporter."""
 
