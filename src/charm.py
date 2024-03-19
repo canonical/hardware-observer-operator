@@ -101,6 +101,7 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.error(msg)
             self.model.unit.status = BlockedStatus(msg)
             return
+        logger.info("Successfully installed exporter")
         self._on_update_status(event)
 
     def _on_remove(self, _: EventBase) -> None:
@@ -124,6 +125,11 @@ class HardwareObserverCharm(ops.CharmBase):
             # The charm should be in BlockedStatus with install failed msg
             return  # type: ignore[unreachable]
 
+        config_valid, config_valid_message = self.validate_exporter_configs()
+        if not config_valid:
+            self.model.unit.status = BlockedStatus(config_valid_message)
+            return
+
         if not self.exporter_enabled:
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
             return
@@ -132,20 +138,16 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus("Cannot relate to more than one grafana-agent")
             return
 
-        config_valied, confg_valid_message = self.validate_exporter_configs()
-        if not config_valied:
-            self.model.unit.status = BlockedStatus(confg_valid_message)
-            return
-
         hw_tool_ok, error_msg = self.hw_tool_helper.check_installed()
         if not hw_tool_ok:
             self.model.unit.status = BlockedStatus(error_msg)
             return
 
-        if not self.exporter.check_health():
-            logger.warning("Exporter health check - failed.")
-            # if restart isn't successful, an ExporterError exception will be raised here
-            self.restart_exporter()
+        if self._stored.exporter_installed:  # type: ignore[truthy-function]
+            if not self.exporter.check_active():
+                logger.warning("Exporter health check - failed.")
+                # if restart isn't successful, an ExporterError exception will be raised here
+                self.restart_exporter()
 
         self.model.unit.status = ActiveStatus("Unit is ready")
 
