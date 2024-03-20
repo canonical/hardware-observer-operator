@@ -16,6 +16,7 @@ from redfish import redfish_client
 from redfish.rest.v1 import InvalidCredentialsError
 
 from config import (
+    EXPORTER_CONFIG_RENDER_FAIL_MSG,
     EXPORTER_CRASH_MSG,
     EXPORTER_DEFAULT_COLLECT_TIMEOUT,
     EXPORTER_DEFAULT_PORT,
@@ -65,6 +66,7 @@ class HardwareObserverCharm(ops.CharmBase):
         self.framework.observe(self.on.remove, self._on_remove)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
+        self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
         self.framework.observe(
             self.on.cos_agent_relation_joined, self._on_cos_agent_relation_joined
         )
@@ -74,21 +76,20 @@ class HardwareObserverCharm(ops.CharmBase):
 
         self._stored.set_default(
             config={},
-            exporter_installed=False,
-            resource_installed=False,
+            resource_status={"installed": False, "msg": ""},
+            exporter_status={"installed": False, "msg": "", "config_rendered": False},
         )
         self.num_cos_agent_relations = self.get_num_cos_agent_relations("cos-agent")
 
     def _on_install_or_upgrade(self, event: ops.InstallEvent) -> None:
         """Install or upgrade charm."""
+        # Install resources
         self.model.unit.status = MaintenanceStatus("Installing resources...")
-
         resource_installed, msg = self.hw_tool_helper.install(self.model.resources)
-        self._stored.resource_installed = resource_installed
-
+        self._stored.resource_status["installed"] = resource_installed
         if not resource_installed:
             logger.warning(msg)
-            self.model.unit.status = BlockedStatus(msg)
+            self._stored.resource_status["msg"] = msg
             return
 
         # Install exporter
@@ -98,59 +99,61 @@ class HardwareObserverCharm(ops.CharmBase):
         scrape_timeout = self.model.config.get("scrape-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT)
         redfish_conn_params = self.get_redfish_conn_params()
         success = self.exporter.install(port, level, redfish_conn_params, int(scrape_timeout))
-        self._stored.exporter_installed = success
+        self._stored.exporter_status["installed"] = success
         if not success:
             msg = "Failed to install exporter, please refer to `juju debug-log`"
             logger.error(msg)
-            self.model.unit.status = BlockedStatus(msg)
+            self._stored.exporter_status["msg"] = msg
             return
-        self._on_update_status(event)
+
+    def _on_collect_status(self, event: ops.CollectStatusEvent):
+        if not self._stored.resource_status["installed"]:
+            event.add_status(BlockedStatus(self._stored.resource_status["msg"]))
+
+        if not self._stored.exporter_status["installed"]:
+            event.add_status(BlockedStatus(self._stored.exporter_status["msg"]))
+
+        if not self.relation_present:
+            event.add_status(BlockedStatus("Missing relation: [cos-agent]"))
+
+        invalid_config = self.validate_exporter_configs()
+        if invalid_config:
+            event.add_status(BlockedStatus(invalid_config))
+
+        if not self._stored.exporter_status["config_rendered"]:
+            event.add_status(BlockedStatus(EXPORTER_CONFIG_RENDER_FAIL_MSG))
+
+        if self.too_many_cos_agent_relations:
+            event.add_status(BlockedStatus("Cannot relate to more than one grafana-agent"))
+
+        hw_tool_ok, hw_tool_msg = self.hw_tool_helper.check_installed()
+        if not hw_tool_ok:
+            event.add_status(BlockedStatus(hw_tool_msg))
+
+        event.add_status(ActiveStatus("Unit is ready"))
 
     def _on_remove(self, _: EventBase) -> None:
         """Remove everything when charm is being removed."""
         logger.info("Start to remove.")
         # Remove binary tool
         self.hw_tool_helper.remove(self.model.resources)
-        self._stored.resource_installed = False
+        self._stored.resource_status["installed"] = False
         success = self.exporter.uninstall()
         if not success:
             msg = "Failed to uninstall exporter, please refer to `juju debug-log`"
             # we probably don't need to set any status here because the charm
             # will go away soon, so only logging is enough
             logger.warning(msg)
-        self._stored.exporter_installed = not success
+        self._stored.exporter_status["installed"] = not success
         logger.info("Remove complete")
 
     def _on_update_status(self, _: EventBase) -> None:  # noqa: C901
         """Update the charm's status."""
-        if not self._stored.resource_installed:  # type: ignore[truthy-function]
-            # The charm should be in BlockedStatus with install failed msg
-            return  # type: ignore[unreachable]
-
-        if not self.exporter_enabled:
-            self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
-            return
-
-        if self.too_many_cos_agent_relations:
-            self.model.unit.status = BlockedStatus("Cannot relate to more than one grafana-agent")
-            return
-
-        config_valid, config_valid_message = self.validate_exporter_configs()
-        if not config_valid:
-            self.model.unit.status = BlockedStatus(config_valid_message)
-            return
-
-        hw_tool_ok, error_msg = self.hw_tool_helper.check_installed()
-        if not hw_tool_ok:
-            self.model.unit.status = BlockedStatus(error_msg)
-            return
-
-        if not self.exporter.check_health():
-            logger.warning("Exporter health check - failed.")
-            # if restart isn't successful, an ExporterError exception will be raised here
-            self.restart_exporter()
-
-        self.model.unit.status = ActiveStatus("Unit is ready")
+        if self._stored.exporter_status["installed"]:
+            if not self.exporter.check_health():
+                logger.warning("Exporter health check - failed.")
+                # if restart isn't successful, an ExporterError exception will be raised here
+                self.restart_exporter()
 
     def restart_exporter(self) -> None:
         """Restart exporter service with retry."""
@@ -185,17 +188,16 @@ class HardwareObserverCharm(ops.CharmBase):
                 self._stored.config[key] = value  # type: ignore
                 change_set.add(key)
 
-        if not self._stored.resource_installed:  # type: ignore[truthy-function]
+        if not self._stored.resource_status["installed"]:  # type: ignore[truthy-function]
             logging.info(  # type: ignore[unreachable]
                 "Config changed called before install complete, deferring event: %s",
                 event.handle,
             )
             event.defer()
 
-        if self.exporter_enabled:
-            success, message = self.validate_exporter_configs()
-            if not success:
-                self.model.unit.status = BlockedStatus(message)
+        if self.relation_present:
+            invalid_config = self.validate_exporter_configs()
+            if invalid_config is not None:
                 return
 
             exporter_configs = {
@@ -207,33 +209,17 @@ class HardwareObserverCharm(ops.CharmBase):
             }
             if exporter_configs.intersection(change_set):
                 logger.info("Detected changes in exporter config.")
-                port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
-                level = self.model.config.get("exporter-log-level", "INFO")
-                collect_timeout = self.model.config.get(
-                    "collect-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT
-                )
-                redfish_conn_params = self.get_redfish_conn_params()
-                success = self.exporter.template.render_config(
-                    port=port,
-                    level=level,
-                    redfish_conn_params=redfish_conn_params,
-                    collect_timeout=int(collect_timeout),
-                )
-                if not success:
-                    message = (
-                        "Failed to configure exporter, please check if the server is healthy."
-                    )
-                    self.model.unit.status = BlockedStatus(message)
+                result = self.render_exporter_config()
+                self._stored.exporter_status["config_rendered"] = result
+                if not result:
                     return
                 self.exporter.restart()
-
-        self._on_update_status(event)
 
     def _on_cos_agent_relation_joined(self, event: EventBase) -> None:
         """Start the exporter when relation joined."""
         if (
-            not self._stored.resource_installed  # type: ignore[truthy-function]
-            or not self._stored.exporter_installed  # type: ignore[truthy-function]
+            not self._stored.resource_status["installed"]  # type: ignore[truthy-function]
+            or not self._stored.exporter_status["installed"]  # type: ignore[truthy-function]
         ):
             logger.info(  # type: ignore[unreachable]
                 "Defer cos-agent relation join because exporter or resources is not ready yet."
@@ -243,15 +229,13 @@ class HardwareObserverCharm(ops.CharmBase):
         self.exporter.enable()
         self.exporter.start()
         logger.info("Start and enable exporter service")
-        self._on_update_status(event)
 
     def _on_cos_agent_relation_departed(self, event: EventBase) -> None:
         """Remove the exporter when relation departed."""
-        if self._stored.exporter_installed:  # type: ignore[truthy-function]
+        if self._stored.exporter_status["installed"]:  # type: ignore[truthy-function]
             self.exporter.stop()
             self.exporter.disable()
             logger.info("Stop and disable exporter service")
-        self._on_update_status(event)
 
     def get_redfish_conn_params(self) -> Dict[str, Any]:
         """Get redfish connection parameters if redfish is available."""
@@ -265,12 +249,15 @@ class HardwareObserverCharm(ops.CharmBase):
             "password": self.model.config.get("redfish-password", ""),
         }
 
-    def validate_exporter_configs(self) -> Tuple[bool, str]:
-        """Validate the static and runtime config options for the exporter."""
+    def validate_exporter_configs(self) -> Optional[str]:
+        """Validate the static and runtime config options for the exporter.
+
+        Returns string with invalid configs if present, otherwise None.
+        """
         port = int(self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT))
         if not 1 <= port <= 65535:
             logger.error("Invalid exporter-port: port must be in [1, 65535].")
-            return False, "Invalid config: 'exporter-port'"
+            return "Invalid config: 'exporter-port'"
 
         level = self.model.config.get("exporter-log-level", "")
         allowed_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
@@ -279,23 +266,42 @@ class HardwareObserverCharm(ops.CharmBase):
                 "Invalid exporter-log-level: level must be in %s (case-insensitive).",
                 allowed_choices,
             )
-            return False, "Invalid config: 'exporter-log-level'"
+            return "Invalid config: 'exporter-log-level'"
 
         # Note we need to use `is False` because `None` means redfish is not
         # available.
         if self.redfish_conn_params_valid is False:
             logger.error("Invalid redfish credentials.")
-            return False, "Invalid config: 'redfish-username' or 'redfish-password'"
+            return "Invalid config: 'redfish-username' or 'redfish-password'"
 
-        return True, "Exporter config is valid."
+        return None
 
     def get_num_cos_agent_relations(self, relation_name: str) -> int:
         """Get the number of relation given a relation_name."""
         relations = self.model.relations.get(relation_name, [])
         return len(relations)
 
+    def render_exporter_config(self) -> bool:
+        """Render config for exporter.
+
+        Returns True if config was rendered successfully, else False.
+        """
+        port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
+        level = self.model.config.get("exporter-log-level", "INFO")
+        redfish_conn_params = self.get_redfish_conn_params()
+        collect_timeout = self.model.config.get(
+            "collect-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT
+        )
+        result = self.exporter.template.render_config(
+            port=port,
+            level=level,
+            redfish_conn_params=redfish_conn_params,
+            collect_timeout=int(collect_timeout),
+        )
+        return result
+
     @property
-    def exporter_enabled(self) -> bool:
+    def relation_present(self) -> bool:
         """Return True if cos-agent relation is present."""
         return self.num_cos_agent_relations != 0
 
