@@ -16,6 +16,7 @@ from redfish import redfish_client
 from redfish.rest.v1 import InvalidCredentialsError
 
 from config import (
+    EXPORTER_CRASH_MSG,
     EXPORTER_DEFAULT_PORT,
     EXPORTER_HEALTH_RETRY_COUNT,
     EXPORTER_HEALTH_RETRY_TIMEOUT,
@@ -151,7 +152,6 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def restart_exporter(self) -> Optional[str]:
         """Restart exporter service with retry."""
-        exporter_crashed_msg = "Exporter crashed unexpectedly, please refer to systemd logs..."
         try:
             for i in range(1, EXPORTER_HEALTH_RETRY_COUNT + 1):
                 logger.warning("Restarting exporter - %d retry", i)
@@ -162,10 +162,10 @@ class HardwareObserverCharm(ops.CharmBase):
                     break
             if not self.exporter.check_active():
                 logger.error("Failed to restart the exporter.")
-                return exporter_crashed_msg
+                return EXPORTER_CRASH_MSG
         except Exception as err:  # pylint: disable=W0718
             logger.error("Exporter crashed unexpectedly: %s", err)
-            return exporter_crashed_msg
+            return EXPORTER_CRASH_MSG
         return None
 
     def _on_config_changed(self, event: EventBase) -> None:
