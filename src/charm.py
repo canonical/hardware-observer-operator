@@ -144,7 +144,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
         if not self.exporter.check_health():
             logger.warning("Exporter health check - failed.")
-            # if restart isn't successful, an ExporterException will be raised here
+            # if restart isn't successful, an ExporterError exception will be raised here
             self.restart_exporter()
 
         self.model.unit.status = ActiveStatus("Unit is ready")
