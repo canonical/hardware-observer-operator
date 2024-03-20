@@ -149,7 +149,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
         self.model.unit.status = ActiveStatus("Unit is ready")
 
-    def restart_exporter(self) -> bool:
+    def restart_exporter(self) -> None:
         """Restart exporter service with retry."""
         try:
             for i in range(1, EXPORTER_HEALTH_RETRY_COUNT + 1):
@@ -165,7 +165,6 @@ class HardwareObserverCharm(ops.CharmBase):
         except Exception as err:  # pylint: disable=W0718
             logger.error("Exporter crashed unexpectedly: %s", err)
             raise ExporterError(EXPORTER_CRASH_MSG) from err
-        return True
 
     def _on_config_changed(self, event: EventBase) -> None:
         """Reconfigure charm."""
