@@ -17,6 +17,13 @@ options:
       default, it will set to INFO. Allowed values are "DEBUG", "INFO",
       "WARNING", "ERROR", "CRITICAL". Values other than those will result in
       failure of the exporter.
+  collect-timeout:
+    type: int
+    default: 10
+    description: |
+      Timeout for collectors' shell commands in seconds. Changing this will also change
+      the scrape_timeout config option for prometheus for the cos-agent relation with
+      grafana-agent.
   redfish-username:
     type: string
     default: ""

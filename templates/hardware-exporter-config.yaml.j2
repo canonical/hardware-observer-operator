@@ -1,5 +1,6 @@
 port: {{ PORT }}
 level: {{ LEVEL }}
+collect_timeout: {{ COLLECT_TIMEOUT }}
 {% if COLLECTORS | length > 0 %}
 enable_collectors:
   {% for collector in COLLECTORS %}
