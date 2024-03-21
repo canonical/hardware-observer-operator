@@ -221,6 +221,7 @@ class TestCharm(unittest.TestCase):
         """Test config change event updates the charm's internal store."""
         self.harness.begin()
         self.harness.charm._stored.resource_installed = True
+        self.harness.charm._stored.exporter_installed = True
 
         new_config = {"exporter-port": 80, "exporter-log-level": "DEBUG"}
         self.harness.update_config(new_config)

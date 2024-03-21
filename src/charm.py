@@ -125,6 +125,10 @@ class HardwareObserverCharm(ops.CharmBase):
             # The charm should be in BlockedStatus with install failed msg
             return  # type: ignore[unreachable]
 
+        if not self._stored.exporter_installed:  # type: ignore[truthy-function]
+            # The charm should be in BlockedStatus with exporter install failed msg
+            return  # type: ignore[unreachable]
+
         config_valid, config_valid_message = self.validate_exporter_configs()
         if not config_valid:
             self.model.unit.status = BlockedStatus(config_valid_message)
@@ -141,10 +145,6 @@ class HardwareObserverCharm(ops.CharmBase):
         hw_tool_ok, error_msg = self.hw_tool_helper.check_installed()
         if not hw_tool_ok:
             self.model.unit.status = BlockedStatus(error_msg)
-            return
-
-        if not self._stored.exporter_installed:  # type: ignore[truthy-function]
-            logger.warning("Exporter not installed")  # type: ignore[unreachable]
             return
 
         if not self.exporter.check_health():
