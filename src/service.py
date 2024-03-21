@@ -40,7 +40,10 @@ def check_installed(func: Callable) -> Callable:
 
 
 class ExporterError(Exception):
-    """Custom exception for exporter errors."""
+    """Custom exception for exporter errors.
+
+    This will cause juju to set the charm in ErrorStatus.
+    """
 
 
 class ExporterTemplate:
