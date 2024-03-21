@@ -3,7 +3,7 @@ groups:
     rules:
       - alert: RedfishCallFailed
         expr: redfish_call_success == 0
-        for: 0m
+        for: 5m
         labels:
           severity: warning
         annotations:
@@ -15,7 +15,7 @@ groups:
 
       - alert: RedfishServiceUnavailable
         expr: redfish_service_available == 0
-        for: 0m
+        for: 5m
         labels:
           severity: warning
         annotations:
@@ -27,7 +27,7 @@ groups:
 
       - alert: RedfishSensorHealthNotOk
         expr: redfish_sensor_info{health!~"OK|N/A"}
-        for: 0m
+        for: 5m
         labels:
           severity: critical
         annotations:
@@ -39,7 +39,7 @@ groups:
 
       - alert: RedfishProcessorHealthNotOk
         expr: redfish_processor_info{health!~"OK|NA"}
-        for: 0m
+        for: 5m
         labels:
           severity: critical
         annotations:
@@ -50,7 +50,7 @@ groups:
 
       - alert: RedfishStorageControllerHealthNotOk
         expr: redfish_storage_controller_info{health!~"OK|NA"}
-        for: 0m
+        for: 5m
         labels:
           severity: critical
         annotations:
@@ -61,7 +61,7 @@ groups:
 
       - alert: RedfishChassisHealthNotOk
         expr: redfish_chassis_info{health!~"OK|NA"}
-        for: 0m
+        for: 5m
         labels:
           severity: critical
         annotations:
@@ -72,7 +72,7 @@ groups:
 
       - alert: RedfishStorageDriveHealthNotOk
         expr: redfish_storage_drive_info{health!~"OK|NA"}
-        for: 0m
+        for: 5m
         labels:
           severity: critical
         annotations:
@@ -83,7 +83,7 @@ groups:
 
       - alert: RedfishMemoryDimmHealthNotOk
         expr: redfish_memory_dimm_info{health!~"OK|NA"}
-        for: 0m
+        for: 5m
         labels:
           severity: critical
         annotations:
@@ -94,7 +94,7 @@ groups:
 
       - alert: RedfishSmartStorageHealthNotOk
         expr: redfish_smart_storage_health == 0
-        for: 0m
+        for: 5m
         labels:
           severity: critical
         annotations:
