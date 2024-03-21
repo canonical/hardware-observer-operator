@@ -206,6 +206,13 @@ class TestCharm(unittest.TestCase):
         self.harness.add_relation("cos-agent", "grafana-agent")
         self.harness.begin()
         self.harness.charm._stored.resource_installed = True
+        self.harness.charm._stored.exporter_installed = False
+
+        # no exception should be raised
+        self.harness.charm.on.update_status.emit()
+
+        # exception raised, exporter should crash
+        self.harness.charm._stored.exporter_installed = True
         with self.assertRaises(ExporterError):
             self.harness.charm.on.update_status.emit()
 

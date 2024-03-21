@@ -143,11 +143,14 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus(error_msg)
             return
 
-        if self._stored.exporter_installed:  # type: ignore[truthy-function]
-            if not self.exporter.check_active():
-                logger.warning("Exporter health check - failed.")
-                # if restart isn't successful, an ExporterError exception will be raised here
-                self.restart_exporter()
+        if not self._stored.exporter_installed:  # type: ignore[truthy-function]
+            logger.warning("Exporter not installed")  # type: ignore[unreachable]
+            return
+
+        if not self.exporter.check_health():
+            logger.warning("Exporter health check - failed.")
+            # if restart isn't successful, an ExporterError exception will be raised here
+            self.restart_exporter()
 
         self.model.unit.status = ActiveStatus("Unit is ready")
 
