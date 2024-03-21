@@ -6,7 +6,7 @@ import unittest
 from unittest import mock
 
 import ops
-from ops.model import ActiveStatus, BlockedStatus, ErrorStatus
+from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
 from parameterized import parameterized
 
@@ -176,8 +176,10 @@ class TestExporter(unittest.TestCase):
         self.harness.begin()
         self.harness.charm._stored.resource_installed = True
         self.harness.charm._stored.exporter_installed = True
-        self.harness.add_relation_unit(rid, "grafana-agent/0")
-        self.harness.remove_relation_unit(rid, "grafana-agent/0")
+        with self.assertRaises(service.ExporterError):
+            self.harness.add_relation_unit(rid, "grafana-agent/0")
+        with self.assertRaises(service.ExporterError):
+            self.harness.remove_relation_unit(rid, "grafana-agent/0")
         self.mock_systemd.service_stop.assert_not_called()
         self.mock_systemd.service_disable.assert_not_called()
 
@@ -186,11 +188,6 @@ class TestExporter(unittest.TestCase):
             (False, ActiveStatus("Unit is ready"), True),
             (True, ActiveStatus("Unit is ready"), True),
             (False, ActiveStatus("Unit is ready"), False),
-            (
-                True,
-                ErrorStatus("Exporter crashed unexpectedly, please refer to systemd logs..."),
-                False,
-            ),
         ]
     )
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
@@ -212,6 +209,20 @@ class TestExporter(unittest.TestCase):
         self.mock_systemd.service_failed.return_value = failed
         self.harness.charm.on.update_status.emit()
         self.assertEqual(self.harness.charm.unit.status, expected_status)
+
+    @mock.patch.object(pathlib.Path, "exists", return_value=True)
+    def test_40_check_health_exporter_crash(self, mock_service_installed):
+        """Test check_health function when service is installed but exporter crashes."""
+        rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
+        self.harness.begin()
+        with mock.patch("builtins.open", new_callable=mock.mock_open) as _:
+            self.harness.charm.on.install.emit()
+            self.harness.add_relation_unit(rid, "grafana-agent/0")
+
+        self.mock_systemd.service_running.return_value = False
+        self.mock_systemd.service_failed.return_value = True
+        with self.assertRaises(service.ExporterError):
+            self.harness.charm.on.update_status.emit()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_50_check_relation_exists(self, mock_service_installed):

@@ -9,12 +9,12 @@ from unittest import mock
 
 import ops
 import ops.testing
-from ops.model import ActiveStatus, BlockedStatus, ErrorStatus
+from ops.model import ActiveStatus, BlockedStatus
 from parameterized import parameterized
 from redfish.rest.v1 import InvalidCredentialsError
 
 import charm
-from charm import HardwareObserverCharm
+from charm import ExporterError, HardwareObserverCharm
 from config import EXPORTER_DEFAULT_PORT, HWTool
 
 
@@ -200,21 +200,14 @@ class TestCharm(unittest.TestCase):
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
         ]
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = True
         mock_exporter.return_value.check_health.return_value = False
         mock_exporter.return_value.restart.side_effect = Exception()
-        rid = self.harness.add_relation("cos-agent", "grafana-agent")
+        self.harness.add_relation("cos-agent", "grafana-agent")
         self.harness.begin()
-        self.harness.charm.on.install.emit()
-        self.harness.add_relation_unit(rid, "grafana-agent/0")
-
-        self.harness.charm.on.update_status.emit()
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            ErrorStatus("Exporter crashed unexpectedly, please refer to systemd logs..."),
-        )
+        self.harness.charm._stored.resource_installed = True
+        with self.assertRaises(ExporterError):
+            self.harness.charm.on.update_status.emit()
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     def test_10_config_changed(self, mock_exporter):
