@@ -17,6 +17,7 @@ from redfish.rest.v1 import InvalidCredentialsError
 
 from config import (
     EXPORTER_CRASH_MSG,
+    EXPORTER_DEFAULT_COLLECT_TIMEOUT,
     EXPORTER_DEFAULT_PORT,
     EXPORTER_HEALTH_RETRY_COUNT,
     EXPORTER_HEALTH_RETRY_TIMEOUT,
@@ -41,6 +42,9 @@ class HardwareObserverCharm(ops.CharmBase):
         super().__init__(*args)
         self.hw_tool_helper = HWToolHelper()
 
+        collect_timeout = self.model.config.get(
+            "collect-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT
+        )
         # Add refresh_events to COSAgentProvider to update relation data when
         # config changed (default behavior) and upgrade charm. This is useful
         # for updating alert rules.
@@ -50,6 +54,9 @@ class HardwareObserverCharm(ops.CharmBase):
             metrics_endpoints=[
                 {"path": "/metrics", "port": int(self.model.config["exporter-port"])}
             ],
+            # Setting scrape_timeout as collect_timeout in the `duration` format specified in
+            # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration
+            scrape_configs=[{"scrape_timeout": f"{collect_timeout}s"}],
         )
         self.exporter = Exporter(self.charm_dir)
 
@@ -93,8 +100,9 @@ class HardwareObserverCharm(ops.CharmBase):
 
         port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
         level = self.model.config.get("exporter-log-level", "INFO")
+        scrape_timeout = self.model.config.get("scrape-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT)
         redfish_conn_params = self.get_redfish_conn_params()
-        success = self.exporter.install(port, level, redfish_conn_params)
+        success = self.exporter.install(port, level, redfish_conn_params, int(scrape_timeout))
         self._stored.exporter_installed = success
         if not success:
             msg = "Failed to install exporter, please refer to `juju debug-log`"
@@ -206,11 +214,15 @@ class HardwareObserverCharm(ops.CharmBase):
                 logger.info("Detected changes in exporter config.")
                 port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
                 level = self.model.config.get("exporter-log-level", "INFO")
+                collect_timeout = self.model.config.get(
+                    "collect-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT
+                )
                 redfish_conn_params = self.get_redfish_conn_params()
                 success = self.exporter.template.render_config(
                     port=port,
                     level=level,
                     redfish_conn_params=redfish_conn_params,
+                    collect_timeout=int(collect_timeout),
                 )
                 if not success:
                     message = (

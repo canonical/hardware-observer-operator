@@ -343,12 +343,14 @@ class TestExporterTemplate(unittest.TestCase):
                 port="80",
                 level="info",
                 redfish_conn_params={},
+                collect_timeout=10,
             )
             mock_install.assert_called_with(
                 EXPORTER_CONFIG_PATH,
                 self.template.config_template.render(
                     PORT="80",
                     LEVEL="info",
+                    COLLECT_TIMEOUT=10,
                     COLLECTORS=["collector.mega_raid", "collector.hpe_ssa"],
                     REDFISH_ENABLE=False,
                     REDFISH_HOST="",
@@ -366,6 +368,7 @@ class TestExporterTemplate(unittest.TestCase):
             self.template.render_config(
                 port="80",
                 level="info",
+                collect_timeout=10,
                 redfish_conn_params={
                     "host": "127.0.0.1",
                     "username": "default_user",
@@ -377,6 +380,7 @@ class TestExporterTemplate(unittest.TestCase):
                 self.template.config_template.render(
                     PORT="80",
                     LEVEL="info",
+                    COLLECT_TIMEOUT=10,
                     COLLECTORS=["collector.redfish"],
                     REDFISH_ENABLE=True,
                     REDFISH_HOST="127.0.0.1",

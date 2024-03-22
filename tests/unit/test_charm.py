@@ -15,7 +15,7 @@ from redfish.rest.v1 import InvalidCredentialsError
 
 import charm
 from charm import ExporterError, HardwareObserverCharm
-from config import EXPORTER_DEFAULT_PORT, HWTool
+from config import EXPORTER_DEFAULT_COLLECT_TIMEOUT, EXPORTER_DEFAULT_PORT, HWTool
 
 
 class TestCharm(unittest.TestCase):
@@ -134,6 +134,7 @@ class TestCharm(unittest.TestCase):
             int(EXPORTER_DEFAULT_PORT),
             "INFO",
             {},
+            int(EXPORTER_DEFAULT_COLLECT_TIMEOUT),
         )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
@@ -366,7 +367,10 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(self.harness.charm._stored.resource_installed)
 
         self.harness.charm.exporter.install.assert_called_with(
-            int(EXPORTER_DEFAULT_PORT), "INFO", self.harness.charm.get_redfish_conn_params()
+            int(EXPORTER_DEFAULT_PORT),
+            "INFO",
+            self.harness.charm.get_redfish_conn_params(),
+            int(EXPORTER_DEFAULT_COLLECT_TIMEOUT),
         )
 
     @parameterized.expand([(InvalidCredentialsError), (Exception)])
