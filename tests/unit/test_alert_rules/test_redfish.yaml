@@ -10,7 +10,7 @@ tests:
         values: "0x15"
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: RedfishCallFailed
         exp_alerts:
           - exp_labels:
@@ -29,7 +29,7 @@ tests:
         values: "0x15"
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: RedfishServiceUnavailable
         exp_alerts:
           - exp_labels:
@@ -48,7 +48,7 @@ tests:
         values: "1x15"
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: RedfishSensorHealthNotOk
         exp_alerts:
           - exp_labels:
@@ -69,7 +69,7 @@ tests:
         values: "1x15"
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: RedfishProcessorHealthNotOk
         exp_alerts:
           - exp_labels:
@@ -91,7 +91,7 @@ tests:
         values: "1x15"
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: RedfishStorageControllerHealthNotOk
         exp_alerts:
           - exp_labels:
@@ -113,7 +113,7 @@ tests:
         values: "1x15"
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: RedfishChassisHealthNotOk
         exp_alerts:
           - exp_labels:
@@ -134,7 +134,7 @@ tests:
         values: "1x15"
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: RedfishStorageDriveHealthNotOk
         exp_alerts:
           - exp_labels:
@@ -156,7 +156,7 @@ tests:
         values: "1x15"
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: RedfishMemoryDimmHealthNotOk
         exp_alerts:
           - exp_labels:
@@ -177,7 +177,7 @@ tests:
         values: "0x15"
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: RedfishSmartStorageHealthNotOk
         exp_alerts:
           - exp_labels:
