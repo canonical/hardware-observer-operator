@@ -6,7 +6,7 @@
 
 import logging
 from time import sleep
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -31,6 +31,8 @@ from hw_tools import HWToolHelper, bmc_hw_verifier
 from service import Exporter, ExporterError
 
 logger = logging.getLogger(__name__)
+
+# mypy: disable-error-code="index"
 
 
 class HardwareObserverCharm(ops.CharmBase):
@@ -81,7 +83,7 @@ class HardwareObserverCharm(ops.CharmBase):
         )
         self.num_cos_agent_relations = self.get_num_cos_agent_relations("cos-agent")
 
-    def _on_install_or_upgrade(self, event: ops.InstallEvent) -> None:
+    def _on_install_or_upgrade(self, _: ops.InstallEvent) -> None:
         """Install or upgrade charm."""
         # Install resources
         self.model.unit.status = MaintenanceStatus("Installing resources...")
@@ -106,7 +108,7 @@ class HardwareObserverCharm(ops.CharmBase):
             self._stored.exporter_status["msg"] = msg
             return
 
-    def _on_collect_status(self, event: ops.CollectStatusEvent):
+    def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         if not self._stored.resource_status["installed"]:
             event.add_status(BlockedStatus(self._stored.resource_status["msg"]))
 
@@ -188,8 +190,8 @@ class HardwareObserverCharm(ops.CharmBase):
                 self._stored.config[key] = value  # type: ignore
                 change_set.add(key)
 
-        if not self._stored.resource_status["installed"]:  # type: ignore[truthy-function]
-            logging.info(  # type: ignore[unreachable]
+        if not self._stored.resource_status["installed"]:
+            logging.info(
                 "Config changed called before install complete, deferring event: %s",
                 event.handle,
             )
@@ -218,10 +220,10 @@ class HardwareObserverCharm(ops.CharmBase):
     def _on_cos_agent_relation_joined(self, event: EventBase) -> None:
         """Start the exporter when relation joined."""
         if (
-            not self._stored.resource_status["installed"]  # type: ignore[truthy-function]
-            or not self._stored.exporter_status["installed"]  # type: ignore[truthy-function]
+            not self._stored.resource_status["installed"]
+            or not self._stored.exporter_status["installed"]
         ):
-            logger.info(  # type: ignore[unreachable]
+            logger.info(
                 "Defer cos-agent relation join because exporter or resources is not ready yet."
             )
             event.defer()
@@ -230,9 +232,9 @@ class HardwareObserverCharm(ops.CharmBase):
         self.exporter.start()
         logger.info("Start and enable exporter service")
 
-    def _on_cos_agent_relation_departed(self, event: EventBase) -> None:
+    def _on_cos_agent_relation_departed(self, _: EventBase) -> None:
         """Remove the exporter when relation departed."""
-        if self._stored.exporter_status["installed"]:  # type: ignore[truthy-function]
+        if self._stored.exporter_status["installed"]:
             self.exporter.stop()
             self.exporter.disable()
             logger.info("Stop and disable exporter service")
