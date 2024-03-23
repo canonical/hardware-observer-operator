@@ -86,11 +86,6 @@ class HardwareObserverCharm(ops.CharmBase):
 
         # Install exporter
         self.model.unit.status = MaintenanceStatus("Installing exporter...")
-        success, err_msg = self.validate_exporter_configs()
-        if not success:
-            self.model.unit.status = BlockedStatus(err_msg)
-            return
-
         port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
         level = self.model.config.get("exporter-log-level", "INFO")
         redfish_conn_params = self.get_redfish_conn_params()
@@ -101,7 +96,6 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.error(msg)
             self.model.unit.status = BlockedStatus(msg)
             return
-        logger.info("Successfully installed exporter")
         self._on_update_status(event)
 
     def _on_remove(self, _: EventBase) -> None:
@@ -125,21 +119,17 @@ class HardwareObserverCharm(ops.CharmBase):
             # The charm should be in BlockedStatus with install failed msg
             return  # type: ignore[unreachable]
 
-        if not self._stored.exporter_installed:  # type: ignore[truthy-function]
-            # The charm should be in BlockedStatus with exporter install failed msg
-            return  # type: ignore[unreachable]
-
-        config_valid, config_valid_message = self.validate_exporter_configs()
-        if not config_valid:
-            self.model.unit.status = BlockedStatus(config_valid_message)
-            return
-
         if not self.exporter_enabled:
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
             return
 
         if self.too_many_cos_agent_relations:
             self.model.unit.status = BlockedStatus("Cannot relate to more than one grafana-agent")
+            return
+
+        config_valid, config_valid_message = self.validate_exporter_configs()
+        if not config_valid:
+            self.model.unit.status = BlockedStatus(config_valid_message)
             return
 
         hw_tool_ok, error_msg = self.hw_tool_helper.check_installed()

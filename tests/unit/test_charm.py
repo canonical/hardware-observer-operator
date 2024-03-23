@@ -149,7 +149,10 @@ class TestCharm(unittest.TestCase):
 
         self.assertTrue(self.harness.charm._stored.resource_installed)
 
-        self.assertEqual(self.harness.charm.unit.status, BlockedStatus("error"))
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            BlockedStatus("Failed to install exporter, please refer to `juju debug-log`"),
+        )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
@@ -206,13 +209,6 @@ class TestCharm(unittest.TestCase):
         self.harness.add_relation("cos-agent", "grafana-agent")
         self.harness.begin()
         self.harness.charm._stored.resource_installed = True
-        self.harness.charm._stored.exporter_installed = False
-
-        # no exception should be raised
-        self.harness.charm.on.update_status.emit()
-
-        # exception raised, exporter should crash
-        self.harness.charm._stored.exporter_installed = True
         with self.assertRaises(ExporterError):
             self.harness.charm.on.update_status.emit()
 
@@ -221,7 +217,6 @@ class TestCharm(unittest.TestCase):
         """Test config change event updates the charm's internal store."""
         self.harness.begin()
         self.harness.charm._stored.resource_installed = True
-        self.harness.charm._stored.exporter_installed = True
 
         new_config = {"exporter-port": 80, "exporter-log-level": "DEBUG"}
         self.harness.update_config(new_config)
@@ -391,11 +386,17 @@ class TestCharm(unittest.TestCase):
         mock_redfish_client.side_effect = test_exception()
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
+        rid = self.harness.add_relation("cos-agent", "grafana-agent")
         self.harness.begin()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
         self.harness.charm.on.install.emit()
 
         self.assertTrue(self.harness.charm._stored.resource_installed)
 
+        # ensure exporter is installed (not started/enabled)
+        # even when redfish credentials are wrong
+        mock_exporter.return_value.install.assert_called_once()
+        mock_exporter.reset_mock()
         self.assertEqual(
             self.harness.charm.unit.status,
             BlockedStatus("Invalid config: 'redfish-username' or 'redfish-password'"),
