@@ -10,7 +10,7 @@ tests:
         values: '0x15'
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: IPMIMonitoringCommandFailed
         exp_alerts:
           - exp_labels:
@@ -35,7 +35,7 @@ tests:
         values: '120x15'
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: IPMITemperatureStateNotOk
         exp_alerts:
           - exp_labels:
@@ -71,7 +71,7 @@ tests:
         values: '240x15'
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: IPMIPowerStateNotOk
         exp_alerts:
           - exp_labels:
@@ -107,7 +107,7 @@ tests:
         values: '280x15'
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: IPMIVoltageStateNotOk
         exp_alerts:
           - exp_labels:
@@ -144,7 +144,7 @@ tests:
         values: '200x15'
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: IPMICurrentStateNotOk
         exp_alerts:
           - exp_labels:
@@ -180,7 +180,7 @@ tests:
         values: '4000x15'
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: IPMIFanSpeedStateNotOk
         exp_alerts:
           - exp_labels:
@@ -220,7 +220,7 @@ tests:
         values: '50x15'
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: IPMISensorStateNotOk
         exp_alerts:
           - exp_labels:

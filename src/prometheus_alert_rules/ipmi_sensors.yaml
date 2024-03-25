@@ -4,7 +4,7 @@ groups:
 
     - alert: IPMIMonitoringCommandFailed
       expr: ipmimonitoring_command_success == 0
-      for: 0m
+      for: 5m
       labels:
         severity: critical
       annotations:
@@ -16,7 +16,7 @@ groups:
 
     - alert: IPMITemperatureStateNotOk
       expr: ipmi_temperature_celsius{state=~"Warning|Critical"}
-      for: 0m
+      for: 5m
       labels: 
         severity: "{{ toLower $labels.state }}"
       annotations:
@@ -28,7 +28,7 @@ groups:
 
     - alert: IPMIPowerStateNotOk
       expr: ipmi_power_watts{state=~"Warning|Critical"}
-      for: 0m
+      for: 5m
       labels: 
         severity: "{{ toLower $labels.state }}"
       annotations:
@@ -40,7 +40,7 @@ groups:
 
     - alert: IPMIVoltageStateNotOk
       expr: ipmi_voltage_volts{state=~"Warning|Critical"}
-      for: 0m
+      for: 5m
       labels: 
         severity: "{{ toLower $labels.state }}"
       annotations:
@@ -52,7 +52,7 @@ groups:
 
     - alert: IPMICurrentStateNotOk
       expr: ipmi_current_amperes{state=~"Warning|Critical"}
-      for: 0m
+      for: 5m
       labels: 
         severity: "{{ toLower $labels.state }}"
       annotations:
@@ -64,7 +64,7 @@ groups:
 
     - alert: IPMIFanSpeedStateNotOk
       expr: ipmi_fan_speed_rpm{state=~"Warning|Critical"}
-      for: 0m
+      for: 5m
       labels: 
         severity: "{{ toLower $labels.state }}"
       annotations:
@@ -78,7 +78,7 @@ groups:
     # Slot Connector sensors are ignored since they raise a high number of false positive alerts
     - alert: IPMISensorStateNotOk
       expr: ipmi_generic_sensor_value{state=~"Warning|Critical", type!~"Entity\\sPresence|Slot/Connector"}
-      for: 0m
+      for: 5m
       labels:
         severity: "{{ toLower $labels.state }}"
       annotations:

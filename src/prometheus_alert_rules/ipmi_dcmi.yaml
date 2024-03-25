@@ -4,7 +4,7 @@ groups:
 
     - alert: IPMIDCMICommandFailed
       expr: ipmi_dcmi_command_success == 0
-      for: 0m
+      for: 5m
       labels:
         severity: critical
       annotations:
