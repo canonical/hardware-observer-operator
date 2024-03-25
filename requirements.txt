@@ -1,9 +1,6 @@
 cosl
 distro
-# ops v2.10.0 breaks unit tests with the following error
-# ops.model.ModelError: ERROR invalid status "error", expected one of [maintenance blocked waiting active]
-# caused due to this change: https://github.com/canonical/operator/pull/1107
-ops >= 2.2.0, <2.10.0
+ops >= 2.2.0
 jinja2
 redfish  # requests is included in this
 git+https://github.com/canonical/prometheus-hardware-exporter.git
