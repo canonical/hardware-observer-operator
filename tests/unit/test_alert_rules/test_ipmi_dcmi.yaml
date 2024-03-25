@@ -20,7 +20,7 @@ tests:
         values: '0.75x15'
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: IPMIDCMICommandFailed
         exp_alerts:
           - exp_labels:

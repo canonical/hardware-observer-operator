@@ -4,7 +4,7 @@ groups:
 
     - alert: IPMISELCommandFailed
       expr: ipmi_sel_command_success == 0
-      for: 0m
+      for: 5m
       labels:
         severity: critical
       annotations:
@@ -16,7 +16,7 @@ groups:
 
     - alert: IPMISELStateWarning
       expr: ipmi_sel_state == 1
-      for: 0m
+      for: 5m
       labels:
         severity: warning
       annotations:
@@ -27,7 +27,7 @@ groups:
 
     - alert: IPMISELStateCritical
       expr: ipmi_sel_state == 2
-      for: 0m
+      for: 5m
       labels:
         severity: critical
       annotations:

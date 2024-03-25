@@ -20,7 +20,7 @@ tests:
         values: '2x15'
 
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: IPMISELCommandFailed
         exp_alerts:
           - exp_labels:
@@ -33,7 +33,7 @@ tests:
                   VALUE = 0
                   LABELS = map[__name__:ipmi_sel_command_success instance:ubuntu-0]
 
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: IPMISELStateWarning
         exp_alerts:
           - exp_labels:
@@ -45,7 +45,7 @@ tests:
                 IPMI SEL entry in warning state.
                   LABELS = map[__name__:ipmi_sel_state instance:ubuntu-1]
 
-      - eval_time: 0m
+      - eval_time: 10m
         alertname: IPMISELStateCritical
         exp_alerts:
           - exp_labels:
