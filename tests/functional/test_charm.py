@@ -50,6 +50,7 @@ class AppStatus(str, Enum):
     MISSING_RESOURCES = "Missing resources:"
     CHECKSUM_ERROR = "Fail strategies: "
     INVALID_CONFIG_EXPORTER_LOG_LEVEL = "Invalid config: 'exporter-log-level'"
+    INVALID_REDFISH_CREDS = "Invalid config: 'redfish-username' or 'redfish-password'"
 
 
 @pytest.mark.abort_on_fail
@@ -109,48 +110,58 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
         timeout=TIMEOUT,
     )
 
-    if required_resources:
-        logging.info(
-            f"Required resources to attach: {[r.resource_name for r in required_resources]}"
-        )
-        # check workload status for real hardware based tests requiring resources to be attached
-        for unit in ops_test.model.applications[APP_NAME].units:
-            assert AppStatus.MISSING_RESOURCES in unit.workload_status_message
-
-        # NOTE: resource files need to be manually placed into the resources directory
-        for resource in required_resources:
-            path = f"{RESOURCES_DIR}/{resource.file_name}"
-            if not Path(path).exists():
-                pytest.fail(f"{path} not provided. Add resource into {RESOURCES_DIR} directory")
-            resource.file_path = path
-
-        resource_path_map = {r.resource_name: r.file_path for r in required_resources}
-        resource_cmd = [f"{name}={path}" for name, path in resource_path_map.items()]
-        juju_cmd = ["attach-resource", APP_NAME, "-m", ops_test.model_full_name] + resource_cmd
-
-        logging.info("Attaching resources...")
-        rc, stdout, stderr = await ops_test.juju(*juju_cmd)
-        assert rc == 0, f"Attaching resources failed: {(stderr or stdout).strip()}"
-
-        # still blocked since cos-agent relation has not been added
-        await ops_test.model.wait_for_idle(
-            apps=[APP_NAME],
-            status="blocked",
-            timeout=TIMEOUT,
-        )
-
-    # Test workload status with no real hardware or
-    # when real hardware doesn't require any resource to be attached
     for unit in ops_test.model.applications[APP_NAME].units:
-        assert AppStatus.MISSING_RESOURCES not in unit.workload_status_message
-        assert unit.workload_status_message == AppStatus.MISSING_RELATION
+        if required_resources:
+            assert AppStatus.MISSING_RESOURCES in unit.workload_status_message
+        else:
+            assert unit.workload_status_message == AppStatus.MISSING_RELATION
 
     for unit in ops_test.model.applications[GRAFANA_AGENT_APP_NAME].units:
         messages = ["grafana-cloud-config: off", "logging-consumer: off", "send-remote-write: off"]
         for msg in messages:
             assert msg in unit.workload_status_message
 
+
+@pytest.mark.abort_on_fail
+async def test_required_resources(ops_test: OpsTest, provided_collectors, required_resources):
+    if not required_resources:
+        pytest.skip("No required resources to be attached, skipping test")
+
+    logging.info(f"Required resources to attach: {[r.resource_name for r in required_resources]}")
+
+    for unit in ops_test.model.applications[APP_NAME].units:
+        assert AppStatus.MISSING_RESOURCES in unit.workload_status_message
+
+    # NOTE: resource files need to be manually placed into the resources directory
+    for resource in required_resources:
+        path = f"{RESOURCES_DIR}/{resource.file_name}"
+        if not Path(path).exists():
+            pytest.fail(f"{path} not provided. Add resource into {RESOURCES_DIR} directory")
+        resource.file_path = path
+
+    resource_path_map = {r.resource_name: r.file_path for r in required_resources}
+    resource_cmd = [f"{name}={path}" for name, path in resource_path_map.items()]
+    juju_cmd = ["attach-resource", APP_NAME, "-m", ops_test.model_full_name] + resource_cmd
+
+    logging.info("Attaching resources...")
+    rc, stdout, stderr = await ops_test.juju(*juju_cmd)
+    assert rc == 0, f"Attaching resources failed: {(stderr or stdout).strip()}"
+
+    # still blocked since cos-agent relation has not been added
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME],
+        status="blocked",
+        timeout=TIMEOUT,
+    )
+    for unit in ops_test.model.applications[APP_NAME].units:
+        assert unit.workload_status_message == AppStatus.MISSING_RELATION
+
+
+@pytest.mark.abort_on_fail
+async def test_cos_agent_relation(ops_test: OpsTest, provided_collectors):
+    """Test adding relation with grafana-agent."""
     check_active_cmd = "systemctl is-active hardware-exporter"
+    redfish_present = True if "redfish" in provided_collectors else False
 
     # Test without cos-agent relation
     logging.info("Check whether hardware-exporter is inactive before creating relation.")
@@ -161,13 +172,14 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
 
     # Add cos-agent relation
     logging.info("Adding cos-agent relation.")
+    status = "blocked" if redfish_present else "active"
     await asyncio.gather(
         ops_test.model.add_relation(
             f"{APP_NAME}:cos-agent", f"{GRAFANA_AGENT_APP_NAME}:cos-agent"
         ),
         ops_test.model.wait_for_idle(
             apps=[APP_NAME],
-            status="active",
+            status=status,
             timeout=TIMEOUT,
         ),
     )
@@ -178,6 +190,32 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
         results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
         assert results.get("return-code") == 0
         assert results.get("stdout").strip() == "active"
+        if redfish_present:
+            assert unit.workload_status_message == AppStatus.INVALID_REDFISH_CREDS
+        else:
+            assert unit.workload_status_message == AppStatus.READY
+
+
+@pytest.mark.abort_on_fail
+async def test_redfish_credential_validation(ops_test: OpsTest, provided_collectors, app):
+    if "redfish" not in provided_collectors:
+        pytest.skip("redfish not in provided collectors, skipping test")
+
+    for unit in ops_test.model.applications[APP_NAME].units:
+        assert unit.workload_status_message == AppStatus.INVALID_REDFISH_CREDS
+
+    logging.info("Setting Redfish credentials...")
+    username = os.getenv("REDFISH_USERNAME")
+    password = os.getenv("REDFISH_PASSWORD")
+    if username is None or password is None:
+        pytest.fail("Environment vars for redfish creds not set")
+    await asyncio.gather(
+        app.set_config({"redfish-username": username}),
+        app.set_config({"redfish-password": password}),
+        ops_test.model.wait_for_idle(apps=[APP_NAME]),
+    )
+
+    for unit in ops_test.model.applications[APP_NAME].units:
         assert unit.workload_status_message == AppStatus.READY
 
 
@@ -202,9 +240,18 @@ class TestCharmWithHW:
 
     async def test_metrics_available(self, app, unit, ops_test):
         """Test if metrics are available at the expected endpoint on unit."""
+        # takes some time for exporter to start and metrics to be available
         try:
-            metrics = await get_metrics_output(ops_test, unit.name)
-        except MetricsFetchError:
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(5),
+                wait=wait_fixed(10),
+            ):
+                with attempt:
+                    logging.info(f"Fetching metrics attempt #{attempt.retry_state.attempt_number}")
+                    get_metrics_output.cache_clear()  # clear empty metrics from cache
+                    metrics = await get_metrics_output(ops_test, unit.name)
+                    await ops_test.model.wait_for_idle(apps=[APP_NAME])
+        except RetryError:
             pytest.fail("Not able to obtain metrics!")
 
         assert metrics, "Metrics result should not be empty"
@@ -237,103 +284,6 @@ class TestCharmWithHW:
 
         assert metrics.get(collector), f"{collector} specific metrics are not available."
 
-    async def test_resource_in_correct_location(self, ops_test, unit, required_resources):
-        """Test if attached resource is added to correctly specified location."""
-        # by default, TOOLS_DIR = Path("/usr/sbin")
-        for resource in required_resources:
-            symlink_bin = TOOLS_DIR / resource.bin_name
-            # checks whether symlink points correctly resource binary
-            check_resource_cmd = f"ls -L {symlink_bin}"
-            results = await run_command_on_unit(ops_test, unit.name, check_resource_cmd)
-            assert results.get("return-code") == 0, f"{symlink_bin} resource doesn't exist"
-
-    async def test_wrong_resource_attached(self, ops_test, unit, required_resources, tmp_path):
-        """Test charm when wrong resource file for collector has been attached."""
-        for resource in required_resources:
-            # resource file names require the right extensions
-            if resource.resource_name in ["storcli-deb", "perccli-deb"]:
-                tmp_resource_file = tmp_path / "resource.deb"
-            else:
-                tmp_resource_file = tmp_path / "resource"
-
-            # write random data into file
-            with open(tmp_resource_file, "w") as file:
-                file.write(str(uuid4()))
-
-            logging.info(f"Testing wrong resource for: {resource.resource_name}")
-            juju_cmd = [
-                "attach-resource",
-                APP_NAME,
-                "-m",
-                ops_test.model_full_name,
-                f"{resource.resource_name}={tmp_resource_file}",
-            ]
-            rc, stdout, stderr = await ops_test.juju(*juju_cmd)
-            assert rc == 0, f"Attaching resource failed: {(stderr or stdout).strip()}"
-
-            await ops_test.model.wait_for_idle(
-                apps=[APP_NAME],
-                status="blocked",
-                timeout=TIMEOUT,
-            )
-            assert AppStatus.CHECKSUM_ERROR in unit.workload_status_message
-
-            resource_path = f"{RESOURCES_DIR}/{resource.file_name}"
-            if not Path(resource_path).exists():
-                pytest.fail(f"{resource_path} doesn't exist.")
-
-            # reset test environment by reattaching correct resource
-            logging.info("Re-attaching correct resource...")
-            juju_cmd = [
-                "attach-resource",
-                APP_NAME,
-                "-m",
-                ops_test.model_full_name,
-                f"{resource.resource_name}={resource_path}",
-            ]
-            # check if attaching resource failed so that it doesn't impact the test for the
-            # next resource
-            rc, stdout, stderr = await ops_test.juju(*juju_cmd)
-            assert rc == 0, f"Attaching resource failed: {(stderr or stdout).strip()}"
-
-            await ops_test.model.wait_for_idle(
-                apps=[APP_NAME],
-                status="active",
-                timeout=TIMEOUT,
-            )
-            assert AppStatus.MISSING_RESOURCES not in unit.workload_status_message
-
-    async def test_resource_clean_up(self, ops_test, app, unit, required_resources):
-        """Test resource clean up behaviour when relation with principal charm is removed."""
-        await asyncio.gather(
-            app.remove_relation(f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"),
-            ops_test.model.wait_for_idle(
-                apps=[PRINCIPAL_APP_NAME], status="active", timeout=TIMEOUT
-            ),
-        )
-        principal_unit = ops_test.model.applications[PRINCIPAL_APP_NAME].units[0]
-
-        # Wait for cleanup activities to finish
-        await ops_test.model.block_until(
-            lambda: ops_test.model.applications[APP_NAME].status == "unknown"
-        )
-
-        for resource in required_resources:
-            symlink_bin = TOOLS_DIR / resource.bin_name
-            check_resource_cmd = f"ls -L {symlink_bin}"
-            results = await run_command_on_unit(ops_test, principal_unit.name, check_resource_cmd)
-            assert results.get("return-code") > 0, f"{symlink_bin} resource has not been removed"
-
-        # reset test environment by adding ubuntu:juju-info relation again
-        await asyncio.gather(
-            ops_test.model.add_relation(
-                f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"
-            ),
-            ops_test.model.wait_for_idle(
-                apps=[PRINCIPAL_APP_NAME], status="active", timeout=TIMEOUT
-            ),
-        )
-
     async def test_redfish_metrics(self, ops_test, app, unit, provided_collectors):  # noqa: C901
         """Tests for redfish specific metrics."""
         if "redfish" not in provided_collectors:
@@ -343,41 +293,6 @@ class TestCharmWithHW:
             metrics = await get_metrics_output(ops_test, unit.name)
         except MetricsFetchError:
             pytest.fail("Not able to obtain metrics!")
-
-        # mapping of metric names with their expected values
-        expected_metric_values = {
-            "redfish_service_available": 1.0,
-            "redfish_call_success": 0.0,
-        }
-        if not assert_metrics(metrics.get("redfish"), expected_metric_values):
-            pytest.fail("Expected metrics not present!")
-
-        # fetch and configure redfish creds
-        logging.info("Setting Redfish credentials...")
-        username = os.getenv("REDFISH_USERNAME")
-        password = os.getenv("REDFISH_PASSWORD")
-        if username is None or password is None:
-            pytest.fail("Environment vars for redfish creds not set")
-        await asyncio.gather(
-            app.set_config({"redfish-username": username}),
-            app.set_config({"redfish-password": password}),
-            ops_test.model.wait_for_idle(apps=[APP_NAME]),
-        )
-
-        logging.info("Check metric after setting redfish credentials...")
-        try:
-            # retry metric endpoint check which takes some time to settle after config change
-            async for attempt in AsyncRetrying(
-                stop=stop_after_attempt(3),
-                wait=wait_fixed(5),
-            ):
-                with attempt:
-                    logging.info(f"Attempt #{attempt.retry_state.attempt_number}")
-                    get_metrics_output.cache_clear()  # don't hit cache, need new redfish metrics
-                    metrics = await get_metrics_output(ops_test, unit.name)
-                    await ops_test.model.wait_for_idle(apps=[APP_NAME])
-        except RetryError:
-            pytest.fail("Not able to obtain metrics.")
 
         expected_metric_values = {
             "redfish_service_available": 1.0,
@@ -500,6 +415,103 @@ class TestCharmWithHW:
         }
         if not assert_metrics(metrics.get("hpe_ssa"), expected_metric_values):
             pytest.fail("Expected metrics not present!")
+
+    async def test_resource_in_correct_location(self, ops_test, unit, required_resources):
+        """Test if attached resource is added to correctly specified location."""
+        # by default, TOOLS_DIR = Path("/usr/sbin")
+        for resource in required_resources:
+            symlink_bin = TOOLS_DIR / resource.bin_name
+            # checks whether symlink points correctly resource binary
+            check_resource_cmd = f"ls -L {symlink_bin}"
+            results = await run_command_on_unit(ops_test, unit.name, check_resource_cmd)
+            assert results.get("return-code") == 0, f"{symlink_bin} resource doesn't exist"
+
+    async def test_wrong_resource_attached(self, ops_test, unit, required_resources, tmp_path):
+        """Test charm when wrong resource file for collector has been attached."""
+        for resource in required_resources:
+            # resource file names require the right extensions
+            if resource.resource_name in ["storcli-deb", "perccli-deb"]:
+                tmp_resource_file = tmp_path / "resource.deb"
+            else:
+                tmp_resource_file = tmp_path / "resource"
+
+            # write random data into file
+            with open(tmp_resource_file, "w") as file:
+                file.write(str(uuid4()))
+
+            logging.info(f"Testing wrong resource for: {resource.resource_name}")
+            juju_cmd = [
+                "attach-resource",
+                APP_NAME,
+                "-m",
+                ops_test.model_full_name,
+                f"{resource.resource_name}={tmp_resource_file}",
+            ]
+            rc, stdout, stderr = await ops_test.juju(*juju_cmd)
+            assert rc == 0, f"Attaching resource failed: {(stderr or stdout).strip()}"
+
+            await ops_test.model.wait_for_idle(
+                apps=[APP_NAME],
+                status="blocked",
+                timeout=TIMEOUT,
+            )
+            assert AppStatus.CHECKSUM_ERROR in unit.workload_status_message
+
+            resource_path = f"{RESOURCES_DIR}/{resource.file_name}"
+            if not Path(resource_path).exists():
+                pytest.fail(f"{resource_path} doesn't exist.")
+
+            # reset test environment by reattaching correct resource
+            logging.info("Re-attaching correct resource...")
+            juju_cmd = [
+                "attach-resource",
+                APP_NAME,
+                "-m",
+                ops_test.model_full_name,
+                f"{resource.resource_name}={resource_path}",
+            ]
+            # check if attaching resource failed so that it doesn't impact the test for the
+            # next resource
+            rc, stdout, stderr = await ops_test.juju(*juju_cmd)
+            assert rc == 0, f"Attaching resource failed: {(stderr or stdout).strip()}"
+
+            await ops_test.model.wait_for_idle(
+                apps=[APP_NAME],
+                status="active",
+                timeout=TIMEOUT,
+            )
+            assert AppStatus.MISSING_RESOURCES not in unit.workload_status_message
+
+    async def test_resource_clean_up(self, ops_test, app, unit, required_resources):
+        """Test resource clean up behaviour when relation with principal charm is removed."""
+        await asyncio.gather(
+            app.remove_relation(f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"),
+            ops_test.model.wait_for_idle(
+                apps=[PRINCIPAL_APP_NAME], status="active", timeout=TIMEOUT
+            ),
+        )
+        principal_unit = ops_test.model.applications[PRINCIPAL_APP_NAME].units[0]
+
+        # Wait for cleanup activities to finish
+        await ops_test.model.block_until(
+            lambda: ops_test.model.applications[APP_NAME].status == "unknown"
+        )
+
+        for resource in required_resources:
+            symlink_bin = TOOLS_DIR / resource.bin_name
+            check_resource_cmd = f"ls -L {symlink_bin}"
+            results = await run_command_on_unit(ops_test, principal_unit.name, check_resource_cmd)
+            assert results.get("return-code") > 0, f"{symlink_bin} resource has not been removed"
+
+        # reset test environment by adding ubuntu:juju-info relation again
+        await asyncio.gather(
+            ops_test.model.add_relation(
+                f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"
+            ),
+            ops_test.model.wait_for_idle(
+                apps=[PRINCIPAL_APP_NAME], status="active", timeout=TIMEOUT
+            ),
+        )
 
 
 class TestCharm:

@@ -58,9 +58,11 @@ def pytest_collection_modifyitems(config, items):
         )
         for item in items:
             # skip TestCharm tests where "realhw" marker is not present
-            # we don't want to skip test_setup_and_build even for hw independent tests
-            # so we also check for the skip_if_deployed marker
-            if "realhw" not in item.keywords and "skip_if_deployed" not in item.keywords:
+            # we don't want to skip test_setup_and_build, test_required_resources,
+            # test_cos_agent_relation and test_redfish_credential_validation
+            # even for hw independent tests
+            # so we also check for the abort_on_fail marker
+            if "realhw" not in item.keywords and "abort_on_fail" not in item.keywords:
                 item.add_marker(skip_hw_independent)
     else:
         # skip hw dependent tests in TestCharmWithHW marked with "realhw"
