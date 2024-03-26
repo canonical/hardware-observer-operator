@@ -93,11 +93,6 @@ class HardwareObserverCharm(ops.CharmBase):
 
         # Install exporter
         self.model.unit.status = MaintenanceStatus("Installing exporter...")
-        success, err_msg = self.validate_exporter_configs()
-        if not success:
-            self.model.unit.status = BlockedStatus(err_msg)
-            return
-
         port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
         level = self.model.config.get("exporter-log-level", "INFO")
         scrape_timeout = self.model.config.get("scrape-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT)
@@ -140,9 +135,9 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus("Cannot relate to more than one grafana-agent")
             return
 
-        config_valied, confg_valid_message = self.validate_exporter_configs()
-        if not config_valied:
-            self.model.unit.status = BlockedStatus(confg_valid_message)
+        config_valid, config_valid_message = self.validate_exporter_configs()
+        if not config_valid:
+            self.model.unit.status = BlockedStatus(config_valid_message)
             return
 
         hw_tool_ok, error_msg = self.hw_tool_helper.check_installed()

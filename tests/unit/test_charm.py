@@ -59,16 +59,16 @@ class TestCharm(unittest.TestCase):
                 notice_count += 1
         return notice_count
 
-    def test_01_harness(self) -> None:
-        """Test charm initialise."""
+    def test_harness(self) -> None:
+        """Test charm initialize."""
         self.harness.begin()
         self.assertFalse(self.harness.charm._stored.resource_installed)
         self.assertTrue(isinstance(self.harness.charm._stored.config, ops.framework.StoredDict))
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_02_install(self, mock_hw_tool_helper, mock_exporter) -> None:
-        """Test event install."""
+    def test_install(self, mock_hw_tool_helper, mock_exporter) -> None:
+        """Test install event handler."""
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
         self.harness.begin()
@@ -83,8 +83,8 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_03_upgrade_charm(self, mock_hw_tool_helper, mock_exporter) -> None:
-        """Test event upgrade_charm."""
+    def test_upgrade_charm(self, mock_hw_tool_helper, mock_exporter) -> None:
+        """Test upgrade_charm event handler."""
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
         self.harness.begin()
@@ -101,8 +101,8 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_04_install_missing_resources(self, mock_hw_tool_helper, mock_exporter) -> None:
-        """Test event install."""
+    def test_install_missing_resources(self, mock_hw_tool_helper, mock_exporter) -> None:
+        """Test install event handler when resources are missing."""
         mock_hw_tool_helper.return_value.install.return_value = (
             False,
             "Missing resources: ['storcli-deb']",
@@ -116,8 +116,8 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_05_install_redfish_unavailable(self, mock_hw_tool_helper, mock_exporter) -> None:
-        """Test event install."""
+    def test_install_redfish_unavailable(self, mock_hw_tool_helper, mock_exporter) -> None:
+        """Test install event handler when redfish is unavailable."""
         self.mock_bmc_hw_verifier.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
@@ -139,8 +139,8 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_06_install_failed(self, mock_hw_tool_helper, mock_exporter) -> None:
-        """Test event install."""
+    def test_exporter_install_fail(self, mock_hw_tool_helper, mock_exporter) -> None:
+        """Test exporter install failure."""
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = False
         self.harness.begin()
@@ -150,12 +150,15 @@ class TestCharm(unittest.TestCase):
 
         self.assertTrue(self.harness.charm._stored.resource_installed)
 
-        self.assertEqual(self.harness.charm.unit.status, BlockedStatus("error"))
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            BlockedStatus("Failed to install exporter, please refer to `juju debug-log`"),
+        )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_07_update_status_all_green(self, mock_hw_tool_helper, mock_exporter):
-        """Test update_status when everything is okay."""
+    def test_update_status_all_green(self, mock_hw_tool_helper, mock_exporter):
+        """Test update_status event handler when everything is okay."""
         self.mock_bmc_hw_verifier.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
@@ -174,8 +177,8 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_08_update_status_check_installed_false(self, mock_hw_tool_helper, mock_exporter):
-        """Test update_status when hw tool checks failed."""
+    def test_update_status_check_installed_false(self, mock_hw_tool_helper, mock_exporter):
+        """Test update_status event handler when hw tool checks failed."""
         self.mock_bmc_hw_verifier.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
@@ -194,7 +197,7 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_09_update_status_exporter_crashed(self, mock_hw_tool_helper, mock_exporter):
+    def test_update_status_exporter_crashed(self, mock_hw_tool_helper, mock_exporter):
         """Test update_status."""
         self.mock_bmc_hw_verifier.return_value = [
             HWTool.IPMI_SENSOR,
@@ -211,7 +214,7 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.on.update_status.emit()
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    def test_10_config_changed(self, mock_exporter):
+    def test_config_changed(self, mock_exporter):
         """Test config change event updates the charm's internal store."""
         self.harness.begin()
         self.harness.charm._stored.resource_installed = True
@@ -228,8 +231,8 @@ class TestCharm(unittest.TestCase):
         )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    def test_11_config_changed_before_install_complete(self, mock_exporter):
-        """Test: config change event is deferred if charm not installed."""
+    def test_config_changed_before_install_complete(self, mock_exporter):
+        """Test config change event is deferred if charm not installed."""
         self.harness.begin()
         self.harness.charm._stored.resource_installed = False
 
@@ -238,8 +241,8 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_12_upgrade_force_reconfig_exporter(self, mock_hw_tool_helper, mock_exporter) -> None:
-        """Test event install."""
+    def test_upgrade_force_reconfig_exporter(self, mock_hw_tool_helper, mock_exporter) -> None:
+        """Test upgrade event handler will reconfigure exporter."""
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
         self.harness.begin()
@@ -257,8 +260,8 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_13_update_status_config_invalid(self, mock_hw_tool_helper, mock_exporter):
-        """Test update_status when everything is okay."""
+    def test_update_status_config_invalid(self, mock_hw_tool_helper, mock_exporter):
+        """Test update_status event handler when config is invalid."""
         self.mock_bmc_hw_verifier.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
@@ -280,7 +283,7 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_14_config_changed_update_alert_rules(self, mock_hw_tool_helper, mock_exporter):
+    def test_config_changed_update_alert_rules(self, mock_hw_tool_helper, mock_exporter):
         """Test config changed will update alert rule."""
         self.mock_bmc_hw_verifier.return_value = [
             HWTool.IPMI_SENSOR,
@@ -316,8 +319,8 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_15_upgrade_charm_update_alert_rules(self, mock_hw_tool_helper, mock_exporter):
-        """Test upgrade charm will update alert rule."""
+    def test_upgrade_charm_update_alert_rules(self, mock_hw_tool_helper, mock_exporter):
+        """Test upgrade charm event updates alert rule."""
         self.mock_bmc_hw_verifier.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
@@ -352,10 +355,10 @@ class TestCharm(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_16_install_redfish_enabled_with_correct_credential(
+    def test_install_redfish_enabled_with_correct_credential(
         self, mock_hw_tool_helper, mock_exporter
     ) -> None:
-        """Test event install when redfish is available and credential is correct."""
+        """Test install event when redfish is available and credential is correct."""
         self.mock_bmc_hw_verifier.return_value = [
             HWTool.REDFISH,
         ]
@@ -377,7 +380,7 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     @mock.patch("charm.redfish_client", return_value=mock.MagicMock())
-    def test_17_install_redfish_enabled_with_incorrect_credential(
+    def test_install_redfish_enabled_with_incorrect_credential(
         self, test_exception, mock_redfish_client, mock_hw_tool_helper, mock_exporter
     ) -> None:
         """Test event install when redfish is available but credential is wrong."""
@@ -387,11 +390,17 @@ class TestCharm(unittest.TestCase):
         mock_redfish_client.side_effect = test_exception()
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
+        rid = self.harness.add_relation("cos-agent", "grafana-agent")
         self.harness.begin()
+        self.harness.add_relation_unit(rid, "grafana-agent/0")
         self.harness.charm.on.install.emit()
 
         self.assertTrue(self.harness.charm._stored.resource_installed)
 
+        # ensure exporter is installed (not started/enabled)
+        # even when redfish credentials are wrong
+        mock_exporter.return_value.install.assert_called_once()
+        mock_exporter.reset_mock()
         self.assertEqual(
             self.harness.charm.unit.status,
             BlockedStatus("Invalid config: 'redfish-username' or 'redfish-password'"),
@@ -401,7 +410,7 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     @mock.patch("charm.redfish_client", return_value=mock.MagicMock())
-    def test_18_config_changed_redfish_enabled_with_incorrect_credential(
+    def test_config_changed_redfish_enabled_with_incorrect_credential(
         self, test_exception, mock_redfish_client, mock_hw_tool_helper, mock_exporter
     ) -> None:
         """Test event config changed when redfish is available but credential is wrong."""
