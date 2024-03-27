@@ -549,6 +549,22 @@ class TestCharm:
 
         await app.reset_config(["exporter-log-level"])
 
+    async def test_config_changed_collect_timeout(self, app, unit, ops_test):
+        """Test changing the config option: collect-timeout."""
+        new_collect_timeout = "20"
+        await asyncio.gather(
+            app.set_config({"collect-timeout": new_collect_timeout}),
+            ops_test.model.wait_for_idle(apps=[APP_NAME]),
+        )
+
+        cmd = "cat /etc/hardware-exporter-config.yaml"
+        results = await run_command_on_unit(ops_test, unit.name, cmd)
+        assert results.get("return-code") == 0
+        config = yaml.safe_load(results.get("stdout").strip())
+        assert config["collect_timeout"] == int(new_collect_timeout)
+
+        await app.reset_config(["collect-timeout"])
+
     async def test_start_and_stop_exporter(self, app, unit, ops_test):
         """Test starting and stopping the exporter results in correct charm status."""
         # Stop the exporter, and the exporter should auto-restart after update status fire.

@@ -204,6 +204,7 @@ class HardwareObserverCharm(ops.CharmBase):
                 "redfish-host",
                 "redfish-username",
                 "redfish-password",
+                "collect-timeout",
             }
             if exporter_configs.intersection(change_set):
                 logger.info("Detected changes in exporter config.")
