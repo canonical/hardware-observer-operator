@@ -13,8 +13,11 @@ EXPORTER_SERVICE_TEMPLATE = f"{EXPORTER_NAME}.service.j2"
 EXPORTER_HEALTH_RETRY_COUNT = 3
 EXPORTER_HEALTH_RETRY_TIMEOUT = 3
 EXPORTER_DEFAULT_PORT = "10200"
-EXPORTER_CRASH_MSG = "Exporter crashed unexpectedly, please refer to systemd logs..."
 EXPORTER_DEFAULT_COLLECT_TIMEOUT = 10
+EXPORTER_CRASH_MSG = "Exporter crashed unexpectedly, please refer to systemd logs..."
+EXPORTER_CONFIG_RENDER_FAIL_MSG = (
+    "Failed to configure exporter, please check if the server is healthy."
+)
 
 # Redfish
 REDFISH_TIMEOUT = 10
