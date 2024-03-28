@@ -275,10 +275,13 @@ class TestExporter(unittest.TestCase):
             self.mock_systemd.service_failed.return_value = False
             self.harness.charm.on.install.emit()
             self.harness.add_relation_unit(rid, "grafana-agent/0")
+            # this will trigger config changed event
             self.harness.update_config({"exporter-log-level": "DEBUG"})
-            self.harness.charm.on.config_changed.emit()
-            self.assertEqual(self.harness.charm._stored.config.get("exporter-log-level"), "DEBUG")
             self.mock_systemd.service_restart.assert_called_once()
+            self.assertEqual(
+                self.harness.charm.unit.status,
+                ActiveStatus("Unit is ready"),
+            )
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_61_config_changed_not_okay(self, mock_service_installed):
