@@ -18,6 +18,7 @@ from redfish.rest.v1 import InvalidCredentialsError
 from config import (
     EXPORTER_CRASH_MSG,
     EXPORTER_DEFAULT_COLLECT_TIMEOUT,
+    EXPORTER_DEFAULT_LOG_LEVEL,
     EXPORTER_DEFAULT_PORT,
     EXPORTER_HEALTH_RETRY_COUNT,
     EXPORTER_HEALTH_RETRY_TIMEOUT,
@@ -184,7 +185,7 @@ class HardwareObserverCharm(ops.CharmBase):
                 return
 
             port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
-            level = self.model.config.get("exporter-log-level", "INFO")
+            level = self.model.config.get("exporter-log-level", EXPORTER_DEFAULT_LOG_LEVEL)
             collect_timeout = self.model.config.get(
                 "collect-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT
             )
