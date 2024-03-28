@@ -63,7 +63,6 @@ class TestCharm(unittest.TestCase):
         """Test charm initialize."""
         self.harness.begin()
         self.assertFalse(self.harness.charm._stored.resource_installed)
-        self.assertTrue(isinstance(self.harness.charm._stored.config, ops.framework.StoredDict))
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
@@ -213,22 +212,26 @@ class TestCharm(unittest.TestCase):
         with self.assertRaises(ExporterError):
             self.harness.charm.on.update_status.emit()
 
+    @mock.patch.object(charm, "bmc_hw_verifier", return_value=[])
+    @mock.patch("charm.HWToolHelper")
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    def test_config_changed(self, mock_exporter):
-        """Test config change event updates the charm's internal store."""
+    def test_config_changed(self, mock_exporter, mock_hw_tool_helper, mock_bmc_hw_verifier):
+        """Test config change event renders config yaml."""
         self.harness.begin()
         self.harness.charm._stored.resource_installed = True
+        self.harness.charm.num_cos_agent_relations = 1  # exported enabled
+        self.harness.charm.hw_tool_helper.check_installed.return_value = (
+            True,
+            "",
+        )  # hw tool install ok
 
         new_config = {"exporter-port": 80, "exporter-log-level": "DEBUG"}
         self.harness.update_config(new_config)
         self.harness.charm.on.config_changed.emit()
 
-        for k, v in self.harness.charm.model.config.items():
-            self.assertEqual(self.harness.charm._stored.config.get(k), v)
+        self.harness.charm.exporter.template.render_config.assert_called()
 
-        self.assertEqual(
-            self.harness.charm.unit.status, BlockedStatus("Missing relation: [cos-agent]")
-        )
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     def test_config_changed_before_install_complete(self, mock_exporter):
