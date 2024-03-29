@@ -32,8 +32,8 @@ class Alert:
     value: float
     labels: dict
 
-    def __eq__(self, other) -> bool:
-        """Implement equals based only on relevant fields."""
+    def is_same_alert(self, other) -> bool:
+        """Check if the two alerts are the same based on relevant fields."""
         if self.state != other.state or self.value != other.value:
             return False
         for key, value in self.labels.items():
