@@ -46,9 +46,11 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     cmd = ["curl", prometheus_alerts_endpoint]
 
     # Sometimes alerts take some time to show after the metrics are exposed on the host.
-    # So retrying for upto 5 minutes.
+    # Additionally, some alerts longer duration like 5m, and they take some time to
+    # transition to `firing` state.
+    # So retrying for upto 15 minutes.
     try:
-        async for attempt in AsyncRetrying(stop=stop_after_attempt(15), wait=wait_fixed(20)):
+        async for attempt in AsyncRetrying(stop=stop_after_attempt(45), wait=wait_fixed(20)):
             with attempt:
                 try:
                     alerts_response = subprocess.check_output(cmd)
@@ -77,8 +79,7 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
 
                 for expected_alert in expected_alerts:
                     assert any(
-                        # Comparing using custom __eq__ based only on relevant fields
-                        expected_alert == received_alert
+                        expected_alert.is_same_alert(received_alert)
                         for received_alert in received_alerts
                     )
 
