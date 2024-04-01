@@ -936,9 +936,9 @@ class TestIPMIHWVerifier(unittest.TestCase):
         """Test a mixture of failures and successes for ipmi."""
 
         def mock_get_response_ipmi(ipmi_call):
-            if ipmi_call == "ipmimonitoring".split():
+            if ipmi_call == "ipmimonitoring --sdr-cache-recreate".split():
                 pass
-            elif ipmi_call == "ipmi-sel".split():
+            elif ipmi_call == "ipmi-sel --sdr-cache-recreate".split():
                 pass
             elif ipmi_call == "ipmi-dcmi --get-system-power-statistics".split():
                 raise subprocess.CalledProcessError(-1, "cmd")
