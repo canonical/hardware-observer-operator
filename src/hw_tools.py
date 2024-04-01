@@ -475,13 +475,13 @@ def bmc_hw_verifier() -> List[HWTool]:
     apt_helpers.add_pkg_with_candidate_version("freeipmi-tools")
 
     try:
-        subprocess.check_output("ipmimonitoring".split())
+        subprocess.check_output("ipmimonitoring --sdr-cache-recreate".split())
         tools.append(HWTool.IPMI_SENSOR)
     except subprocess.CalledProcessError:
         logger.info("IPMI sensors monitoring is not available")
 
     try:
-        subprocess.check_output("ipmi-sel".split())
+        subprocess.check_output("ipmi-sel --sdr-cache-recreate".split())
         tools.append(HWTool.IPMI_SEL)
     except subprocess.CalledProcessError:
         logger.info("IPMI SEL monitoring is not available")
