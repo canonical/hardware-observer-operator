@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 jneo8
+# Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 import asyncio
