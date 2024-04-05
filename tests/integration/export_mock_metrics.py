@@ -10,8 +10,6 @@ from mock_data import SAMPLE_METRICS
 from prometheus_client import REGISTRY, start_http_server
 from prometheus_client.core import GaugeMetricFamily
 
-from config import EXPORTER_DEFAULT_PORT
-
 
 class SyntheticCollector:
     """Collector for creating synthetic(mock) metrics."""
@@ -30,7 +28,7 @@ class SyntheticCollector:
 
 
 if __name__ == "__main__":
-    start_http_server(int(EXPORTER_DEFAULT_PORT))
+    start_http_server(10200)  # start at default port (see config.yaml)
     REGISTRY.register(SyntheticCollector())
 
     while True:

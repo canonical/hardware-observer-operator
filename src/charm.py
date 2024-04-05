@@ -17,9 +17,6 @@ from redfish.rest.v1 import InvalidCredentialsError
 
 from config import (
     EXPORTER_CRASH_MSG,
-    EXPORTER_DEFAULT_COLLECT_TIMEOUT,
-    EXPORTER_DEFAULT_LOG_LEVEL,
-    EXPORTER_DEFAULT_PORT,
     EXPORTER_HEALTH_RETRY_COUNT,
     EXPORTER_HEALTH_RETRY_TIMEOUT,
     REDFISH_MAX_RETRY,
@@ -43,9 +40,6 @@ class HardwareObserverCharm(ops.CharmBase):
         super().__init__(*args)
         self.hw_tool_helper = HWToolHelper()
 
-        collect_timeout = self.model.config.get(
-            "collect-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT
-        )
         # Add refresh_events to COSAgentProvider to update relation data when
         # config changed (default behavior) and upgrade charm. This is useful
         # for updating alert rules.
@@ -57,7 +51,7 @@ class HardwareObserverCharm(ops.CharmBase):
             ],
             # Setting scrape_timeout as collect_timeout in the `duration` format specified in
             # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration
-            scrape_configs=[{"scrape_timeout": f"{collect_timeout}s"}],
+            scrape_configs=[{"scrape_timeout": f"{int(self.model.config['collect-timeout'])}s"}],
         )
         self.exporter = Exporter(self.charm_dir)
 
@@ -93,11 +87,12 @@ class HardwareObserverCharm(ops.CharmBase):
 
         # Install exporter
         self.model.unit.status = MaintenanceStatus("Installing exporter...")
-        port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
-        level = self.model.config.get("exporter-log-level", "INFO")
-        scrape_timeout = self.model.config.get("scrape-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT)
-        redfish_conn_params = self.get_redfish_conn_params()
-        success = self.exporter.install(port, level, redfish_conn_params, int(scrape_timeout))
+        success = self.exporter.install(
+            int(self.model.config["exporter-port"]),
+            self.model.config["exporter-log-level"],
+            self.get_redfish_conn_params(),
+            int(self.model.config["collect-timeout"]),
+        )
         self._stored.exporter_installed = success
         if not success:
             msg = "Failed to install exporter, please refer to `juju debug-log`"
@@ -184,17 +179,11 @@ class HardwareObserverCharm(ops.CharmBase):
                 self.model.unit.status = BlockedStatus(message)
                 return
 
-            port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
-            level = self.model.config.get("exporter-log-level", EXPORTER_DEFAULT_LOG_LEVEL)
-            collect_timeout = self.model.config.get(
-                "collect-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT
-            )
-            redfish_conn_params = self.get_redfish_conn_params()
             success = self.exporter.template.render_config(
-                port=port,
-                level=level,
-                redfish_conn_params=redfish_conn_params,
-                collect_timeout=int(collect_timeout),
+                port=int(self.model.config["exporter-port"]),
+                level=self.model.config["exporter-log-level"],
+                redfish_conn_params=self.get_redfish_conn_params(),
+                collect_timeout=int(self.model.config["collect-timeout"]),
             )
             if not success:
                 message = "Failed to configure exporter, please check if the server is healthy."
@@ -242,12 +231,12 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
-        port = int(self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT))
+        port = int(self.model.config["exporter-port"])
         if not 1 <= port <= 65535:
             logger.error("Invalid exporter-port: port must be in [1, 65535].")
             return False, "Invalid config: 'exporter-port'"
 
-        level = self.model.config.get("exporter-log-level", "")
+        level = self.model.config["exporter-log-level"]
         allowed_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if level.upper() not in allowed_choices:
             logger.error(
