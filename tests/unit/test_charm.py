@@ -219,7 +219,7 @@ class TestCharm(unittest.TestCase):
         """Test config change event renders config yaml."""
         self.harness.begin()
         self.harness.charm._stored.resource_installed = True
-        self.harness.charm.num_cos_agent_relations = 1  # exported enabled
+        self.harness.charm.num_cos_agent_relations = 1  # exporter enabled
         self.harness.charm.hw_tool_helper.check_installed.return_value = (
             True,
             "",
