@@ -86,7 +86,7 @@ class ExporterTemplate:
         return success
 
     def render_config(
-        self, port: str, level: str, collect_timeout: int, redfish_conn_params: dict
+        self, port: int, level: str, collect_timeout: int, redfish_conn_params: dict
     ) -> bool:
         """Render and install exporter config file."""
         hw_tools = get_hw_tool_white_list()
@@ -130,7 +130,7 @@ class Exporter:
         self.template = ExporterTemplate(charm_dir)
 
     def install(
-        self, port: str, level: str, redfish_conn_params: dict, collect_timeout: int
+        self, port: int, level: str, redfish_conn_params: dict, collect_timeout: int
     ) -> bool:
         """Install the exporter."""
         logger.info("Installing %s.", EXPORTER_NAME)

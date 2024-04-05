@@ -8,8 +8,6 @@ from typing import Optional
 
 from async_lru import alru_cache
 
-from config import EXPORTER_DEFAULT_PORT
-
 RESOURCES_DIR = Path("./resources/")
 
 
@@ -62,7 +60,7 @@ async def get_metrics_output(ops_test, unit_name) -> Optional[dict[str, list[Met
 
     Raises MetricsFetchError if command to fetch metrics didn't execute successfully.
     """
-    command = f"curl -s localhost:{EXPORTER_DEFAULT_PORT}"
+    command = "curl -s localhost:10200"  # curl at default port (see config.yaml)
     results = await run_command_on_unit(ops_test, unit_name, command)
     if results.get("return-code") > 0:
         raise MetricsFetchError

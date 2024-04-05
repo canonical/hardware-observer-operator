@@ -17,8 +17,6 @@ from redfish.rest.v1 import InvalidCredentialsError
 
 from config import (
     EXPORTER_CRASH_MSG,
-    EXPORTER_DEFAULT_COLLECT_TIMEOUT,
-    EXPORTER_DEFAULT_PORT,
     EXPORTER_HEALTH_RETRY_COUNT,
     EXPORTER_HEALTH_RETRY_TIMEOUT,
     REDFISH_MAX_RETRY,
@@ -42,9 +40,6 @@ class HardwareObserverCharm(ops.CharmBase):
         super().__init__(*args)
         self.hw_tool_helper = HWToolHelper()
 
-        collect_timeout = self.model.config.get(
-            "collect-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT
-        )
         # Add refresh_events to COSAgentProvider to update relation data when
         # config changed (default behavior) and upgrade charm. This is useful
         # for updating alert rules.
@@ -56,7 +51,7 @@ class HardwareObserverCharm(ops.CharmBase):
             ],
             # Setting scrape_timeout as collect_timeout in the `duration` format specified in
             # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration
-            scrape_configs=[{"scrape_timeout": f"{collect_timeout}s"}],
+            scrape_configs=[{"scrape_timeout": f"{int(self.model.config['collect-timeout'])}s"}],
         )
         self.exporter = Exporter(self.charm_dir)
 
@@ -73,7 +68,6 @@ class HardwareObserverCharm(ops.CharmBase):
         )
 
         self._stored.set_default(
-            config={},
             exporter_installed=False,
             resource_installed=False,
         )
@@ -93,11 +87,12 @@ class HardwareObserverCharm(ops.CharmBase):
 
         # Install exporter
         self.model.unit.status = MaintenanceStatus("Installing exporter...")
-        port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
-        level = self.model.config.get("exporter-log-level", "INFO")
-        scrape_timeout = self.model.config.get("scrape-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT)
-        redfish_conn_params = self.get_redfish_conn_params()
-        success = self.exporter.install(port, level, redfish_conn_params, int(scrape_timeout))
+        success = self.exporter.install(
+            int(self.model.config["exporter-port"]),
+            self.model.config["exporter-log-level"],
+            self.get_redfish_conn_params(),
+            int(self.model.config["collect-timeout"]),
+        )
         self._stored.exporter_installed = success
         if not success:
             msg = "Failed to install exporter, please refer to `juju debug-log`"
@@ -171,20 +166,6 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_config_changed(self, event: EventBase) -> None:
         """Reconfigure charm."""
-        # Keep track of what model config options + some extra config related
-        # information are changed. This can be helpful when we want to respond
-        # to the change of a specific config option.
-        change_set = set()
-        model_config: Dict[str, Optional[str]] = dict(self.model.config.items())
-        for key, value in model_config.items():
-            if (
-                key not in self._stored.config  # type: ignore[operator]
-                or self._stored.config[key] != value  # type: ignore[index]
-            ):
-                logger.info("Setting %s to: %s", key, value)
-                self._stored.config[key] = value  # type: ignore
-                change_set.add(key)
-
         if not self._stored.resource_installed:  # type: ignore[truthy-function]
             logging.info(  # type: ignore[unreachable]
                 "Config changed called before install complete, deferring event: %s",
@@ -198,35 +179,17 @@ class HardwareObserverCharm(ops.CharmBase):
                 self.model.unit.status = BlockedStatus(message)
                 return
 
-            exporter_configs = {
-                "exporter-port",
-                "exporter-log-level",
-                "redfish-host",
-                "redfish-username",
-                "redfish-password",
-                "collect-timeout",
-            }
-            if exporter_configs.intersection(change_set):
-                logger.info("Detected changes in exporter config.")
-                port = self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT)
-                level = self.model.config.get("exporter-log-level", "INFO")
-                collect_timeout = self.model.config.get(
-                    "collect-timeout", EXPORTER_DEFAULT_COLLECT_TIMEOUT
-                )
-                redfish_conn_params = self.get_redfish_conn_params()
-                success = self.exporter.template.render_config(
-                    port=port,
-                    level=level,
-                    redfish_conn_params=redfish_conn_params,
-                    collect_timeout=int(collect_timeout),
-                )
-                if not success:
-                    message = (
-                        "Failed to configure exporter, please check if the server is healthy."
-                    )
-                    self.model.unit.status = BlockedStatus(message)
-                    return
-                self.exporter.restart()
+            success = self.exporter.template.render_config(
+                port=int(self.model.config["exporter-port"]),
+                level=self.model.config["exporter-log-level"],
+                redfish_conn_params=self.get_redfish_conn_params(),
+                collect_timeout=int(self.model.config["collect-timeout"]),
+            )
+            if not success:
+                message = "Failed to configure exporter, please check if the server is healthy."
+                self.model.unit.status = BlockedStatus(message)
+                return
+            self.exporter.restart()
 
         self._on_update_status(event)
 
@@ -268,12 +231,12 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
-        port = int(self.model.config.get("exporter-port", EXPORTER_DEFAULT_PORT))
+        port = int(self.model.config["exporter-port"])
         if not 1 <= port <= 65535:
             logger.error("Invalid exporter-port: port must be in [1, 65535].")
             return False, "Invalid config: 'exporter-port'"
 
-        level = self.model.config.get("exporter-log-level", "")
+        level = self.model.config["exporter-log-level"]
         allowed_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if level.upper() not in allowed_choices:
             logger.error(
