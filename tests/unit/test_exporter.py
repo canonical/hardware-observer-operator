@@ -46,12 +46,12 @@ class TestExporter(unittest.TestCase):
         get_bmc_address_patcher.start()
         self.addCleanup(get_bmc_address_patcher.stop)
 
-        bmc_hw_verifier_patcher = mock.patch(
-            "charm.bmc_hw_verifier",
+        get_charm_hw_tool_white_list_patcher = mock.patch(
+            "charm.get_hw_tool_white_list",
             return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
         )
-        bmc_hw_verifier_patcher.start()
-        self.addCleanup(bmc_hw_verifier_patcher.stop)
+        get_charm_hw_tool_white_list_patcher.start()
+        self.addCleanup(get_charm_hw_tool_white_list_patcher.stop)
 
         redfish_client_patcher = mock.patch("charm.redfish_client")
         redfish_client_patcher.start()

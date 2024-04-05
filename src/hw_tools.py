@@ -569,9 +569,9 @@ class HWToolHelper:
             return False, f"Missing resources: {missing_resources}"
         return True, ""
 
-    def install(self, resources: Resources) -> Tuple[bool, str]:
+    def install(self, resources: Resources, enable_hw_tool_list: List[HWTool]) -> Tuple[bool, str]:
         """Install tools."""
-        hw_white_list: List[HWTool] = get_hw_tool_white_list()
+        hw_white_list: List[HWTool] = enable_hw_tool_list
         logger.info("hw_white_list: %s", hw_white_list)
 
         fetch_tools: Dict[HWTool, Path] = self.fetch_tools(resources, hw_white_list)
@@ -609,9 +609,10 @@ class HWToolHelper:
             return False, f"Fail strategies: {fail_strategies}"
         return True, ""
 
-    def remove(self, resources: Resources) -> None:  # pylint: disable=W0613
+    # pylint: disable=W0613
+    def remove(self, resources: Resources, enable_hw_tool_list: List[HWTool]) -> None:
         """Execute all remove strategies."""
-        hw_white_list: List[HWTool] = get_hw_tool_white_list()
+        hw_white_list: List[HWTool] = enable_hw_tool_list
         for strategy in self.strategies:
             if strategy.name not in hw_white_list:
                 continue
@@ -619,9 +620,9 @@ class HWToolHelper:
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
 
-    def check_installed(self) -> Tuple[bool, str]:
+    def check_installed(self, enable_hw_tool_list: List[HWTool]) -> Tuple[bool, str]:
         """Check tool status."""
-        hw_white_list: List[HWTool] = get_hw_tool_white_list()
+        hw_white_list: List[HWTool] = enable_hw_tool_list
         failed_checks: List[HWTool] = []
 
         for strategy in self.strategies:

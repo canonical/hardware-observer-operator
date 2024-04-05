@@ -6,7 +6,7 @@
 
 import logging
 from time import sleep
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -24,7 +24,7 @@ from config import (
     HWTool,
 )
 from hardware import get_bmc_address
-from hw_tools import HWToolHelper, bmc_hw_verifier
+from hw_tools import HWToolHelper, get_hw_tool_white_list
 from service import Exporter, ExporterError
 
 logger = logging.getLogger(__name__)
@@ -70,14 +70,28 @@ class HardwareObserverCharm(ops.CharmBase):
         self._stored.set_default(
             exporter_installed=False,
             resource_installed=False,
+            # Storing only the values from `HWTool` because entire HWTool
+            # cannot be stored in _stored. Only simple types can be stored.
+            enable_hw_tool_list_values=[],
         )
         self.num_cos_agent_relations = self.get_num_cos_agent_relations("cos-agent")
 
-    def _on_install_or_upgrade(self, event: ops.InstallEvent) -> None:
+    def _on_install_or_upgrade(self, event: ops.HookEvent) -> None:
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
 
-        resource_installed, msg = self.hw_tool_helper.install(self.model.resources)
+        if isinstance(event, ops.InstallEvent):
+            logger.debug("Install hook: Getting hw tool white list")
+            enable_hw_tool_list = get_hw_tool_white_list()
+            self._stored.enable_hw_tool_list_values = [tool.value for tool in enable_hw_tool_list]
+        else:  # UgradeCharmEvent
+            logger.debug("Upgrade charm hook: Using stored hw tool white list")
+            enable_hw_tool_list = [
+                HWTool(value) for value in self._stored.enable_hw_tool_list_values  # type: ignore
+            ]
+        resource_installed, msg = self.hw_tool_helper.install(
+            self.model.resources, enable_hw_tool_list
+        )
         self._stored.resource_installed = resource_installed
 
         if not resource_installed:
@@ -90,7 +104,7 @@ class HardwareObserverCharm(ops.CharmBase):
         success = self.exporter.install(
             int(self.model.config["exporter-port"]),
             self.model.config["exporter-log-level"],
-            self.get_redfish_conn_params(),
+            self.get_redfish_conn_params(enable_hw_tool_list),
             int(self.model.config["collect-timeout"]),
         )
         self._stored.exporter_installed = success
@@ -105,7 +119,10 @@ class HardwareObserverCharm(ops.CharmBase):
         """Remove everything when charm is being removed."""
         logger.info("Start to remove.")
         # Remove binary tool
-        self.hw_tool_helper.remove(self.model.resources)
+        self.hw_tool_helper.remove(
+            self.model.resources,
+            [HWTool(value) for value in self._stored.enable_hw_tool_list_values],  # type: ignore
+        )
         self._stored.resource_installed = False
         success = self.exporter.uninstall()
         if not success:
@@ -135,7 +152,9 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus(config_valid_message)
             return
 
-        hw_tool_ok, error_msg = self.hw_tool_helper.check_installed()
+        hw_tool_ok, error_msg = self.hw_tool_helper.check_installed(
+            [HWTool(value) for value in self._stored.enable_hw_tool_list_values]  # type: ignore
+        )
         if not hw_tool_ok:
             self.model.unit.status = BlockedStatus(error_msg)
             return
@@ -182,8 +201,17 @@ class HardwareObserverCharm(ops.CharmBase):
             success = self.exporter.template.render_config(
                 port=int(self.model.config["exporter-port"]),
                 level=self.model.config["exporter-log-level"],
-                redfish_conn_params=self.get_redfish_conn_params(),
+                redfish_conn_params=self.get_redfish_conn_params(
+                    [
+                        HWTool(value)
+                        for value in self._stored.enable_hw_tool_list_values  # type: ignore
+                    ]
+                ),
                 collect_timeout=int(self.model.config["collect-timeout"]),
+                enable_hw_tool_list=[
+                    HWTool(value)
+                    for value in self._stored.enable_hw_tool_list_values  # type: ignore
+                ],
             )
             if not success:
                 message = "Failed to configure exporter, please check if the server is healthy."
@@ -217,10 +245,9 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.info("Stop and disable exporter service")
         self._on_update_status(event)
 
-    def get_redfish_conn_params(self) -> Dict[str, Any]:
+    def get_redfish_conn_params(self, enable_hw_tool_list: List[HWTool]) -> Dict[str, Any]:
         """Get redfish connection parameters if redfish is available."""
-        bmc_tools = bmc_hw_verifier()
-        if HWTool.REDFISH not in bmc_tools:
+        if HWTool.REDFISH not in enable_hw_tool_list:
             logger.warning("Redfish unavailable, disregarding redfish config options...")
             return {}
         return {
@@ -277,7 +304,9 @@ class HardwareObserverCharm(ops.CharmBase):
         connection parameters are valid, it returns True; if not valid, it
         returns False.
         """
-        redfish_conn_params = self.get_redfish_conn_params()
+        redfish_conn_params = self.get_redfish_conn_params(
+            [HWTool(value) for value in self._stored.enable_hw_tool_list_values]  # type: ignore
+        )
         if not redfish_conn_params:
             return None
 

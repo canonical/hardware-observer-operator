@@ -3,7 +3,7 @@
 from functools import wraps
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, List, Tuple, Union
 
 from charms.operator_libs_linux.v1 import systemd
 from jinja2 import Environment, FileSystemLoader
@@ -15,6 +15,7 @@ from config import (
     EXPORTER_NAME,
     EXPORTER_SERVICE_PATH,
     EXPORTER_SERVICE_TEMPLATE,
+    HWTool,
 )
 from hw_tools import get_hw_tool_white_list
 
@@ -85,11 +86,20 @@ class ExporterTemplate:
             logger.info("Removing file '%s' - Done.", path)
         return success
 
+    # pylint: disable=too-many-arguments
     def render_config(
-        self, port: int, level: str, collect_timeout: int, redfish_conn_params: dict
+        self,
+        port: int,
+        level: str,
+        collect_timeout: int,
+        redfish_conn_params: dict,
+        enable_hw_tool_list: Union[List[HWTool], None] = None,
     ) -> bool:
         """Render and install exporter config file."""
-        hw_tools = get_hw_tool_white_list()
+        if enable_hw_tool_list is not None:
+            hw_tools = enable_hw_tool_list
+        else:
+            hw_tools = get_hw_tool_white_list()
         collectors = []
         for tool in hw_tools:
             collector = EXPORTER_COLLECTOR_MAPPING.get(tool)

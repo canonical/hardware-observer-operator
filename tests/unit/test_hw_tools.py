@@ -163,7 +163,6 @@ class TestHWToolHelper(unittest.TestCase):
 
         self.assertEqual(fetch_tools, {})
 
-    @mock.patch("hw_tools.get_hw_tool_white_list")
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[
@@ -172,7 +171,7 @@ class TestHWToolHelper(unittest.TestCase):
         ],
         new_callable=mock.PropertyMock,
     )
-    def test_04_install(self, mock_strategies, mock_hw_white_list):
+    def test_04_install(self, mock_strategies):
         """Check strategy is been called."""
         self.harness.add_resource("storcli-deb", "storcli.deb")
         self.harness.begin()
@@ -180,11 +179,11 @@ class TestHWToolHelper(unittest.TestCase):
 
         mock_strategies.return_value[0].name = HWTool.STORCLI
 
-        mock_hw_white_list.return_value = []
+        mock_enable_hw_tool_list = []
         for strategy in mock_strategies.return_value:
-            mock_hw_white_list.return_value.append(strategy.name)
+            mock_enable_hw_tool_list.append(strategy.name)
 
-        self.hw_tool_helper.install(mock_resources)
+        self.hw_tool_helper.install(mock_resources, mock_enable_hw_tool_list)
 
         for strategy in mock_strategies.return_value:
             if isinstance(strategy, TPRStrategyABC):
@@ -193,7 +192,6 @@ class TestHWToolHelper(unittest.TestCase):
             elif isinstance(strategy, APTStrategyABC):
                 strategy.install.assert_any_call()
 
-    @mock.patch("hw_tools.get_hw_tool_white_list", return_value=[HWTool.STORCLI])
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[
@@ -201,15 +199,15 @@ class TestHWToolHelper(unittest.TestCase):
         ],
         new_callable=mock.PropertyMock,
     )
-    def test_05_remove(self, mock_strategies, _):
+    def test_05_remove(self, mock_strategies):
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         mock_strategies.return_value[0].name = HWTool.STORCLI
-        self.hw_tool_helper.remove(mock_resources)
+        mock_enable_hw_tool_list = [HWTool.STORCLI]
+        self.hw_tool_helper.remove(mock_resources, mock_enable_hw_tool_list)
         for strategy in mock_strategies.return_value:
             strategy.remove.assert_called()
 
-    @mock.patch("hw_tools.get_hw_tool_white_list")
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[
@@ -218,7 +216,7 @@ class TestHWToolHelper(unittest.TestCase):
         ],
         new_callable=mock.PropertyMock,
     )
-    def test_06_install_not_in_white_list(self, mock_strategies, mock_hw_white_list):
+    def test_06_install_not_in_white_list(self, mock_strategies):
         """Check strategy is been called."""
         self.harness.add_resource("storcli-deb", "storcli.deb")
         self.harness.begin()
@@ -226,21 +224,20 @@ class TestHWToolHelper(unittest.TestCase):
 
         mock_strategies.return_value[0].name = HWTool.STORCLI
 
-        mock_hw_white_list.return_value = []
+        mock_enable_hw_tool_list = []
 
-        self.hw_tool_helper.install(mock_resources)
+        self.hw_tool_helper.install(mock_resources, mock_enable_hw_tool_list)
 
         for strategy in mock_strategies.return_value:
             strategy.install.assert_not_called()
 
     @mock.patch("hw_tools.TPR_RESOURCES", {})
-    @mock.patch("hw_tools.get_hw_tool_white_list")
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[mock.MagicMock(spec=TPRStrategyABC)],
         new_callable=mock.PropertyMock,
     )
-    def test_07_install_no_resource(self, mock_strategies, mock_hw_white_list):
+    def test_07_install_no_resource(self, mock_strategies):
         """Check tpr strategy is not been called if resource is not defined."""
         self.harness.add_resource("storcli-deb", "storcli.deb")
         self.harness.begin()
@@ -248,16 +245,15 @@ class TestHWToolHelper(unittest.TestCase):
 
         mock_strategies.return_value[0].name = HWTool.STORCLI
 
-        mock_hw_white_list.return_value = []
+        mock_enable_hw_tool_list = []
         for strategy in mock_strategies.return_value:
-            mock_hw_white_list.return_value.append(strategy.name)
+            mock_enable_hw_tool_list.append(strategy.name)
 
-        self.hw_tool_helper.install(mock_resources)
+        self.hw_tool_helper.install(mock_resources, mock_enable_hw_tool_list)
 
         for strategy in mock_strategies.return_value:
             strategy.install.assert_not_called()
 
-    @mock.patch("hw_tools.get_hw_tool_white_list", return_value=[])
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[
@@ -265,15 +261,15 @@ class TestHWToolHelper(unittest.TestCase):
         ],
         new_callable=mock.PropertyMock,
     )
-    def test_08_remove_not_in_white_list(self, mock_strategies, _):
+    def test_08_remove_not_in_white_list(self, mock_strategies):
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         mock_strategies.return_value[0].name = HWTool.STORCLI
-        self.hw_tool_helper.remove(mock_resources)
+        mock_enable_hw_tool_list = []
+        self.hw_tool_helper.remove(mock_resources, mock_enable_hw_tool_list)
         for strategy in mock_strategies.return_value:
             strategy.remove.assert_not_called()
 
-    @mock.patch("hw_tools.get_hw_tool_white_list", return_value=[HWTool.STORCLI, HWTool.PERCCLI])
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[
@@ -281,24 +277,17 @@ class TestHWToolHelper(unittest.TestCase):
         ],
         new_callable=mock.PropertyMock,
     )
-    def test_09_install_required_resource_not_uploaded(self, _, mock_hw_white_list):
+    def test_09_install_required_resource_not_uploaded(self, _):
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
-        ok, msg = self.hw_tool_helper.install(mock_resources)
+        mock_enable_hw_tool_list = [HWTool.STORCLI, HWTool.PERCCLI]
+        ok, msg = self.hw_tool_helper.install(mock_resources, mock_enable_hw_tool_list)
         self.assertFalse(ok)
         self.assertTrue("storcli-deb" in msg)
         self.assertTrue("perccli-deb" in msg)
         self.assertFalse(self.harness.charm._stored.resource_installed)
 
     @mock.patch(
-        "hw_tools.get_hw_tool_white_list",
-        return_value=[
-            HWTool.STORCLI,
-            HWTool.IPMI_SENSOR,
-            HWTool.REDFISH,
-        ],
-    )
-    @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[
             mock.PropertyMock(spec=TPRStrategyABC),
@@ -307,7 +296,7 @@ class TestHWToolHelper(unittest.TestCase):
         ],
         new_callable=mock.PropertyMock,
     )
-    def test_10_install_strategy_errors(self, mock_strategies, mock_hw_white_list):
+    def test_10_install_strategy_errors(self, mock_strategies):
         """Catch excepted error when execute strategies' install method."""
         self.harness.add_resource("storcli-deb", "storcli.deb")
         self.harness.begin()
@@ -323,8 +312,13 @@ class TestHWToolHelper(unittest.TestCase):
         mock_strategies.return_value[2].install.side_effect = apt.PackageError(
             "Fake apt package error"
         )
+        mock_enable_hw_tool_list = [
+            HWTool.STORCLI,
+            HWTool.IPMI_SENSOR,
+            HWTool.REDFISH,
+        ]
 
-        ok, msg = self.hw_tool_helper.install(mock_resources)
+        ok, msg = self.hw_tool_helper.install(mock_resources, mock_enable_hw_tool_list)
 
         self.assertFalse(ok)
         self.assertEqual(
@@ -342,7 +336,6 @@ class TestHWToolHelper(unittest.TestCase):
         self.assertFalse(ok)
         self.assertEqual("Missing resources: ['storcli-deb']", msg)
 
-    @mock.patch("hw_tools.get_hw_tool_white_list", return_value=[HWTool.STORCLI])
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[
@@ -350,14 +343,14 @@ class TestHWToolHelper(unittest.TestCase):
         ],
         new_callable=mock.PropertyMock,
     )
-    def test_12_check_installed_okay(self, mock_strategies, _):
+    def test_12_check_installed_okay(self, mock_strategies):
         self.harness.begin()
         mock_strategies.return_value[0].name = HWTool.STORCLI
-        self.hw_tool_helper.check_installed()
+        mock_enable_hw_tool_list = [HWTool.STORCLI]
+        self.hw_tool_helper.check_installed(mock_enable_hw_tool_list)
         for strategy in mock_strategies.return_value:
             strategy.check.assert_called()
 
-    @mock.patch("hw_tools.get_hw_tool_white_list", return_value=[HWTool.STORCLI])
     @mock.patch(
         "hw_tools.HWToolHelper.strategies",
         return_value=[
@@ -365,18 +358,19 @@ class TestHWToolHelper(unittest.TestCase):
         ],
         new_callable=mock.PropertyMock,
     )
-    def test_13_check_installed_okay(self, mock_strategies, _):
+    def test_13_check_installed_okay(self, mock_strategies):
         self.harness.begin()
         mock_strategies.return_value[0].name = HWTool.SSACLI
-        success, msg = self.hw_tool_helper.check_installed()
+        mock_enable_hw_tool_list = [HWTool.STORCLI]
+        success, msg = self.hw_tool_helper.check_installed(mock_enable_hw_tool_list)
         self.assertTrue(success)
         self.assertEqual(msg, "")
 
     @mock.patch("hw_tools.os")
     @mock.patch("hw_tools.Path")
-    @mock.patch(
-        "hw_tools.get_hw_tool_white_list",
-        return_value=[
+    def test_14_check_installed_not_okay(self, mock_os, mock_path):
+        self.harness.begin()
+        mock_enable_hw_tool_list = [
             HWTool.STORCLI,
             HWTool.PERCCLI,
             HWTool.SAS2IRCU,
@@ -386,11 +380,8 @@ class TestHWToolHelper(unittest.TestCase):
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
             HWTool.REDFISH,
-        ],
-    )
-    def test_14_check_installed_not_okay(self, _, mock_os, mock_path):
-        self.harness.begin()
-        success, msg = self.hw_tool_helper.check_installed()
+        ]
+        success, msg = self.hw_tool_helper.check_installed(mock_enable_hw_tool_list)
         self.assertFalse(success)
 
 
@@ -740,6 +731,7 @@ class TestIPMIDCMIStrategy(unittest.TestCase):
 @mock.patch("hw_tools.bmc_hw_verifier", return_value=[1, 2, 3])
 @mock.patch("hw_tools.raid_hw_verifier", return_value=[4, 5, 6])
 def test_get_hw_tool_white_list(mock_raid_verifier, mock_bmc_hw_verifier):
+    get_hw_tool_white_list.cache_clear()
     output = get_hw_tool_white_list()
     mock_raid_verifier.assert_called()
     mock_bmc_hw_verifier.assert_called()
