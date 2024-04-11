@@ -28,7 +28,7 @@ from checksum import (
     validate_checksum,
 )
 from config import (
-    REDFISH_TIMEOUT,
+    HARDWARE_EXPORTER_SETTINGS,
     SNAP_COMMON,
     TOOLS_DIR,
     TPR_RESOURCES,
@@ -441,7 +441,9 @@ def redfish_available() -> bool:
     bmc_address = get_bmc_address()
     health_check_endpoint = f"https://{bmc_address}:443/redfish/v1/"
     try:
-        response = requests.get(health_check_endpoint, verify=False, timeout=REDFISH_TIMEOUT)
+        response = requests.get(
+            health_check_endpoint, verify=False, timeout=HARDWARE_EXPORTER_SETTINGS.redfish_timeout
+        )
         response.raise_for_status()
         data = response.json()
         # only check if the data is empty dict or not

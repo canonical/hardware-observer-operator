@@ -5,3 +5,4 @@ pytest-operator
 # https://github.com/go-macaroon-bakery/py-macaroon-bakery/issues/94
 protobuf<4.0
 tenacity
+pydantic
