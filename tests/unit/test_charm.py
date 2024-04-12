@@ -121,11 +121,12 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_install_redfish_unavailable(self, mock_hw_tool_helper, mock_exporter) -> None:
         """Test install event handler when redfish is unavailable."""
-        self.mock_get_hw_tool_white_list.return_value = [
+        mock_enable_hw_tool_list = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
         ]
+        self.mock_get_hw_tool_white_list.return_value = mock_enable_hw_tool_list
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
         self.harness.begin()
@@ -138,6 +139,7 @@ class TestCharm(unittest.TestCase):
             "INFO",  # default in config.yaml
             {},
             10,  # default int config.yaml
+            mock_enable_hw_tool_list,
         )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
@@ -391,6 +393,7 @@ class TestCharm(unittest.TestCase):
         mock_enable_hw_tool_list = [
             HWTool.REDFISH,
         ]
+        self.mock_get_hw_tool_white_list.return_value = mock_enable_hw_tool_list
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
         self.harness.begin()
@@ -403,6 +406,7 @@ class TestCharm(unittest.TestCase):
             "INFO",  # default in config.yaml
             self.harness.charm.get_redfish_conn_params(mock_enable_hw_tool_list),
             10,  # default int config.yaml
+            mock_enable_hw_tool_list,
         )
 
     @parameterized.expand([(InvalidCredentialsError), (Exception)])

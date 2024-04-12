@@ -17,7 +17,6 @@ from config import (
     EXPORTER_SERVICE_TEMPLATE,
     HWTool,
 )
-from hw_tools import get_hw_tool_white_list
 
 logger = getLogger(__name__)
 
@@ -93,13 +92,10 @@ class ExporterTemplate:
         level: str,
         collect_timeout: int,
         redfish_conn_params: dict,
-        enable_hw_tool_list: Union[List[HWTool], None] = None,
+        enable_hw_tool_list: List[HWTool],
     ) -> bool:
         """Render and install exporter config file."""
-        if enable_hw_tool_list is not None:
-            hw_tools = enable_hw_tool_list
-        else:
-            hw_tools = get_hw_tool_white_list()
+        hw_tools = enable_hw_tool_list
         collectors = []
         for tool in hw_tools:
             collector = EXPORTER_COLLECTOR_MAPPING.get(tool)
@@ -140,7 +136,7 @@ class Exporter:
         self.template = ExporterTemplate(charm_dir)
 
     def install(
-        self, port: int, level: str, redfish_conn_params: dict, collect_timeout: int
+        self, port: int, level: str, redfish_conn_params: dict, collect_timeout: int, enable_hw_tool_list: List
     ) -> bool:
         """Install the exporter."""
         logger.info("Installing %s.", EXPORTER_NAME)
@@ -149,6 +145,7 @@ class Exporter:
             level=level,
             redfish_conn_params=redfish_conn_params,
             collect_timeout=collect_timeout,
+            enable_hw_tool_list=enable_hw_tool_list,
         )
         success = self.template.render_service(str(self.charm_dir), str(EXPORTER_CONFIG_PATH))
         if not success:
