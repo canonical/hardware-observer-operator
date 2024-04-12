@@ -42,12 +42,12 @@ class TestExporter(unittest.TestCase):
         get_bmc_address_patcher.start()
         self.addCleanup(get_bmc_address_patcher.stop)
 
-        get_charm_hw_tool_white_list_patcher = mock.patch(
-            "charm.get_hw_tool_white_list",
+        get_charm_hw_tool_enable_list_patcher = mock.patch(
+            "charm.get_hw_tool_enable_list",
             return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
         )
-        get_charm_hw_tool_white_list_patcher.start()
-        self.addCleanup(get_charm_hw_tool_white_list_patcher.stop)
+        get_charm_hw_tool_enable_list_patcher.start()
+        self.addCleanup(get_charm_hw_tool_enable_list_patcher.stop)
 
         redfish_client_patcher = mock.patch("charm.redfish_client")
         redfish_client_patcher.start()
@@ -339,7 +339,7 @@ class TestExporterTemplate(unittest.TestCase):
                 level="info",
                 redfish_conn_params={},
                 collect_timeout=10,
-                enable_hw_tool_list=[HWTool.STORCLI, HWTool.SSACLI],
+                hw_tools=[HWTool.STORCLI, HWTool.SSACLI],
             )
             mock_install.assert_called_with(
                 EXPORTER_CONFIG_PATH,
@@ -366,7 +366,7 @@ class TestExporterTemplate(unittest.TestCase):
                     "username": "default_user",
                     "password": "default_pwd",
                 },
-                enable_hw_tool_list=[HWTool.REDFISH],
+                hw_tools=[HWTool.REDFISH],
             )
             mock_install.assert_called_with(
                 EXPORTER_CONFIG_PATH,

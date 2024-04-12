@@ -41,7 +41,7 @@ from hw_tools import (
     check_deb_pkg_installed,
     copy_to_snap_common_bin,
     file_is_empty,
-    get_hw_tool_white_list,
+    get_hw_tool_enable_list,
     install_deb,
     make_executable,
     raid_hw_verifier,
@@ -141,7 +141,7 @@ class TestHWToolHelper(unittest.TestCase):
 
         self.hw_tool_helper.fetch_tools(
             resources=mock_resources,
-            hw_white_list=[tool for tool in HWTool],
+            hw_enable_list=[tool for tool in HWTool],
         )
 
         for tool in TPR_RESOURCES.values():
@@ -155,7 +155,7 @@ class TestHWToolHelper(unittest.TestCase):
 
         fetch_tools = self.hw_tool_helper.fetch_tools(
             mock_resources,
-            hw_white_list=[tool for tool in HWTool],
+            hw_enable_list=[tool for tool in HWTool],
         )
 
         for tool in TPR_RESOURCES.values():
@@ -179,11 +179,11 @@ class TestHWToolHelper(unittest.TestCase):
 
         mock_strategies.return_value[0].name = HWTool.STORCLI
 
-        mock_enable_hw_tool_list = []
+        mock_hw_enable_list = []
         for strategy in mock_strategies.return_value:
-            mock_enable_hw_tool_list.append(strategy.name)
+            mock_hw_enable_list.append(strategy.name)
 
-        self.hw_tool_helper.install(mock_resources, mock_enable_hw_tool_list)
+        self.hw_tool_helper.install(mock_resources, mock_hw_enable_list)
 
         for strategy in mock_strategies.return_value:
             if isinstance(strategy, TPRStrategyABC):
@@ -203,8 +203,8 @@ class TestHWToolHelper(unittest.TestCase):
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         mock_strategies.return_value[0].name = HWTool.STORCLI
-        mock_enable_hw_tool_list = [HWTool.STORCLI]
-        self.hw_tool_helper.remove(mock_resources, mock_enable_hw_tool_list)
+        mock_hw_enable_list = [HWTool.STORCLI]
+        self.hw_tool_helper.remove(mock_resources, mock_hw_enable_list)
         for strategy in mock_strategies.return_value:
             strategy.remove.assert_called()
 
@@ -216,7 +216,7 @@ class TestHWToolHelper(unittest.TestCase):
         ],
         new_callable=mock.PropertyMock,
     )
-    def test_06_install_not_in_white_list(self, mock_strategies):
+    def test_06_install_not_in_enable_list(self, mock_strategies):
         """Check strategy is been called."""
         self.harness.add_resource("storcli-deb", "storcli.deb")
         self.harness.begin()
@@ -224,9 +224,9 @@ class TestHWToolHelper(unittest.TestCase):
 
         mock_strategies.return_value[0].name = HWTool.STORCLI
 
-        mock_enable_hw_tool_list = []
+        mock_hw_enable_list = []
 
-        self.hw_tool_helper.install(mock_resources, mock_enable_hw_tool_list)
+        self.hw_tool_helper.install(mock_resources, mock_hw_enable_list)
 
         for strategy in mock_strategies.return_value:
             strategy.install.assert_not_called()
@@ -245,11 +245,11 @@ class TestHWToolHelper(unittest.TestCase):
 
         mock_strategies.return_value[0].name = HWTool.STORCLI
 
-        mock_enable_hw_tool_list = []
+        mock_hw_enable_list = []
         for strategy in mock_strategies.return_value:
-            mock_enable_hw_tool_list.append(strategy.name)
+            mock_hw_enable_list.append(strategy.name)
 
-        self.hw_tool_helper.install(mock_resources, mock_enable_hw_tool_list)
+        self.hw_tool_helper.install(mock_resources, mock_hw_enable_list)
 
         for strategy in mock_strategies.return_value:
             strategy.install.assert_not_called()
@@ -261,12 +261,12 @@ class TestHWToolHelper(unittest.TestCase):
         ],
         new_callable=mock.PropertyMock,
     )
-    def test_08_remove_not_in_white_list(self, mock_strategies):
+    def test_08_remove_not_in_enable_list(self, mock_strategies):
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         mock_strategies.return_value[0].name = HWTool.STORCLI
-        mock_enable_hw_tool_list = []
-        self.hw_tool_helper.remove(mock_resources, mock_enable_hw_tool_list)
+        mock_hw_enable_list = []
+        self.hw_tool_helper.remove(mock_resources, mock_hw_enable_list)
         for strategy in mock_strategies.return_value:
             strategy.remove.assert_not_called()
 
@@ -280,8 +280,8 @@ class TestHWToolHelper(unittest.TestCase):
     def test_09_install_required_resource_not_uploaded(self, _):
         self.harness.begin()
         mock_resources = self.harness.charm.model.resources
-        mock_enable_hw_tool_list = [HWTool.STORCLI, HWTool.PERCCLI]
-        ok, msg = self.hw_tool_helper.install(mock_resources, mock_enable_hw_tool_list)
+        mock_hw_enable_list = [HWTool.STORCLI, HWTool.PERCCLI]
+        ok, msg = self.hw_tool_helper.install(mock_resources, mock_hw_enable_list)
         self.assertFalse(ok)
         self.assertTrue("storcli-deb" in msg)
         self.assertTrue("perccli-deb" in msg)
@@ -312,13 +312,13 @@ class TestHWToolHelper(unittest.TestCase):
         mock_strategies.return_value[2].install.side_effect = apt.PackageError(
             "Fake apt package error"
         )
-        mock_enable_hw_tool_list = [
+        mock_hw_enable_list = [
             HWTool.STORCLI,
             HWTool.IPMI_SENSOR,
             HWTool.REDFISH,
         ]
 
-        ok, msg = self.hw_tool_helper.install(mock_resources, mock_enable_hw_tool_list)
+        ok, msg = self.hw_tool_helper.install(mock_resources, mock_hw_enable_list)
 
         self.assertFalse(ok)
         self.assertEqual(
@@ -330,7 +330,7 @@ class TestHWToolHelper(unittest.TestCase):
     def test_11_check_missing_resources_zero_size_resources(self, file_is_empty):
         self.harness.begin()
         ok, msg = self.hw_tool_helper.check_missing_resources(
-            hw_white_list=[HWTool.STORCLI],
+            hw_enable_list=[HWTool.STORCLI],
             fetch_tools={HWTool.STORCLI: "fake-path"},
         )
         self.assertFalse(ok)
@@ -346,8 +346,8 @@ class TestHWToolHelper(unittest.TestCase):
     def test_12_check_installed_okay(self, mock_strategies):
         self.harness.begin()
         mock_strategies.return_value[0].name = HWTool.STORCLI
-        mock_enable_hw_tool_list = [HWTool.STORCLI]
-        self.hw_tool_helper.check_installed(mock_enable_hw_tool_list)
+        mock_hw_enable_list = [HWTool.STORCLI]
+        self.hw_tool_helper.check_installed(mock_hw_enable_list)
         for strategy in mock_strategies.return_value:
             strategy.check.assert_called()
 
@@ -361,8 +361,8 @@ class TestHWToolHelper(unittest.TestCase):
     def test_13_check_installed_okay(self, mock_strategies):
         self.harness.begin()
         mock_strategies.return_value[0].name = HWTool.SSACLI
-        mock_enable_hw_tool_list = [HWTool.STORCLI]
-        success, msg = self.hw_tool_helper.check_installed(mock_enable_hw_tool_list)
+        mock_hw_enable_list = [HWTool.STORCLI]
+        success, msg = self.hw_tool_helper.check_installed(mock_hw_enable_list)
         self.assertTrue(success)
         self.assertEqual(msg, "")
 
@@ -370,7 +370,7 @@ class TestHWToolHelper(unittest.TestCase):
     @mock.patch("hw_tools.Path")
     def test_14_check_installed_not_okay(self, mock_os, mock_path):
         self.harness.begin()
-        mock_enable_hw_tool_list = [
+        mock_hw_enable_list = [
             HWTool.STORCLI,
             HWTool.PERCCLI,
             HWTool.SAS2IRCU,
@@ -381,7 +381,7 @@ class TestHWToolHelper(unittest.TestCase):
             HWTool.IPMI_DCMI,
             HWTool.REDFISH,
         ]
-        success, msg = self.hw_tool_helper.check_installed(mock_enable_hw_tool_list)
+        success, msg = self.hw_tool_helper.check_installed(mock_hw_enable_list)
         self.assertFalse(success)
 
 
@@ -730,9 +730,9 @@ class TestIPMIDCMIStrategy(unittest.TestCase):
 
 @mock.patch("hw_tools.bmc_hw_verifier", return_value=[1, 2, 3])
 @mock.patch("hw_tools.raid_hw_verifier", return_value=[4, 5, 6])
-def test_get_hw_tool_white_list(mock_raid_verifier, mock_bmc_hw_verifier):
-    get_hw_tool_white_list.cache_clear()
-    output = get_hw_tool_white_list()
+def test_get_hw_tool_enable_list(mock_raid_verifier, mock_bmc_hw_verifier):
+    get_hw_tool_enable_list.cache_clear()
+    output = get_hw_tool_enable_list()
     mock_raid_verifier.assert_called()
     mock_bmc_hw_verifier.assert_called()
     assert output == [4, 5, 6, 1, 2, 3]

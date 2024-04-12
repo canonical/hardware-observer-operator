@@ -24,7 +24,7 @@ from config import (
     HWTool,
 )
 from hardware import get_bmc_address
-from hw_tools import HWToolHelper, get_hw_tool_white_list
+from hw_tools import HWToolHelper, get_hw_tool_enable_list
 from service import Exporter, ExporterError
 
 logger = logging.getLogger(__name__)
@@ -72,29 +72,31 @@ class HardwareObserverCharm(ops.CharmBase):
             resource_installed=False,
             # Storing only the values from `HWTool` because entire HWTool
             # cannot be stored in _stored. Only simple types can be stored.
-            enable_hw_tool_list_values=[],
+            enabled_hw_tool_list_values=[],
         )
         self.num_cos_agent_relations = self.get_num_cos_agent_relations("cos-agent")
 
-    def get_enabled_hw_tool_list_values(self):
-        if not self._stored.enable_hw_tool_list_values:
-            self._stored.enable_hw_tool_list_values = [tool.value for tool in get_hw_tool_white_list()]
-        return self._stored.enable_hw_tool_list_values
+    def get_enabled_hw_tool_list_values(self) -> List[str]:
+        """Get hw tool list from stored or from machine if not in stored."""
+        if not self._stored.enabled_hw_tool_list_values:  # type: ignore[truthy-function]
+            self._stored.enabled_hw_tool_list_values = [  # type: ignore[unreachable]
+                tool.value for tool in get_hw_tool_enable_list()
+            ]
+        return list(self._stored.enabled_hw_tool_list_values)  # type: ignore[call-overload]
 
-    def get_hw_tools_from_values(self, hw_tool_values):
-        return [
-            HWTool(value) for value in hw_tool_values
-        ]
+    def get_hw_tools_from_values(self, hw_tool_values: List[str]) -> List[HWTool]:
+        """Get HWTool objects from hw tool values."""
+        return [HWTool(value) for value in hw_tool_values]
 
     def _on_install_or_upgrade(self, event: ops.HookEvent) -> None:
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
 
         enabled_hw_tool_list_values = self.get_enabled_hw_tool_list_values()
-        enable_hw_tool_list = self.get_hw_tools_from_values(enabled_hw_tool_list_values)
+        enabled_hw_tool_list = self.get_hw_tools_from_values(enabled_hw_tool_list_values)
 
         resource_installed, msg = self.hw_tool_helper.install(
-            self.model.resources, enable_hw_tool_list
+            self.model.resources, enabled_hw_tool_list
         )
         self._stored.resource_installed = resource_installed
 
@@ -108,9 +110,9 @@ class HardwareObserverCharm(ops.CharmBase):
         success = self.exporter.install(
             int(self.model.config["exporter-port"]),
             self.model.config["exporter-log-level"],
-            self.get_redfish_conn_params(enable_hw_tool_list),
+            self.get_redfish_conn_params(enabled_hw_tool_list),
             int(self.model.config["collect-timeout"]),
-            enable_hw_tool_list,
+            enabled_hw_tool_list,
         )
         self._stored.exporter_installed = success
         if not success:
@@ -126,7 +128,7 @@ class HardwareObserverCharm(ops.CharmBase):
         # Remove binary tool
         self.hw_tool_helper.remove(
             self.model.resources,
-            self.get_hw_tools_from_values(self.get_enabled_hw_tool_list_values())
+            self.get_hw_tools_from_values(self.get_enabled_hw_tool_list_values()),
         )
         self._stored.resource_installed = False
         success = self.exporter.uninstall()
@@ -210,7 +212,7 @@ class HardwareObserverCharm(ops.CharmBase):
                     self.get_hw_tools_from_values(self.get_enabled_hw_tool_list_values())
                 ),
                 collect_timeout=int(self.model.config["collect-timeout"]),
-                enable_hw_tool_list=self.get_hw_tools_from_values(self.get_enabled_hw_tool_list_values()),
+                hw_tools=self.get_hw_tools_from_values(self.get_enabled_hw_tool_list_values()),
             )
             if not success:
                 message = "Failed to configure exporter, please check if the server is healthy."
@@ -244,9 +246,9 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.info("Stop and disable exporter service")
         self._on_update_status(event)
 
-    def get_redfish_conn_params(self, enable_hw_tool_list: List[HWTool]) -> Dict[str, Any]:
+    def get_redfish_conn_params(self, enabled_hw_tool_list: List[HWTool]) -> Dict[str, Any]:
         """Get redfish connection parameters if redfish is available."""
-        if HWTool.REDFISH not in enable_hw_tool_list:
+        if HWTool.REDFISH not in enabled_hw_tool_list:
             logger.warning("Redfish unavailable, disregarding redfish config options...")
             return {}
         return {
