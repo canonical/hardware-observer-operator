@@ -82,7 +82,7 @@ class HardwareObserverCharm(ops.CharmBase):
             self._stored.enabled_hw_tool_list_values = [  # type: ignore[unreachable]
                 tool.value for tool in get_hw_tool_enable_list()
             ]
-        return list(self._stored.enabled_hw_tool_list_values)  # type: ignore[call-overload]
+        return self._stored.enabled_hw_tool_list_values  # type: ignore[return-value]
 
     def get_hw_tools_from_values(self, hw_tool_values: List[str]) -> List[HWTool]:
         """Get HWTool objects from hw tool values."""
