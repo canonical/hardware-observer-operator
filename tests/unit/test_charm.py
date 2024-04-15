@@ -28,15 +28,15 @@ class TestCharm(unittest.TestCase):
         self.mock_get_bmc_address.return_value = "127.0.0.1"
         self.addCleanup(get_bmc_address_patcher.stop)
 
-        bmc_hw_verifier_patcher = mock.patch.object(charm, "bmc_hw_verifier")
-        self.mock_bmc_hw_verifier = bmc_hw_verifier_patcher.start()
-        self.mock_bmc_hw_verifier.return_value = [
+        get_hw_tool_enable_list_patcher = mock.patch.object(charm, "get_hw_tool_enable_list")
+        self.mock_get_hw_tool_enable_list = get_hw_tool_enable_list_patcher.start()
+        self.mock_get_hw_tool_enable_list.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
             HWTool.REDFISH,
         ]
-        self.addCleanup(bmc_hw_verifier_patcher.stop)
+        self.addCleanup(get_hw_tool_enable_list_patcher.stop)
 
         redfish_client_patcher = mock.patch("charm.redfish_client")
         redfish_client_patcher.start()
@@ -71,13 +71,15 @@ class TestCharm(unittest.TestCase):
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
         self.harness.begin()
+        self.harness.charm._stored.enabled_hw_tool_list_values = []
         self.harness.charm.on.install.emit()
 
         self.assertTrue(self.harness.charm._stored.resource_installed)
 
         self.harness.charm.exporter.install.assert_called_once()
         self.harness.charm.hw_tool_helper.install.assert_called_with(
-            self.harness.charm.model.resources
+            self.harness.charm.model.resources,
+            self.harness.charm._stored.enabled_hw_tool_list_values,
         )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
@@ -87,13 +89,15 @@ class TestCharm(unittest.TestCase):
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
         self.harness.begin()
+        self.harness.charm._stored.enabled_hw_tool_list_values = []
         self.harness.charm.on.install.emit()
 
         self.assertTrue(self.harness.charm._stored.resource_installed)
 
         self.harness.charm.exporter.install.assert_called_once()
         self.harness.charm.hw_tool_helper.install.assert_called_with(
-            self.harness.charm.model.resources
+            self.harness.charm.model.resources,
+            self.harness.charm._stored.enabled_hw_tool_list_values,
         )
 
         self.harness.charm.unit.status = ActiveStatus("Install complete")
@@ -117,11 +121,12 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_install_redfish_unavailable(self, mock_hw_tool_helper, mock_exporter) -> None:
         """Test install event handler when redfish is unavailable."""
-        self.mock_bmc_hw_verifier.return_value = [
+        mock_enabled_hw_tool_list = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
         ]
+        self.mock_get_hw_tool_enable_list.return_value = mock_enabled_hw_tool_list
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
         self.harness.begin()
@@ -134,6 +139,7 @@ class TestCharm(unittest.TestCase):
             "INFO",  # default in config.yaml
             {},
             10,  # default int config.yaml
+            mock_enabled_hw_tool_list,
         )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
@@ -158,7 +164,7 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_update_status_all_green(self, mock_hw_tool_helper, mock_exporter):
         """Test update_status event handler when everything is okay."""
-        self.mock_bmc_hw_verifier.return_value = [
+        self.mock_get_hw_tool_enable_list.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
@@ -178,7 +184,7 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_update_status_check_installed_false(self, mock_hw_tool_helper, mock_exporter):
         """Test update_status event handler when hw tool checks failed."""
-        self.mock_bmc_hw_verifier.return_value = [
+        self.mock_get_hw_tool_enable_list.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
@@ -198,7 +204,7 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_update_status_exporter_crashed(self, mock_hw_tool_helper, mock_exporter):
         """Test update_status."""
-        self.mock_bmc_hw_verifier.return_value = [
+        self.mock_get_hw_tool_enable_list.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
@@ -212,10 +218,9 @@ class TestCharm(unittest.TestCase):
         with self.assertRaises(ExporterError):
             self.harness.charm.on.update_status.emit()
 
-    @mock.patch.object(charm, "bmc_hw_verifier", return_value=[])
     @mock.patch("charm.HWToolHelper")
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    def test_config_changed(self, mock_exporter, mock_hw_tool_helper, mock_bmc_hw_verifier):
+    def test_config_changed(self, mock_exporter, mock_hw_tool_helper):
         """Test config change event renders config file."""
         self.harness.begin()
         self.harness.charm._stored.resource_installed = True
@@ -233,12 +238,9 @@ class TestCharm(unittest.TestCase):
 
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
 
-    @mock.patch.object(charm, "bmc_hw_verifier", return_value=[])
     @mock.patch("charm.HWToolHelper")
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    def test_config_changed_without_cos_agent_relation(
-        self, mock_exporter, mock_hw_tool_helper, mock_bmc_hw_verifier
-    ):
+    def test_config_changed_without_cos_agent_relation(self, mock_exporter, mock_hw_tool_helper):
         """Test config change event don't render config file if cos_agent relation is missing."""
         self.harness.begin()
         self.harness.charm._stored.resource_installed = True
@@ -275,7 +277,7 @@ class TestCharm(unittest.TestCase):
         mock_exporter.return_value.install.return_value = True
         self.harness.begin()
         self.harness.charm._stored.exporter_installed = True
-        print(dir(self.harness.charm.on))
+        self.harness.charm._stored.enabled_hw_tool_list_values = []
         self.harness.charm.on.upgrade_charm.emit()
 
         self.assertTrue(self.harness.charm._stored.resource_installed)
@@ -283,14 +285,15 @@ class TestCharm(unittest.TestCase):
 
         self.harness.charm.exporter.install.assert_called_once()
         self.harness.charm.hw_tool_helper.install.assert_called_with(
-            self.harness.charm.model.resources
+            self.harness.charm.model.resources,
+            self.harness.charm._stored.enabled_hw_tool_list_values,
         )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_update_status_config_invalid(self, mock_hw_tool_helper, mock_exporter):
         """Test update_status event handler when config is invalid."""
-        self.mock_bmc_hw_verifier.return_value = [
+        self.mock_get_hw_tool_enable_list.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
@@ -313,7 +316,7 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_config_changed_update_alert_rules(self, mock_hw_tool_helper, mock_exporter):
         """Test config changed will update alert rule."""
-        self.mock_bmc_hw_verifier.return_value = [
+        self.mock_get_hw_tool_enable_list.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
@@ -349,7 +352,7 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     def test_upgrade_charm_update_alert_rules(self, mock_hw_tool_helper, mock_exporter):
         """Test upgrade charm event updates alert rule."""
-        self.mock_bmc_hw_verifier.return_value = [
+        self.mock_get_hw_tool_enable_list.return_value = [
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
@@ -387,9 +390,10 @@ class TestCharm(unittest.TestCase):
         self, mock_hw_tool_helper, mock_exporter
     ) -> None:
         """Test install event when redfish is available and credential is correct."""
-        self.mock_bmc_hw_verifier.return_value = [
+        mock_enabled_hw_tool_list = [
             HWTool.REDFISH,
         ]
+        self.mock_get_hw_tool_enable_list.return_value = mock_enabled_hw_tool_list
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_exporter.return_value.install.return_value = True
         self.harness.begin()
@@ -400,8 +404,9 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.exporter.install.assert_called_with(
             10200,  # default in config.yaml
             "INFO",  # default in config.yaml
-            self.harness.charm.get_redfish_conn_params(),
+            self.harness.charm.get_redfish_conn_params(mock_enabled_hw_tool_list),
             10,  # default int config.yaml
+            mock_enabled_hw_tool_list,
         )
 
     @parameterized.expand([(InvalidCredentialsError), (Exception)])
@@ -412,7 +417,7 @@ class TestCharm(unittest.TestCase):
         self, test_exception, mock_redfish_client, mock_hw_tool_helper, mock_exporter
     ) -> None:
         """Test event install when redfish is available but credential is wrong."""
-        self.mock_bmc_hw_verifier.return_value = [
+        self.mock_get_hw_tool_enable_list.return_value = [
             HWTool.REDFISH,
         ]
         mock_redfish_client.side_effect = test_exception()
@@ -438,15 +443,16 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
     @mock.patch("charm.redfish_client", return_value=mock.MagicMock())
+    @mock.patch("charm.HardwareObserverCharm._stored")
     def test_config_changed_redfish_enabled_with_incorrect_credential(
-        self, test_exception, mock_redfish_client, mock_hw_tool_helper, mock_exporter
+        self, test_exception, mock_stored, mock_redfish_client, mock_hw_tool_helper, mock_exporter
     ) -> None:
         """Test event config changed when redfish is available but credential is wrong."""
-        self.mock_bmc_hw_verifier.return_value = [
-            HWTool.IPMI_SENSOR,
-            HWTool.IPMI_SEL,
-            HWTool.IPMI_DCMI,
-            HWTool.REDFISH,
+        mock_stored.enabled_hw_tool_list_values = [
+            "ipmi_sensor",
+            "ipmi_sel",
+            "ipmi_dcmi",
+            "redfish",
         ]
         mock_hw_tool_helper.return_value.install.return_value = (True, "")
         mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
@@ -459,6 +465,7 @@ class TestCharm(unittest.TestCase):
         new_config = {
             "exporter-port": 80,
             "exporter-log-level": "DEBUG",
+            "collect-timeout": 10,
             "redfish-username": "redfish",
             "redfish-password": "redfish",
         }
