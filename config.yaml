@@ -37,3 +37,8 @@ options:
     default: ""
     description: |
       BMC password to be used by the redfish collector.
+  redfish-client-timeout:
+    type: int
+    default: 15
+    description: |
+      Timeout for redfish_client in seconds.

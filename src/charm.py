@@ -227,6 +227,7 @@ class HardwareObserverCharm(ops.CharmBase):
             "host": f"https://{get_bmc_address()}",
             "username": self.model.config.get("redfish-username", ""),
             "password": self.model.config.get("redfish-password", ""),
+            "timeout": self.model.config.get("redfish-client-timeout"),
         }
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
