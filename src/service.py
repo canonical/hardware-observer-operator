@@ -104,7 +104,7 @@ class ExporterTemplate:
             REDFISH_HOST=redfish_conn_params.get("host", ""),
             REDFISH_USERNAME=redfish_conn_params.get("username", ""),
             REDFISH_PASSWORD=redfish_conn_params.get("password", ""),
-            REDFISH_CLIENT_TIMEOUT=redfish_conn_params.get("timeout"),
+            REDFISH_CLIENT_TIMEOUT=redfish_conn_params.get("timeout", ""),
         )
         return self._install(EXPORTER_CONFIG_PATH, content)
 
