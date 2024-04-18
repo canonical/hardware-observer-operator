@@ -133,7 +133,7 @@ class TestCharm(unittest.TestCase):
             10200,  # default in config.yaml
             "INFO",  # default in config.yaml
             {},
-            15,  # default int config.yaml
+            10,  # default int config.yaml
         )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
@@ -401,7 +401,7 @@ class TestCharm(unittest.TestCase):
             10200,  # default in config.yaml
             "INFO",  # default in config.yaml
             self.harness.charm.get_redfish_conn_params(),
-            15,  # default int config.yaml
+            10,  # default int config.yaml
         )
 
     @parameterized.expand([(InvalidCredentialsError), (Exception)])
@@ -477,7 +477,7 @@ class TestCharm(unittest.TestCase):
             "host": "https://127.0.0.1",
             "username": "",
             "password": "",
-            "timeout": 15,
+            "timeout": 10,
         }
         self.assertEqual(result, expected_result)
 
