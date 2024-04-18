@@ -238,6 +238,22 @@ class TestCharmWithHW:
         )
         assert provided_collectors == collectors_in_config, error_msg
 
+    async def test_redfish_client_timeout_config(self, app, unit, ops_test):
+        """Test whether the redfish client's timeout depends on collect-timeout charm config."""
+        new_timeout = 20
+        await asyncio.gather(
+            app.set_config({"collect-timeout": new_timeout}),
+            ops_test.model.wait_for_idle(apps=[APP_NAME]),
+        )
+
+        cmd = "cat /etc/hardware-exporter-config.yaml"
+        results = await run_command_on_unit(ops_test, unit.name, cmd)
+        assert results.get("return-code") == 0
+        config = yaml.safe_load(results.get("stdout").strip())
+        assert config["redfish_client_timeout"] == int(new_timeout)
+
+        await app.reset_config(["collect-timeout"])
+
     async def test_metrics_available(self, app, unit, ops_test):
         """Test if metrics are available at the expected endpoint on unit."""
         # takes some time for exporter to start and metrics to be available

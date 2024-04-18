@@ -133,7 +133,7 @@ class TestCharm(unittest.TestCase):
             10200,  # default in config.yaml
             "INFO",  # default in config.yaml
             {},
-            10,  # default int config.yaml
+            15,  # default int config.yaml
         )
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
@@ -401,7 +401,7 @@ class TestCharm(unittest.TestCase):
             10200,  # default in config.yaml
             "INFO",  # default in config.yaml
             self.harness.charm.get_redfish_conn_params(),
-            10,  # default int config.yaml
+            15,  # default int config.yaml
         )
 
     @parameterized.expand([(InvalidCredentialsError), (Exception)])
@@ -468,3 +468,52 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.unit.status,
             BlockedStatus("Invalid config: 'redfish-username' or 'redfish-password'"),
         )
+
+    def test_get_redfish_conn_params_when_redfish_is_available(self):
+        """Test get_redfish_conn_params when Redfish is available."""
+        self.harness.begin()
+        result = self.harness.charm.get_redfish_conn_params()
+        expected_result = {
+            "host": "https://127.0.0.1",
+            "username": "",
+            "password": "",
+            "timeout": 15,
+        }
+        self.assertEqual(result, expected_result)
+
+        # redfish client timeout is also set with the value from collect-timeout
+        new_config = {
+            "redfish-username": "redfish",
+            "redfish-password": "redfish",
+            "collect-timeout": 20,
+        }
+        self.harness.update_config(new_config)
+        expected_result = {
+            "host": "https://127.0.0.1",
+            "username": "redfish",
+            "password": "redfish",
+            "timeout": 20,
+        }
+        result = self.harness.charm.get_redfish_conn_params()
+        self.assertEqual(result, expected_result)
+
+    def test_get_redfish_conn_params_when_redfish_is_absent(self):
+        """Test get_redfish_conn_params when Redfish is absent."""
+        # Redfish isn't present
+        self.mock_bmc_hw_verifier.return_value = [
+            HWTool.IPMI_SENSOR,
+            HWTool.IPMI_SEL,
+            HWTool.IPMI_DCMI,
+        ]
+        self.harness.begin()
+        result = self.harness.charm.get_redfish_conn_params()
+        self.assertEqual(result, {})
+
+        new_config = {
+            "redfish-username": "redfish",
+            "redfish-password": "redfish",
+            "collect-timeout": 20,
+        }
+        self.harness.update_config(new_config)
+        result = self.harness.charm.get_redfish_conn_params()
+        self.assertEqual(result, {})

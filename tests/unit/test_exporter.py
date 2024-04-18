@@ -359,6 +359,7 @@ class TestExporterTemplate(unittest.TestCase):
                     REDFISH_HOST="",
                     REDFISH_PASSWORD="",
                     REDFISH_USERNAME="",
+                    REDFISH_CLIENT_TIMEOUT=10,
                 ),
             )
 
@@ -376,6 +377,7 @@ class TestExporterTemplate(unittest.TestCase):
                     "host": "127.0.0.1",
                     "username": "default_user",
                     "password": "default_pwd",
+                    "timeout": 10,
                 },
             )
             mock_install.assert_called_with(
@@ -389,5 +391,6 @@ class TestExporterTemplate(unittest.TestCase):
                     REDFISH_HOST="127.0.0.1",
                     REDFISH_PASSWORD="default_pwd",
                     REDFISH_USERNAME="default_user",
+                    REDFISH_CLIENT_TIMEOUT="10",
                 ),
             )
