@@ -48,7 +48,7 @@ jobs:
       matrix:
         include:
           - juju-channel: "3.4/stable"
-            command: "FUNC_ARGS='--series jammy' make functional34"
+            command: "FUNC_ARGS='--series jammy' make functional"
     with:
       command: ${{ matrix.command }}
       juju-channel: ${{ matrix.juju-channel }}
@@ -56,4 +56,3 @@ jobs:
       provider: "lxd"
       python-version: "3.10"
       timeout-minutes: 120
-      tox-version: "<4"
