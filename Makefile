@@ -78,7 +78,7 @@ unittests:
 
 functional: 
 	@echo "Executing functional tests using built charm at ${PROJECTPATH}"
-	@CHARM_LOCATION=${PROJECTPATH} tox -e func34 -- ${FUNC_ARGS}
+	@CHARM_LOCATION=${PROJECTPATH} tox -e func -- ${FUNC_ARGS}
 
 integration:
 	@echo "Executing integration tests with COS"
