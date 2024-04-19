@@ -10,6 +10,10 @@ on:
       - "**.md"
       - "**.rst"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+  
 jobs:
   lint-unit:
     uses: canonical/bootstack-actions/.github/workflows/lint-unit.yaml@v2
@@ -44,7 +48,7 @@ jobs:
       matrix:
         include:
           - juju-channel: "3.4/stable"
-            command: "FUNC_ARGS='--series jammy' make functional31"
+            command: "FUNC_ARGS='--series jammy' make functional"
     with:
       command: ${{ matrix.command }}
       juju-channel: ${{ matrix.juju-channel }}
