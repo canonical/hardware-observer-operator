@@ -2,6 +2,7 @@
 
 from functools import wraps
 from logging import getLogger
+from os import chmod
 from pathlib import Path
 from typing import Any, Callable, Dict, Tuple
 
@@ -55,7 +56,7 @@ class ExporterTemplate:
         self.config_template = self.environment.get_template(EXPORTER_CONFIG_TEMPLATE)
         self.service_template = self.environment.get_template(EXPORTER_SERVICE_TEMPLATE)
 
-    def _install(self, path: Path, content: str) -> bool:
+    def _install(self, path: Path, content: str, mode: int = 0o644) -> bool:
         """Install file."""
         success = True
         try:
@@ -67,6 +68,7 @@ class ExporterTemplate:
             logger.info("Writing file to %s - Failed.", path)
             success = False
         else:
+            chmod(path, mode)
             logger.info("Writing file to %s - Done.", path)
         return success
 
@@ -106,7 +108,7 @@ class ExporterTemplate:
             REDFISH_PASSWORD=redfish_conn_params.get("password", ""),
             REDFISH_CLIENT_TIMEOUT=redfish_conn_params.get("timeout", ""),
         )
-        return self._install(EXPORTER_CONFIG_PATH, content)
+        return self._install(EXPORTER_CONFIG_PATH, content, mode=0o600)
 
     def render_service(self, charm_dir: str, config_file: str) -> bool:
         """Render and install exporter service file."""

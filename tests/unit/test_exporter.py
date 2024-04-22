@@ -57,6 +57,10 @@ class TestExporter(unittest.TestCase):
         redfish_client_patcher.start()
         self.addCleanup(redfish_client_patcher.stop)
 
+        chmod_patcher = mock.patch.object(service, "chmod")
+        chmod_patcher.start()
+        self.addCleanup(chmod_patcher.stop)
+
     @classmethod
     def setUpClass(cls):
         exporter_health_retry_count_patcher = mock.patch("charm.EXPORTER_HEALTH_RETRY_COUNT", 1)
@@ -361,6 +365,7 @@ class TestExporterTemplate(unittest.TestCase):
                     REDFISH_USERNAME="",
                     REDFISH_CLIENT_TIMEOUT=10,
                 ),
+                mode=0o600,
             )
 
     @mock.patch(
@@ -393,4 +398,5 @@ class TestExporterTemplate(unittest.TestCase):
                     REDFISH_USERNAME="default_user",
                     REDFISH_CLIENT_TIMEOUT="10",
                 ),
+                mode=0o600,
             )
