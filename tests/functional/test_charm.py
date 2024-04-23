@@ -539,7 +539,7 @@ class TestCharm:
         cmd = "stat -c '%a' /etc/hardware-exporter-config.yaml"
         results = await run_command_on_unit(ops_test, unit.name, cmd)
         assert results.get("return-code") == 0
-        assert results.get("stdout") == expected_file_mode
+        assert results.get("stdout").rstrip("\n") == expected_file_mode
 
     async def test_config_changed_port(self, app, unit, ops_test):
         """Test changing the config option: exporter-port."""
