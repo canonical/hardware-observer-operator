@@ -8,7 +8,7 @@ from charms.operator_libs_linux.v0 import apt
 
 
 def get_candidate_version(package: str) -> Optional[str]:
-    """Get candiate version of package from apt-cache.
+    """Get candidate version of package from apt-cache.
 
     Related issue: https://github.com/canonical/operator-libs-linux/issues/113
     """
