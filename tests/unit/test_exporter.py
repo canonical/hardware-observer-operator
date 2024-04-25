@@ -57,9 +57,9 @@ class TestExporter(unittest.TestCase):
         redfish_client_patcher.start()
         self.addCleanup(redfish_client_patcher.stop)
 
-        chmod_patcher = mock.patch.object(service, "chmod")
-        chmod_patcher.start()
-        self.addCleanup(chmod_patcher.stop)
+        os_patcher = mock.patch.object(service, "os")
+        os_patcher.start()
+        self.addCleanup(os_patcher.stop)
 
     @classmethod
     def setUpClass(cls):

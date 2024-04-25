@@ -1,10 +1,10 @@
 """Exporter service helper."""
 
+import os
 from functools import wraps
 from logging import getLogger
-from os import chmod
 from pathlib import Path
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from charms.operator_libs_linux.v1 import systemd
 from jinja2 import Environment, FileSystemLoader
@@ -56,19 +56,25 @@ class ExporterTemplate:
         self.config_template = self.environment.get_template(EXPORTER_CONFIG_TEMPLATE)
         self.service_template = self.environment.get_template(EXPORTER_SERVICE_TEMPLATE)
 
-    def _install(self, path: Path, content: str, mode: int = 0o644) -> bool:
+    def _install(self, path: Path, content: str, mode: Optional[int] = None) -> bool:
         """Install file."""
         success = True
         try:
             logger.info("Writing file to %s.", path)
-            with open(path, "w", encoding="utf-8") as file:
-                file.write(content)
+            if mode:
+                with os.fdopen(
+                    os.open(path, os.O_CREAT | os.O_WRONLY, mode), "w", encoding="utf-8"
+                ) as file:
+                    file.write(content)
+            else:
+                # create file with default permissions based on default OS umask
+                with open(path, "w", encoding="utf-8") as file:
+                    file.write(content)
         except (NotADirectoryError, PermissionError) as err:
             logger.error(err)
             logger.info("Writing file to %s - Failed.", path)
             success = False
         else:
-            chmod(path, mode)
             logger.info("Writing file to %s - Done.", path)
         return success
 
