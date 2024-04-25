@@ -66,6 +66,9 @@ class HardwareObserverCharm(ops.CharmBase):
         self.framework.observe(
             self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
         )
+        self.framework.observe(
+            self.on.detect_hardwares_action, self._on_detect_hardwares
+        )
 
         self._stored.set_default(
             exporter_installed=False,
@@ -87,6 +90,36 @@ class HardwareObserverCharm(ops.CharmBase):
     def get_hw_tools_from_values(self, hw_tool_values: List[str]) -> List[HWTool]:
         """Get HWTool objects from hw tool values."""
         return [HWTool(value) for value in hw_tool_values]
+
+    def _on_detect_hardwares(self, event: ops.ActionEvent) -> None:
+        if event.params["dry-run"] == True:
+            event.set_results(
+                {
+                    "tools": ",".join([tool.value for tool in get_hw_tool_enable_list()]),
+                    "dry-run": True,
+                }
+            )
+            return
+        # Clear the enabled_hw_tool_list_values and re-generate
+        self._stored.enabled_hw_tool_list_values = []
+        enabled_hw_tool_list_values = self.get_enabled_hw_tool_list_values()
+
+        tools = ",".join(
+            [
+                tool.value for tool in self.get_hw_tools_from_values(
+                    enabled_hw_tool_list_values
+                )
+            ]
+        )
+        event.log(f"Run install hook with enable tools: {tools}")
+        self._on_install_or_upgrade(event=event)
+
+        event.set_results(
+            {
+                "tools": tools,
+                "dry-run": False,
+            }
+        )
 
     def _on_install_or_upgrade(self, event: ops.HookEvent) -> None:
         """Install or upgrade charm."""

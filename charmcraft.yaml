@@ -24,3 +24,14 @@ bases:
         channel: "20.04"
         architectures:
           - amd64
+
+actions:
+  detect-hardwares:
+    description: >
+      Redetect the hardwares and reinitialize the charm.
+      The exporter service(s) will be reconfigured and restarted.
+    params:
+      dry-run:
+        type: boolean
+        description: Only run detection without restart the exporter service.
+        default: false

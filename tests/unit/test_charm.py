@@ -475,3 +475,60 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.unit.status,
             BlockedStatus("Invalid config: 'redfish-username' or 'redfish-password'"),
         )
+
+    @parameterized.expand(
+        [
+            (
+                True,
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI,HWTool.REDFISH],
+                ops.testing.ActionOutput(
+                    results={
+                        "tools": "ipmi_sensor,ipmi_sel,ipmi_dcmi,redfish",
+                        "dry-run": True,
+                    },
+                    logs=[],
+                )
+            ),
+            (
+                True,
+                [HWTool.PERCCLI, HWTool.STORCLI],
+                ops.testing.ActionOutput(
+                    results={
+                        "tools": "perccli,storcli",
+                        "dry-run": True,
+                    },
+                    logs=[],
+                )
+            ),
+            (
+                False,
+                [HWTool.PERCCLI, HWTool.STORCLI],
+                ops.testing.ActionOutput(
+                    results={
+                        "tools": "perccli,storcli",
+                        "dry-run": False,
+                    },
+                    logs=["Run install hook with enable tools: perccli,storcli"],
+                )
+            ),
+        ]
+    )
+    @mock.patch(
+        "charm.get_hw_tool_enable_list",
+    )
+    def test_detect_hardwares_action(self, dry_run, return_hw_tools, expect_output, mock_get_hw_tool_enable_list) -> None:
+        """Test action detect-hardwares."""
+        event = mock.MagicMock()
+        mock_get_hw_tool_enable_list.return_value = return_hw_tools
+        self.harness.begin()
+        self.harness.charm._on_install_or_upgrade = mock.MagicMock()
+        output = self.harness.run_action("detect-hardwares", {"dry-run": dry_run})
+        self.assertEqual(output, expect_output)
+        if dry_run:
+            self.harness.charm._on_install_or_upgrade.assert_not_called()
+        else:
+            self.assertEqual(
+                self.harness.charm.get_hw_tools_from_values(self.harness.charm._stored.enabled_hw_tool_list_values),
+                expect_output.results["tools"].split(","),
+            )
+            self.harness.charm._on_install_or_upgrade.assert_called()
