@@ -12,13 +12,7 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
-from exporter_helpers import (
-    get_exporter,
-    remove_exporter,
-    get_installed_exporters,
-    check_exporter_health,
-    reconfigure_exporter,
-)
+import exporter_helpers
 from hw_tools import HWToolHelper
 from service import HardwareExporter
 
@@ -51,7 +45,9 @@ class HardwareObserverCharm(ops.CharmBase):
 
         self.exporters = []
 
-        hardware_exporter = get_exporter(HardwareExporter(self.charm_dir, self.model.config))
+        hardware_exporter = exporter_helpers.get_exporter(
+            HardwareExporter(self.charm_dir, self.model.config)
+        )
         if hardware_exporter:
             self.exporters.append(hardware_exporter)
 
@@ -95,7 +91,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
         # Remove exporters
         for exporter in self.exporters:
-            remove_exporter(exporter, self.model)
+            exporter_helpers.remove_exporter(exporter, self.model)
 
     def _on_update_status(self, _: EventBase) -> None:  # noqa: C901
         """Update the charm's status."""
@@ -123,7 +119,8 @@ class HardwareObserverCharm(ops.CharmBase):
 
         # Check health of all exporters
         exporters_health = [
-            check_exporter_health(exporter, self.model) for exporter in self.exporters
+            exporter_helpers.check_exporter_health(exporter, self.model)
+            for exporter in self.exporters
         ]
 
         if all(exporters_health):
@@ -145,7 +142,7 @@ class HardwareObserverCharm(ops.CharmBase):
                 return
 
             for exporter in self.exporters:
-                reconfigure_exporter(exporter, self.model)
+                exporter_helpers.reconfigure_exporter(exporter, self.model)
 
         self._on_update_status(event)
 
@@ -153,7 +150,7 @@ class HardwareObserverCharm(ops.CharmBase):
         """Start the exporter when relation joined."""
         if (
             not self._stored.resource_installed  # type: ignore[truthy-function]
-            or not get_installed_exporters(self.exporters)
+            or not exporter_helpers.get_installed_exporters(self.exporters)
         ):
             logger.info(  # type: ignore[unreachable]
                 "Defer cos-agent relation join because exporters or resources are not ready yet."
