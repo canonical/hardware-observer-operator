@@ -34,7 +34,7 @@ actions:
       Default will only show the current hardward tool list and compare with new
       detection.
       The exporter service(s) will be reconfigured and restarted if option
-      `--apply` is provided.
+      `apply` is provided.
     params:
       apply:
         type: boolean
