@@ -61,15 +61,15 @@ class ExporterTemplate:
         success = True
         try:
             logger.info("Writing file to %s.", path)
-            if mode:
-                with os.fdopen(
-                    os.open(path, os.O_CREAT | os.O_WRONLY, mode), "w", encoding="utf-8"
-                ) as file:
-                    file.write(content)
-            else:
+            fileobj = (
+                os.fdopen(os.open(path, os.O_CREAT | os.O_WRONLY, mode), "w", encoding="utf-8")
+                if mode
                 # create file with default permissions based on default OS umask
-                with open(path, "w", encoding="utf-8") as file:
-                    file.write(content)
+                else open(path, "w", encoding="utf-8")  # pylint: disable=consider-using-with
+            )
+            with fileobj as file:
+                file.write(content)
+
         except (NotADirectoryError, PermissionError) as err:
             logger.error(err)
             logger.info("Writing file to %s - Failed.", path)
