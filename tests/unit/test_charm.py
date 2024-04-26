@@ -479,56 +479,100 @@ class TestCharm(unittest.TestCase):
     @parameterized.expand(
         [
             (
-                True,
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI,HWTool.REDFISH],
+                False,
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
                 ops.testing.ActionOutput(
                     results={
-                        "tools": "ipmi_sensor,ipmi_sel,ipmi_dcmi,redfish",
-                        "dry-run": True,
+                        "consistent": True,
+                        "detected-hw-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
+                        "apply": False,
                     },
                     logs=[],
-                )
-            ),
-            (
-                True,
-                [HWTool.PERCCLI, HWTool.STORCLI],
-                ops.testing.ActionOutput(
-                    results={
-                        "tools": "perccli,storcli",
-                        "dry-run": True,
-                    },
-                    logs=[],
-                )
+                ),
             ),
             (
                 False,
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI],
+                ops.testing.ActionOutput(
+                    results={
+                        "consistent": False,
+                        "detected-hw-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor",
+                        "current-hw-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
+                        "apply": False,
+                    },
+                    logs=[],
+                ),
+            ),
+            (
+                True,
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI],
+                ops.testing.ActionOutput(
+                    results={
+                        "consistent": False,
+                        "detected-hw-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor",
+                        "current-hw-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
+                        "apply": True,
+                    },
+                    logs=["Run install hook with enable tools: ipmi_dcmi,ipmi_sel,ipmi_sensor"],
+                ),
+            ),
+            (
+                True,
+                [HWTool.PERCCLI, HWTool.STORCLI],
                 [HWTool.PERCCLI, HWTool.STORCLI],
                 ops.testing.ActionOutput(
                     results={
-                        "tools": "perccli,storcli",
-                        "dry-run": False,
+                        "consistent": True,
+                        "detected-hw-tools": "perccli,storcli",
+                        "apply": False,
                     },
-                    logs=["Run install hook with enable tools: perccli,storcli"],
-                )
+                    logs=[],
+                ),
             ),
         ]
     )
     @mock.patch(
         "charm.get_hw_tool_enable_list",
     )
-    def test_detect_hardwares_action(self, dry_run, return_hw_tools, expect_output, mock_get_hw_tool_enable_list) -> None:
+    def test_detect_hardwares_action(
+        self,
+        apply,
+        current_hw_tools,
+        detected_hw_tools,
+        expect_output,
+        mock_get_hw_tool_enable_list,
+    ) -> None:
         """Test action detect-hardwares."""
-        event = mock.MagicMock()
-        mock_get_hw_tool_enable_list.return_value = return_hw_tools
+        mock_get_hw_tool_enable_list.return_value = detected_hw_tools
         self.harness.begin()
         self.harness.charm._on_install_or_upgrade = mock.MagicMock()
-        output = self.harness.run_action("detect-hardwares", {"dry-run": dry_run})
+        self.harness.charm._stored.enabled_hw_tool_list_values = [
+            tool.value for tool in current_hw_tools
+        ]
+
+        output = self.harness.run_action("detect-hardwares", {"apply": apply})
+        print(output)
+        print(expect_output)
         self.assertEqual(output, expect_output)
-        if dry_run:
-            self.harness.charm._on_install_or_upgrade.assert_not_called()
+        if not current_hw_tools == detected_hw_tools:
+            if apply:
+                self.assertEqual(
+                    self.harness.charm.get_hw_tools_from_values(
+                        self.harness.charm._stored.enabled_hw_tool_list_values
+                    ),
+                    expect_output.results["detected-hw-tools"].split(","),
+                )
+                self.harness.charm._on_install_or_upgrade.assert_called()
+            else:
+                self.harness.charm._on_install_or_upgrade.assert_not_called()
+                self.assertEqual(
+                    self.harness.charm.get_hw_tools_from_values(
+                        self.harness.charm._stored.enabled_hw_tool_list_values
+                    ),
+                    [tool.value for tool in current_hw_tools],
+                )
         else:
-            self.assertEqual(
-                self.harness.charm.get_hw_tools_from_values(self.harness.charm._stored.enabled_hw_tool_list_values),
-                expect_output.results["tools"].split(","),
-            )
-            self.harness.charm._on_install_or_upgrade.assert_called()
+            self.harness.charm._on_install_or_upgrade.assert_not_called()

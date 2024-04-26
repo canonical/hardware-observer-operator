@@ -66,9 +66,7 @@ class HardwareObserverCharm(ops.CharmBase):
         self.framework.observe(
             self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
         )
-        self.framework.observe(
-            self.on.detect_hardwares_action, self._on_detect_hardwares
-        )
+        self.framework.observe(self.on.detect_hardwares_action, self._on_detect_hardwares)
 
         self._stored.set_default(
             exporter_installed=False,
@@ -92,36 +90,37 @@ class HardwareObserverCharm(ops.CharmBase):
         return [HWTool(value) for value in hw_tool_values]
 
     def _on_detect_hardwares(self, event: ops.ActionEvent) -> None:
-        if event.params["dry-run"] == True:
-            event.set_results(
-                {
-                    "tools": ",".join([tool.value for tool in get_hw_tool_enable_list()]),
-                    "dry-run": True,
-                }
-            )
-            return
-        # Clear the enabled_hw_tool_list_values and re-generate
-        self._stored.enabled_hw_tool_list_values = []
-        enabled_hw_tool_list_values = self.get_enabled_hw_tool_list_values()
+        """Detect hardware tool list and option to rerun the install hook."""
+        current_hw_tools_value_list = self.get_enabled_hw_tool_list_values()
+        current_hw_tools_str_list = [str(tool) for tool in current_hw_tools_value_list]
+        current_hw_tools_str_list.sort()
 
-        tools = ",".join(
-            [
-                tool.value for tool in self.get_hw_tools_from_values(
-                    enabled_hw_tool_list_values
-                )
-            ]
-        )
-        event.log(f"Run install hook with enable tools: {tools}")
-        self._on_install_or_upgrade(event=event)
+        detected_hw_tool_list = get_hw_tool_enable_list()
+        detected_hw_tool_str_list = [tool.value for tool in detected_hw_tool_list]
+        detected_hw_tool_str_list.sort()
 
-        event.set_results(
-            {
-                "tools": tools,
-                "dry-run": False,
-            }
-        )
+        consistent = False
+        if current_hw_tools_str_list == detected_hw_tool_str_list:
+            consistent = True
 
-    def _on_install_or_upgrade(self, event: ops.HookEvent) -> None:
+        result = {
+            "consistent": consistent,
+            "detected-hw-tools": ",".join(detected_hw_tool_str_list),
+            "apply": False,
+        }
+        # Show compare lists if not consistent
+        if not consistent:
+            result["current-hw-tools"] = ",".join(current_hw_tools_str_list)
+
+        if event.params["apply"] and not consistent:
+            # Reset the value in local Store
+            self._stored.enabled_hw_tool_list_values = detected_hw_tool_str_list
+            event.log(f"Run install hook with enable tools: {','.join(detected_hw_tool_str_list)}")
+            self._on_install_or_upgrade(event=event)
+            result["apply"] = True
+        event.set_results(result)
+
+    def _on_install_or_upgrade(self, event: EventBase) -> None:
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
 

@@ -28,10 +28,17 @@ bases:
 actions:
   detect-hardwares:
     description: >
-      Redetect the hardwares and reinitialize the charm.
-      The exporter service(s) will be reconfigured and restarted.
+      Re-detect the hardwares on the device and provide an option to
+      reinitialize the charm.
+
+      Default will only show the current hardward tool list and compare with new
+      detection.
+      The exporter service(s) will be reconfigured and restarted if option
+      `--apply` is provided.
     params:
-      dry-run:
+      apply:
         type: boolean
-        description: Only run detection without restart the exporter service.
+        description: |
+          Run detection and use it as the enablelist to restart the exporter
+          service(s).
         default: false
