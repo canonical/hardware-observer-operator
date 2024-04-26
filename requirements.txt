@@ -3,5 +3,5 @@ distro
 ops >= 2.2.0
 jinja2
 redfish  # requests is included in this
-pydantic
+pydantic < 2
 git+https://github.com/canonical/prometheus-hardware-exporter.git
