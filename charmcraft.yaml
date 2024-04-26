@@ -26,9 +26,9 @@ bases:
           - amd64
 
 actions:
-  detect-hardwares:
+  detect-hardware:
     description: >
-      Re-detect the hardwares on the device and provide an option to
+      Re-detect the hardware on the device and provide an option to
       reinitialize the charm.
 
       Default will only show the current hardward tool list and compare with new

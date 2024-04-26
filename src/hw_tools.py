@@ -1,6 +1,6 @@
 """Helper for hardware tools.
 
-Define strategy for install, remove and verifier for different hardwares.
+Define strategy for install, remove and verifier for different hardware.
 """
 
 import logging

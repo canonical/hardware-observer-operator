@@ -537,7 +537,7 @@ class TestCharm(unittest.TestCase):
     @mock.patch(
         "charm.get_hw_tool_enable_list",
     )
-    def test_detect_hardwares_action(
+    def test_detect_hardware_action(
         self,
         apply,
         current_hw_tools,
@@ -545,7 +545,7 @@ class TestCharm(unittest.TestCase):
         expect_output,
         mock_get_hw_tool_enable_list,
     ) -> None:
-        """Test action detect-hardwares."""
+        """Test action detect-hardware."""
         mock_get_hw_tool_enable_list.return_value = detected_hw_tools
         self.harness.begin()
         self.harness.charm._on_install_or_upgrade = mock.MagicMock()
@@ -553,7 +553,7 @@ class TestCharm(unittest.TestCase):
             tool.value for tool in current_hw_tools
         ]
 
-        output = self.harness.run_action("detect-hardwares", {"apply": apply})
+        output = self.harness.run_action("detect-hardware", {"apply": apply})
         print(output)
         print(expect_output)
         self.assertEqual(output, expect_output)

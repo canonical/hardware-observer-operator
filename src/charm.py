@@ -66,7 +66,7 @@ class HardwareObserverCharm(ops.CharmBase):
         self.framework.observe(
             self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
         )
-        self.framework.observe(self.on.detect_hardwares_action, self._on_detect_hardwares)
+        self.framework.observe(self.on.detect_hardware_action, self._on_detect_hardware)
 
         self._stored.set_default(
             exporter_installed=False,
@@ -89,7 +89,7 @@ class HardwareObserverCharm(ops.CharmBase):
         """Get HWTool objects from hw tool values."""
         return [HWTool(value) for value in hw_tool_values]
 
-    def _on_detect_hardwares(self, event: ops.ActionEvent) -> None:
+    def _on_detect_hardware(self, event: ops.ActionEvent) -> None:
         """Detect hardware tool list and option to rerun the install hook."""
         current_hw_tools_value_list = self.get_enabled_hw_tool_list_values()
         current_hw_tools_str_list = [str(tool) for tool in current_hw_tools_value_list]
