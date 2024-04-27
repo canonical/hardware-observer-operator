@@ -1,9 +1,10 @@
 """Exporter service helper."""
 
+import os
 from functools import wraps
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from charms.operator_libs_linux.v1 import systemd
 from jinja2 import Environment, FileSystemLoader
@@ -55,13 +56,20 @@ class ExporterTemplate:
         self.config_template = self.environment.get_template(EXPORTER_CONFIG_TEMPLATE)
         self.service_template = self.environment.get_template(EXPORTER_SERVICE_TEMPLATE)
 
-    def _install(self, path: Path, content: str) -> bool:
+    def _install(self, path: Path, content: str, mode: Optional[int] = None) -> bool:
         """Install file."""
         success = True
         try:
             logger.info("Writing file to %s.", path)
-            with open(path, "w", encoding="utf-8") as file:
+            fileobj = (
+                os.fdopen(os.open(path, os.O_CREAT | os.O_WRONLY, mode), "w", encoding="utf-8")
+                if mode
+                # create file with default permissions based on default OS umask
+                else open(path, "w", encoding="utf-8")  # pylint: disable=consider-using-with
+            )
+            with fileobj as file:
                 file.write(content)
+
         except (NotADirectoryError, PermissionError) as err:
             logger.error(err)
             logger.info("Writing file to %s - Failed.", path)
@@ -106,7 +114,7 @@ class ExporterTemplate:
             REDFISH_PASSWORD=redfish_conn_params.get("password", ""),
             REDFISH_CLIENT_TIMEOUT=redfish_conn_params.get("timeout", ""),
         )
-        return self._install(EXPORTER_CONFIG_PATH, content)
+        return self._install(EXPORTER_CONFIG_PATH, content, mode=0o600)
 
     def render_service(self, charm_dir: str, config_file: str) -> bool:
         """Render and install exporter service file."""
