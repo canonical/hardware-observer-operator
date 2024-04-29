@@ -53,6 +53,10 @@ class TestExporter(unittest.TestCase):
         redfish_client_patcher.start()
         self.addCleanup(redfish_client_patcher.stop)
 
+        os_patcher = mock.patch.object(service, "os")
+        os_patcher.start()
+        self.addCleanup(os_patcher.stop)
+
     @classmethod
     def setUpClass(cls):
         exporter_health_retry_count_patcher = mock.patch("charm.EXPORTER_HEALTH_RETRY_COUNT", 1)
@@ -65,7 +69,7 @@ class TestExporter(unittest.TestCase):
         exporter_health_retry_timeout_patcher.start()
         cls.addClassCleanup(exporter_health_retry_timeout_patcher.stop)
 
-    def test_00_install_okay(self):
+    def test_install_okay(self):
         """Test exporter service is installed when charm is installed - okay."""
         self.harness.begin()
 
@@ -74,7 +78,7 @@ class TestExporter(unittest.TestCase):
             mock_open.assert_called()
             self.mock_systemd.daemon_reload.assert_called_once()
 
-    def test_01_install_failed_rendering(self):
+    def test_install_failed_rendering(self):
         """Test exporter service is failed to installed - failed to render."""
         self.harness.begin()
 
@@ -91,7 +95,7 @@ class TestExporter(unittest.TestCase):
             self.mock_systemd.daemon_reload.assert_not_called()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_10_uninstall_okay(self, mock_service_exists):
+    def test_uninstall_okay(self, mock_service_exists):
         """Test exporter service is uninstalled when charm is removed - okay."""
         self.harness.begin()
 
@@ -101,7 +105,7 @@ class TestExporter(unittest.TestCase):
             self.mock_systemd.daemon_reload.assert_called_once()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_11_uninstall_failed(self, mock_service_exists):
+    def test_uninstall_failed(self, mock_service_exists):
         """Test exporter service is not uninstalled - failed to remove."""
         self.harness.begin()
 
@@ -112,7 +116,7 @@ class TestExporter(unittest.TestCase):
             self.mock_systemd.daemon_reload.assert_not_called()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_20_start_okay(self, mock_service_installed):
+    def test_start_okay(self, mock_service_installed):
         """Test exporter service started when relation is joined."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -123,7 +127,7 @@ class TestExporter(unittest.TestCase):
         self.mock_systemd.service_enable.assert_called_once()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=False)
-    def test_21_start_failed(self, mock_service_not_installed):
+    def test_start_failed(self, mock_service_not_installed):
         """Test exporter service failed to started when relation is joined."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -132,7 +136,7 @@ class TestExporter(unittest.TestCase):
         self.mock_systemd.service_enable.assert_not_called()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_22_start_defer_resource_not_ready(self, mock_service_installed):
+    def test_start_defer_resource_not_ready(self, mock_service_installed):
         """Test exporter service started when relation is joined."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -143,7 +147,7 @@ class TestExporter(unittest.TestCase):
         self.mock_systemd.service_enable.assert_not_called()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_23_start_defer_exporter_not_ready(self, mock_service_installed):
+    def test_start_defer_exporter_not_ready(self, mock_service_installed):
         """Test exporter service started when relation is joined."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -154,7 +158,7 @@ class TestExporter(unittest.TestCase):
         self.mock_systemd.service_enable.assert_not_called()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_30_stop_okay(self, mock_service_installed):
+    def test_stop_okay(self, mock_service_installed):
         """Test exporter service is stopped when service is installed and relation is departed."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -166,7 +170,7 @@ class TestExporter(unittest.TestCase):
         self.mock_systemd.service_disable.assert_called_once()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=False)
-    def test_31_stop_failed(self, mock_service_not_installed):
+    def test_stop_failed(self, mock_service_not_installed):
         """Test exporter service failed to stop when service is not installed."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -187,7 +191,7 @@ class TestExporter(unittest.TestCase):
         ]
     )
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_40_check_health(
+    def test_check_health(
         self,
         failed,
         expected_status,
@@ -207,7 +211,7 @@ class TestExporter(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, expected_status)
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_40_check_health_exporter_crash(self, mock_service_installed):
+    def test_check_health_exporter_crash(self, mock_service_installed):
         """Test check_health function when service is installed but exporter crashes."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -221,7 +225,7 @@ class TestExporter(unittest.TestCase):
             self.harness.charm.on.update_status.emit()
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_50_check_relation_exists(self, mock_service_installed):
+    def test_check_relation_exists(self, mock_service_installed):
         """Test check_relation function when relation exists."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -233,7 +237,7 @@ class TestExporter(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_51_check_relation_not_exists(self, mock_service_installed):
+    def test_check_relation_not_exists(self, mock_service_installed):
         """Test check_relation function when relation does not exists."""
         self.harness.begin()
         with mock.patch("builtins.open", new_callable=mock.mock_open) as _:
@@ -245,7 +249,7 @@ class TestExporter(unittest.TestCase):
         )
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_52_too_many_relations(self, mock_service_installed):
+    def test_too_many_relations(self, mock_service_installed):
         """Test there too many relations."""
         rid_1 = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         rid_2 = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
@@ -262,7 +266,7 @@ class TestExporter(unittest.TestCase):
         )
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_60_config_changed_log_level_okay(self, mock_service_installed):
+    def test_config_changed_log_level_okay(self, mock_service_installed):
         """Test on_config_change function when exporter-log-level is changed."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -280,7 +284,7 @@ class TestExporter(unittest.TestCase):
             )
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_61_config_changed_not_okay(self, mock_service_installed):
+    def test_invalid_exporter_log_level(self, mock_service_installed):
         """Test on_config_change function when exporter-log-level is changed."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
@@ -305,8 +309,8 @@ class TestExporter(unittest.TestCase):
 
     @mock.patch("charm.Exporter", return_value=mock.MagicMock())
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_62_config_changed_not_okay(self, mock_service_installed, mock_exporter):
-        """Test on_config_change function when exporter-log-level is changed."""
+    def test_render_config_fail(self, mock_service_installed, mock_exporter):
+        """Test on_config_change function when render config fails."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
         self.harness.begin()
 
@@ -352,7 +356,9 @@ class TestExporterTemplate(unittest.TestCase):
                     REDFISH_HOST="",
                     REDFISH_PASSWORD="",
                     REDFISH_USERNAME="",
+                    REDFISH_CLIENT_TIMEOUT=10,
                 ),
+                mode=0o600,
             )
 
     def test_render_config_redfish(self):
@@ -365,6 +371,7 @@ class TestExporterTemplate(unittest.TestCase):
                     "host": "127.0.0.1",
                     "username": "default_user",
                     "password": "default_pwd",
+                    "timeout": 10,
                 },
                 hw_tools=[HWTool.REDFISH],
             )
@@ -379,5 +386,7 @@ class TestExporterTemplate(unittest.TestCase):
                     REDFISH_HOST="127.0.0.1",
                     REDFISH_PASSWORD="default_pwd",
                     REDFISH_USERNAME="default_user",
+                    REDFISH_CLIENT_TIMEOUT="10",
                 ),
+                mode=0o600,
             )

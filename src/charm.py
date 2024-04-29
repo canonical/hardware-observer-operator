@@ -287,6 +287,7 @@ class HardwareObserverCharm(ops.CharmBase):
             "host": f"https://{get_bmc_address()}",
             "username": self.model.config.get("redfish-username", ""),
             "password": self.model.config.get("redfish-password", ""),
+            "timeout": self.model.config.get("collect-timeout"),
         }
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
@@ -349,7 +350,7 @@ class HardwareObserverCharm(ops.CharmBase):
                 base_url=redfish_conn_params.get("host", ""),
                 username=redfish_conn_params.get("username", ""),
                 password=redfish_conn_params.get("password", ""),
-                timeout=REDFISH_TIMEOUT,
+                timeout=redfish_conn_params.get("timeout", REDFISH_TIMEOUT),
                 max_retry=REDFISH_MAX_RETRY,
             )
             redfish_obj.login(auth="session")

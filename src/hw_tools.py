@@ -424,7 +424,7 @@ def _raid_hw_verifier_lshw() -> Set[HWTool]:
 
 
 # Using cache here to avoid repeat call.
-# The lru_cache should be clean everytime the hook been triggered.
+# The lru_cache should be cleaned every time the hook been triggered.
 @lru_cache
 def raid_hw_verifier() -> List[HWTool]:
     """Verify if the HWTool support RAID card exists on machine."""
@@ -434,7 +434,7 @@ def raid_hw_verifier() -> List[HWTool]:
 
 
 # Using cache here to avoid repeat call.
-# The lru_cache should be clean everytime the hook been triggered.
+# The lru_cache should be cleaned every time the hook been triggered.
 @lru_cache
 def redfish_available() -> bool:
     """Check if redfish service is available."""
@@ -462,7 +462,7 @@ def redfish_available() -> bool:
 
 
 # Using cache here to avoid repeat call.
-# The lru_cache should be clean everytime the hook been triggered.
+# The lru_cache should be cleaned every time the hook been triggered.
 @lru_cache
 def bmc_hw_verifier() -> List[HWTool]:
     """Verify if the ipmi is available on the machine.
@@ -501,7 +501,7 @@ def bmc_hw_verifier() -> List[HWTool]:
 
 
 # Using cache here to avoid repeat call.
-# The lru_cache should be clean everytime the hook been triggered.
+# The lru_cache should be cleaned every time the hook been triggered.
 @lru_cache
 def get_hw_tool_enable_list() -> List[HWTool]:
     """Return HWTool enable list."""

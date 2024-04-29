@@ -576,3 +576,52 @@ class TestCharm(unittest.TestCase):
                 )
         else:
             self.harness.charm._on_install_or_upgrade.assert_not_called()
+
+    def test_get_redfish_conn_params_when_redfish_is_available(self):
+        """Test get_redfish_conn_params when Redfish is available."""
+        self.harness.begin()
+        result = self.harness.charm.get_redfish_conn_params([HWTool.REDFISH])
+        expected_result = {
+            "host": "https://127.0.0.1",
+            "username": "",
+            "password": "",
+            "timeout": 10,
+        }
+        self.assertEqual(result, expected_result)
+
+        # redfish client timeout is also set with the value from collect-timeout
+        new_config = {
+            "redfish-username": "redfish",
+            "redfish-password": "redfish",
+            "collect-timeout": 20,
+        }
+        self.harness.update_config(new_config)
+        expected_result = {
+            "host": "https://127.0.0.1",
+            "username": "redfish",
+            "password": "redfish",
+            "timeout": 20,
+        }
+        result = self.harness.charm.get_redfish_conn_params([HWTool.REDFISH])
+        self.assertEqual(result, expected_result)
+
+    def test_get_redfish_conn_params_when_redfish_is_absent(self):
+        """Test get_redfish_conn_params when Redfish is absent."""
+        # Redfish isn't present
+        self.mock_get_hw_tool_enable_list.return_value = [
+            HWTool.IPMI_SENSOR,
+            HWTool.IPMI_SEL,
+            HWTool.IPMI_DCMI,
+        ]
+        self.harness.begin()
+        result = self.harness.charm.get_redfish_conn_params([])
+        self.assertEqual(result, {})
+
+        new_config = {
+            "redfish-username": "redfish",
+            "redfish-password": "redfish",
+            "collect-timeout": 20,
+        }
+        self.harness.update_config(new_config)
+        result = self.harness.charm.get_redfish_conn_params([])
+        self.assertEqual(result, {})
