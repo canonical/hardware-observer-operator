@@ -1,5 +1,8 @@
 async-lru
-pytest
+# pytest-8.2.0 with asyncio-0.21.1 breaks func tests with error:
+# AttributeError: 'FixtureDef' object has no attribute 'unittest'.
+# https://github.com/charmed-kubernetes/pytest-operator/issues/131
+pytest==8.1.1
 pytest-operator
 # Keep protobuf < 4.0 until macaroonbakery solves its incompatibility
 # https://github.com/go-macaroon-bakery/py-macaroon-bakery/issues/94
