@@ -484,7 +484,7 @@ class TestCharm(unittest.TestCase):
                 [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
                 ops.testing.ActionOutput(
                     results={
-                        "hardware-change-detected": True,
+                        "hardware-change-detected": False,
                         "detected-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
                         "update-hardware-tools": False,
                     },
@@ -497,7 +497,7 @@ class TestCharm(unittest.TestCase):
                 [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI],
                 ops.testing.ActionOutput(
                     results={
-                        "hardware-change-detected": False,
+                        "hardware-change-detected": True,
                         "detected-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor",
                         "current-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
                         "update-hardware-tools": False,
@@ -511,7 +511,7 @@ class TestCharm(unittest.TestCase):
                 [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI],
                 ops.testing.ActionOutput(
                     results={
-                        "hardware-change-detected": False,
+                        "hardware-change-detected": True,
                         "detected-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor",
                         "current-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
                         "update-hardware-tools": True,
@@ -525,7 +525,7 @@ class TestCharm(unittest.TestCase):
                 [HWTool.PERCCLI, HWTool.STORCLI],
                 ops.testing.ActionOutput(
                     results={
-                        "hardware-change-detected": True,
+                        "hardware-change-detected": False,
                         "detected-hardware-tools": "perccli,storcli",
                         "update-hardware-tools": False,
                     },

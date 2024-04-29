@@ -100,7 +100,7 @@ class HardwareObserverCharm(ops.CharmBase):
         detected_hw_tool_str_list.sort()
 
         hw_change_detected = False
-        if current_hw_tools_str_list == detected_hw_tool_str_list:
+        if current_hw_tools_str_list != detected_hw_tool_str_list:
             hw_change_detected = True
 
         result = {
@@ -109,10 +109,10 @@ class HardwareObserverCharm(ops.CharmBase):
             "update-hardware-tools": False,
         }
         # Show compare lists if not hw_change_detected
-        if not hw_change_detected:
+        if hw_change_detected:
             result["current-hardware-tools"] = ",".join(current_hw_tools_str_list)
 
-        if event.params["apply"] and not hw_change_detected:
+        if event.params["apply"] and hw_change_detected:
             # Reset the value in local Store
             self._stored.enabled_hw_tool_list_values = detected_hw_tool_str_list
             event.log(f"Run install hook with enable tools: {','.join(detected_hw_tool_str_list)}")
