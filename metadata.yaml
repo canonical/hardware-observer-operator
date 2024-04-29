@@ -28,7 +28,7 @@ resources:
       (Optional) StorCLI deb file published by Broadcom for their RAID devices.
       Download v7.26 from: https://docs.broadcom.com/docs/1232743291.
       The download will start automatically upon accepting the license agreement.
-      Unzip the downloaded file and attach the relevant deb package. 
+      Unzip the downloaded file and attach the relevant deb package.
       Eg: ./Unified_storcli_all_os/Ubuntu/storcli_007.2612.0000.0000_all.deb
     filename: storcli.deb
 
@@ -38,7 +38,7 @@ resources:
       (Optional) PERCCLI deb file published by Dell for their RAID devices.
       Download v7.23 from https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=tdghn.
       Scroll down to "Available Formats" and download the PERCCLI_XXX_Linux.tar.gz file.
-      Extract the downloaded file and attach the relevant deb package. 
+      Extract the downloaded file and attach the relevant deb package.
       Eg: ./PERCCLI_7.2313.0_A14_Linux/perccli_007.2313.0000.0000_all.deb
     filename: perccli.deb
 
@@ -48,7 +48,7 @@ resources:
       (Optional) SASIRCU binary file published by Broadcom.
       Download vP20 from https://docs.broadcom.com/docs/12351735.
       The download will start automatically upon accepting the license agreement.
-      Unzip the downloaded file and attach the relevant binary. 
+      Unzip the downloaded file and attach the relevant binary.
       Eg: ./SAS2IRCU_P20/sas2ircu_linux_x86_rel/sas2ircu
     filename: sas2ircu
 
@@ -58,13 +58,14 @@ resources:
       (Optional) SASIRCU binary file published by Broadcom.
       Download vP16 from https://docs.broadcom.com/docs/SAS3IRCU_P16.zip.
       The download will start automatically upon accepting the license agreement.
-      Unzip the downloaded file and attach the relevant binary. 
+      Unzip the downloaded file and attach the relevant binary.
       Eg: ./SAS3IRCU_P16/sas3ircu_rel/sas3ircu_linux_x86_rel/sas3ircu
     filename: sas3ircu
 
 provides:
   cos-agent:
     interface: cos_agent
+    limit: 1
 
 requires:
   general-info:
