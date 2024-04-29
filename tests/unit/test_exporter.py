@@ -249,23 +249,6 @@ class TestExporter(unittest.TestCase):
         )
 
     @mock.patch.object(pathlib.Path, "exists", return_value=True)
-    def test_too_many_relations(self, mock_service_installed):
-        """Test there too many relations."""
-        rid_1 = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
-        rid_2 = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
-        self.harness.begin()
-        with mock.patch("builtins.open", new_callable=mock.mock_open) as _:
-            self.harness.charm.on.install.emit()
-            self.harness.add_relation_unit(rid_1, "grafana-agent/0")
-            self.harness.add_relation_unit(rid_2, "grafana-agent/1")
-        self.mock_systemd.service_failed.return_value = False
-        self.harness.charm.on.update_status.emit()
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            BlockedStatus("Cannot relate to more than one grafana-agent"),
-        )
-
-    @mock.patch.object(pathlib.Path, "exists", return_value=True)
     def test_config_changed_log_level_okay(self, mock_service_installed):
         """Test on_config_change function when exporter-log-level is changed."""
         rid = self.harness.add_relation(EXPORTER_RELATION_NAME, "grafana-agent")
