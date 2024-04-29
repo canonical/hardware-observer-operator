@@ -484,9 +484,9 @@ class TestCharm(unittest.TestCase):
                 [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
                 ops.testing.ActionOutput(
                     results={
-                        "consistent": True,
-                        "detected-hw-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
-                        "apply": False,
+                        "hardware-change-detected": True,
+                        "detected-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
+                        "update-hardware-tools": False,
                     },
                     logs=[],
                 ),
@@ -497,10 +497,10 @@ class TestCharm(unittest.TestCase):
                 [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI],
                 ops.testing.ActionOutput(
                     results={
-                        "consistent": False,
-                        "detected-hw-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor",
-                        "current-hw-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
-                        "apply": False,
+                        "hardware-change-detected": False,
+                        "detected-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor",
+                        "current-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
+                        "update-hardware-tools": False,
                     },
                     logs=[],
                 ),
@@ -511,10 +511,10 @@ class TestCharm(unittest.TestCase):
                 [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI],
                 ops.testing.ActionOutput(
                     results={
-                        "consistent": False,
-                        "detected-hw-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor",
-                        "current-hw-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
-                        "apply": True,
+                        "hardware-change-detected": False,
+                        "detected-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor",
+                        "current-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
+                        "update-hardware-tools": True,
                     },
                     logs=["Run install hook with enable tools: ipmi_dcmi,ipmi_sel,ipmi_sensor"],
                 ),
@@ -525,9 +525,9 @@ class TestCharm(unittest.TestCase):
                 [HWTool.PERCCLI, HWTool.STORCLI],
                 ops.testing.ActionOutput(
                     results={
-                        "consistent": True,
-                        "detected-hw-tools": "perccli,storcli",
-                        "apply": False,
+                        "hardware-change-detected": True,
+                        "detected-hardware-tools": "perccli,storcli",
+                        "update-hardware-tools": False,
                     },
                     logs=[],
                 ),
@@ -553,9 +553,7 @@ class TestCharm(unittest.TestCase):
             tool.value for tool in current_hw_tools
         ]
 
-        output = self.harness.run_action("detect-hardware", {"apply": apply})
-        print(output)
-        print(expect_output)
+        output = self.harness.run_action("redetect-hardware", {"apply": apply})
         self.assertEqual(output, expect_output)
         if not current_hw_tools == detected_hw_tools:
             if apply:
@@ -563,7 +561,7 @@ class TestCharm(unittest.TestCase):
                     self.harness.charm.get_hw_tools_from_values(
                         self.harness.charm._stored.enabled_hw_tool_list_values
                     ),
-                    expect_output.results["detected-hw-tools"].split(","),
+                    expect_output.results["detected-hardware-tools"].split(","),
                 )
                 self.harness.charm._on_install_or_upgrade.assert_called()
             else:

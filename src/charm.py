@@ -66,7 +66,7 @@ class HardwareObserverCharm(ops.CharmBase):
         self.framework.observe(
             self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
         )
-        self.framework.observe(self.on.detect_hardware_action, self._on_detect_hardware)
+        self.framework.observe(self.on.redetect_hardware_action, self._on_redetect_hardware)
 
         self._stored.set_default(
             exporter_installed=False,
@@ -89,7 +89,7 @@ class HardwareObserverCharm(ops.CharmBase):
         """Get HWTool objects from hw tool values."""
         return [HWTool(value) for value in hw_tool_values]
 
-    def _on_detect_hardware(self, event: ops.ActionEvent) -> None:
+    def _on_redetect_hardware(self, event: ops.ActionEvent) -> None:
         """Detect hardware tool list and option to rerun the install hook."""
         current_hw_tools_value_list = self.get_enabled_hw_tool_list_values()
         current_hw_tools_str_list = [str(tool) for tool in current_hw_tools_value_list]
@@ -99,25 +99,25 @@ class HardwareObserverCharm(ops.CharmBase):
         detected_hw_tool_str_list = [tool.value for tool in detected_hw_tool_list]
         detected_hw_tool_str_list.sort()
 
-        consistent = False
+        hw_change_detected = False
         if current_hw_tools_str_list == detected_hw_tool_str_list:
-            consistent = True
+            hw_change_detected = True
 
         result = {
-            "consistent": consistent,
-            "detected-hw-tools": ",".join(detected_hw_tool_str_list),
-            "apply": False,
+            "hardware-change-detected": hw_change_detected,
+            "detected-hardware-tools": ",".join(detected_hw_tool_str_list),
+            "update-hardware-tools": False,
         }
-        # Show compare lists if not consistent
-        if not consistent:
-            result["current-hw-tools"] = ",".join(current_hw_tools_str_list)
+        # Show compare lists if not hw_change_detected
+        if not hw_change_detected:
+            result["current-hardware-tools"] = ",".join(current_hw_tools_str_list)
 
-        if event.params["apply"] and not consistent:
+        if event.params["apply"] and not hw_change_detected:
             # Reset the value in local Store
             self._stored.enabled_hw_tool_list_values = detected_hw_tool_str_list
             event.log(f"Run install hook with enable tools: {','.join(detected_hw_tool_str_list)}")
             self._on_install_or_upgrade(event=event)
-            result["apply"] = True
+            result["update-hardware-tools"] = True
         event.set_results(result)
 
     def _on_install_or_upgrade(self, event: EventBase) -> None:
