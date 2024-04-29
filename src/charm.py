@@ -66,6 +66,7 @@ class HardwareObserverCharm(ops.CharmBase):
         self.framework.observe(
             self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
         )
+        self.framework.observe(self.on.redetect_hardware_action, self._on_redetect_hardware)
 
         self._stored.set_default(
             exporter_installed=False,
@@ -88,7 +89,38 @@ class HardwareObserverCharm(ops.CharmBase):
         """Get HWTool objects from hw tool values."""
         return [HWTool(value) for value in hw_tool_values]
 
-    def _on_install_or_upgrade(self, event: ops.HookEvent) -> None:
+    def _on_redetect_hardware(self, event: ops.ActionEvent) -> None:
+        """Detect hardware tool list and option to rerun the install hook."""
+        current_hw_tools_value_list = self.get_enabled_hw_tool_list_values()
+        current_hw_tools_str_list = [str(tool) for tool in current_hw_tools_value_list]
+        current_hw_tools_str_list.sort()
+
+        detected_hw_tool_list = get_hw_tool_enable_list()
+        detected_hw_tool_str_list = [tool.value for tool in detected_hw_tool_list]
+        detected_hw_tool_str_list.sort()
+
+        hw_change_detected = False
+        if current_hw_tools_str_list != detected_hw_tool_str_list:
+            hw_change_detected = True
+
+        result = {
+            "hardware-change-detected": hw_change_detected,
+            "current-hardware-tools": ",".join(current_hw_tools_str_list),
+            "update-hardware-tools": False,
+        }
+        # Show compare lists if hw_change_detected
+        if hw_change_detected:
+            result["detected-hardware-tools"] = ",".join(detected_hw_tool_str_list)
+
+        if event.params["apply"] and hw_change_detected:
+            # Reset the value in local Store
+            self._stored.enabled_hw_tool_list_values = detected_hw_tool_str_list
+            event.log(f"Run install hook with enable tools: {','.join(detected_hw_tool_str_list)}")
+            self._on_install_or_upgrade(event=event)
+            result["update-hardware-tools"] = True
+        event.set_results(result)
+
+    def _on_install_or_upgrade(self, event: EventBase) -> None:
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
 

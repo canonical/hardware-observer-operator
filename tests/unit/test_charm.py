@@ -475,3 +475,104 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.unit.status,
             BlockedStatus("Invalid config: 'redfish-username' or 'redfish-password'"),
         )
+
+    @parameterized.expand(
+        [
+            (
+                False,
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+                ops.testing.ActionOutput(
+                    results={
+                        "hardware-change-detected": False,
+                        "current-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
+                        "update-hardware-tools": False,
+                    },
+                    logs=[],
+                ),
+            ),
+            (
+                False,
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI],
+                ops.testing.ActionOutput(
+                    results={
+                        "hardware-change-detected": True,
+                        "detected-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor",
+                        "current-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
+                        "update-hardware-tools": False,
+                    },
+                    logs=[],
+                ),
+            ),
+            (
+                True,
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI],
+                ops.testing.ActionOutput(
+                    results={
+                        "hardware-change-detected": True,
+                        "detected-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor",
+                        "current-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
+                        "update-hardware-tools": True,
+                    },
+                    logs=["Run install hook with enable tools: ipmi_dcmi,ipmi_sel,ipmi_sensor"],
+                ),
+            ),
+            (
+                True,
+                [HWTool.PERCCLI, HWTool.STORCLI],
+                [HWTool.PERCCLI, HWTool.STORCLI],
+                ops.testing.ActionOutput(
+                    results={
+                        "hardware-change-detected": False,
+                        "current-hardware-tools": "perccli,storcli",
+                        "update-hardware-tools": False,
+                    },
+                    logs=[],
+                ),
+            ),
+        ]
+    )
+    @mock.patch(
+        "charm.get_hw_tool_enable_list",
+    )
+    def test_detect_hardware_action(
+        self,
+        apply,
+        current_hw_tools,
+        detected_hw_tools,
+        expect_output,
+        mock_get_hw_tool_enable_list,
+    ) -> None:
+        """Test action detect-hardware."""
+        mock_get_hw_tool_enable_list.return_value = detected_hw_tools
+        self.harness.begin()
+        self.harness.charm._on_install_or_upgrade = mock.MagicMock()
+        self.harness.charm._stored.enabled_hw_tool_list_values = [
+            tool.value for tool in current_hw_tools
+        ]
+
+        output = self.harness.run_action("redetect-hardware", {"apply": apply})
+        self.assertEqual(output, expect_output)
+
+        if not current_hw_tools == detected_hw_tools:
+            if apply:
+                detected_hw_tools.sort()
+                self.assertEqual(
+                    self.harness.charm.get_hw_tools_from_values(
+                        self.harness.charm._stored.enabled_hw_tool_list_values
+                    ),
+                    detected_hw_tools,
+                )
+                self.harness.charm._on_install_or_upgrade.assert_called()
+            else:
+                self.harness.charm._on_install_or_upgrade.assert_not_called()
+                self.assertEqual(
+                    self.harness.charm.get_hw_tools_from_values(
+                        self.harness.charm._stored.enabled_hw_tool_list_values
+                    ),
+                    [tool.value for tool in current_hw_tools],
+                )
+        else:
+            self.harness.charm._on_install_or_upgrade.assert_not_called()
