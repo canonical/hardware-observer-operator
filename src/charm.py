@@ -105,12 +105,12 @@ class HardwareObserverCharm(ops.CharmBase):
 
         result = {
             "hardware-change-detected": hw_change_detected,
-            "detected-hardware-tools": ",".join(detected_hw_tool_str_list),
+            "current-hardware-tools": ",".join(current_hw_tools_str_list),
             "update-hardware-tools": False,
         }
-        # Show compare lists if not hw_change_detected
+        # Show compare lists if hw_change_detected
         if hw_change_detected:
-            result["current-hardware-tools"] = ",".join(current_hw_tools_str_list)
+            result["detected-hardware-tools"] = ",".join(detected_hw_tool_str_list)
 
         if event.params["apply"] and hw_change_detected:
             # Reset the value in local Store

@@ -485,7 +485,7 @@ class TestCharm(unittest.TestCase):
                 ops.testing.ActionOutput(
                     results={
                         "hardware-change-detected": False,
-                        "detected-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
+                        "current-hardware-tools": "ipmi_dcmi,ipmi_sel,ipmi_sensor,redfish",
                         "update-hardware-tools": False,
                     },
                     logs=[],
@@ -526,7 +526,7 @@ class TestCharm(unittest.TestCase):
                 ops.testing.ActionOutput(
                     results={
                         "hardware-change-detected": False,
-                        "detected-hardware-tools": "perccli,storcli",
+                        "current-hardware-tools": "perccli,storcli",
                         "update-hardware-tools": False,
                     },
                     logs=[],
@@ -555,13 +555,15 @@ class TestCharm(unittest.TestCase):
 
         output = self.harness.run_action("redetect-hardware", {"apply": apply})
         self.assertEqual(output, expect_output)
+
         if not current_hw_tools == detected_hw_tools:
             if apply:
+                detected_hw_tools.sort()
                 self.assertEqual(
                     self.harness.charm.get_hw_tools_from_values(
                         self.harness.charm._stored.enabled_hw_tool_list_values
                     ),
-                    expect_output.results["detected-hardware-tools"].split(","),
+                    detected_hw_tools,
                 )
                 self.harness.charm._on_install_or_upgrade.assert_called()
             else:
