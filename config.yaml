@@ -3,12 +3,12 @@
 #
 
 options:
-  exporter-port:
+  hardware-exporter-port:
     type: int
     default: 10200
     description: |
-      Start the prometheus exporter at "exporter-port". By default, it will
-      start at port 10200.
+      Start the prometheus hardware exporter at "hardware-exporter-port". By default,
+      it will start at port 10200.
   exporter-log-level:
     type: string
     default: "INFO"
