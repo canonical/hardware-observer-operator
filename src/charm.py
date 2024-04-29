@@ -148,9 +148,8 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_cos_agent_relation_joined(self, event: EventBase) -> None:
         """Start the exporter when relation joined."""
-        if (
-            not self._stored.resource_installed  # type: ignore[truthy-function]
-            or not exporter_helpers.get_installed_exporters(self.exporters)
+        if not self._stored.resource_installed or not any(  # type: ignore[truthy-function]
+            [exporter_helpers.get_exporter(exporter) for exporter in self.exporters]
         ):
             logger.info(  # type: ignore[unreachable]
                 "Defer cos-agent relation join because exporters or resources are not ready yet."

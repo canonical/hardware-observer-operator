@@ -16,11 +16,12 @@ logger = getLogger(__name__)
 
 def get_exporter(exporter: BaseExporter):
     """Install and get an exporter"""
+    if exporter.exporter_service_path.exists():
+        return exporter
     installed = exporter.install()
     if not installed:
         logger.error(f"Failed to install {exporter.exporter_name}")
         return
-
     return exporter
 
 
@@ -29,16 +30,6 @@ def remove_exporter(exporter: BaseExporter, model):
     model.unit.status = MaintenanceStatus(f"Removing {exporter.exporter_name}...")
     exporter.uninstall()
     logger.info(f"Removed {exporter.exporter_name}.")
-
-
-def get_installed_exporters(all_exporters) -> List:
-    """Get a list of installed exporters."""
-    installed_exporters = []
-    for exporter in all_exporters:
-        if exporter.exporter_service_path.exists():
-            installed_exporters.append(exporter)
-
-    return installed_exporters
 
 
 def check_exporter_health(exporter: BaseExporter, model) -> bool:
@@ -86,7 +77,9 @@ def reconfigure_exporter(exporter: BaseExporter, model) -> bool:
     exporter.set_config(model.config)
     success = exporter.render_config()
     if not success:
-        message = f"Failed to configure {exporter.exporter_name}, please check if the server is healthy."
+        message = (
+            f"Failed to configure {exporter.exporter_name}, please check if the server is healthy."
+        )
         model.unit.status = BlockedStatus(message)
         return False
     exporter.restart()
