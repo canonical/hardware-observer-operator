@@ -39,6 +39,6 @@ actions:
       apply:
         type: boolean
         description: |
-          Run detection and use it as the enablelist to restart the exporter
-          service(s).
+          Use the re-detected list of hardware tools as the new enable-list to reconfigure
+          and restart the exporter.
         default: false
