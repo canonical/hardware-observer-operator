@@ -38,20 +38,16 @@ class TestExporter(unittest.TestCase):
         mock_hw_tool_helper.return_value.check_installed.return_value = [True, ""]
         self.addCleanup(hw_tool_lib_patcher.stop)
 
-        get_hw_tool_white_list_patcher = mock.patch.object(service, "get_hw_tool_white_list")
-        get_hw_tool_white_list_patcher.start()
-        self.addCleanup(get_hw_tool_white_list_patcher.stop)
-
         get_bmc_address_patcher = mock.patch("charm.get_bmc_address", return_value="127.0.0.1")
         get_bmc_address_patcher.start()
         self.addCleanup(get_bmc_address_patcher.stop)
 
-        bmc_hw_verifier_patcher = mock.patch(
-            "charm.bmc_hw_verifier",
+        get_charm_hw_tool_enable_list_patcher = mock.patch(
+            "charm.get_hw_tool_enable_list",
             return_value=[HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
         )
-        bmc_hw_verifier_patcher.start()
-        self.addCleanup(bmc_hw_verifier_patcher.stop)
+        get_charm_hw_tool_enable_list_patcher.start()
+        self.addCleanup(get_charm_hw_tool_enable_list_patcher.stop)
 
         redfish_client_patcher = mock.patch("charm.redfish_client")
         redfish_client_patcher.start()
@@ -340,17 +336,14 @@ class TestExporterTemplate(unittest.TestCase):
         search_path = pathlib.Path(f"{__file__}/../../..").resolve()
         self.template = service.ExporterTemplate(search_path)
 
-    @mock.patch(
-        "service.get_hw_tool_white_list",
-        return_value=[HWTool.STORCLI, HWTool.SSACLI],
-    )
-    def test_render_config(self, mock_get_hw_tool_white_list):
+    def test_render_config(self):
         with mock.patch.object(self.template, "_install") as mock_install:
             self.template.render_config(
                 port="80",
                 level="info",
                 redfish_conn_params={},
                 collect_timeout=10,
+                hw_tools=[HWTool.STORCLI, HWTool.SSACLI],
             )
             mock_install.assert_called_with(
                 EXPORTER_CONFIG_PATH,
@@ -368,11 +361,7 @@ class TestExporterTemplate(unittest.TestCase):
                 mode=0o600,
             )
 
-    @mock.patch(
-        "service.get_hw_tool_white_list",
-        return_value=[HWTool.REDFISH],
-    )
-    def test_render_config_redfish(self, mock_get_hw_tool_white_list):
+    def test_render_config_redfish(self):
         with mock.patch.object(self.template, "_install") as mock_install:
             self.template.render_config(
                 port="80",
@@ -384,6 +373,7 @@ class TestExporterTemplate(unittest.TestCase):
                     "password": "default_pwd",
                     "timeout": 10,
                 },
+                hw_tools=[HWTool.REDFISH],
             )
             mock_install.assert_called_with(
                 EXPORTER_CONFIG_PATH,

@@ -4,7 +4,7 @@ import os
 from functools import wraps
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from charms.operator_libs_linux.v1 import systemd
 from jinja2 import Environment, FileSystemLoader
@@ -16,8 +16,8 @@ from config import (
     EXPORTER_NAME,
     EXPORTER_SERVICE_PATH,
     EXPORTER_SERVICE_TEMPLATE,
+    HWTool,
 )
-from hw_tools import get_hw_tool_white_list
 
 logger = getLogger(__name__)
 
@@ -93,11 +93,16 @@ class ExporterTemplate:
             logger.info("Removing file '%s' - Done.", path)
         return success
 
+    # pylint: disable=too-many-arguments
     def render_config(
-        self, port: int, level: str, collect_timeout: int, redfish_conn_params: dict
+        self,
+        port: int,
+        level: str,
+        collect_timeout: int,
+        redfish_conn_params: dict,
+        hw_tools: List[HWTool],
     ) -> bool:
         """Render and install exporter config file."""
-        hw_tools = get_hw_tool_white_list()
         collectors = []
         for tool in hw_tools:
             collector = EXPORTER_COLLECTOR_MAPPING.get(tool)
@@ -138,8 +143,14 @@ class Exporter:
         self.charm_dir = charm_dir
         self.template = ExporterTemplate(charm_dir)
 
+    # pylint: disable=too-many-arguments
     def install(
-        self, port: int, level: str, redfish_conn_params: dict, collect_timeout: int
+        self,
+        port: int,
+        level: str,
+        redfish_conn_params: dict,
+        collect_timeout: int,
+        hw_tool_enable_list: List,
     ) -> bool:
         """Install the exporter."""
         logger.info("Installing %s.", EXPORTER_NAME)
@@ -148,6 +159,7 @@ class Exporter:
             level=level,
             redfish_conn_params=redfish_conn_params,
             collect_timeout=collect_timeout,
+            hw_tools=hw_tool_enable_list,
         )
         success = self.template.render_service(str(self.charm_dir), str(EXPORTER_CONFIG_PATH))
         if not success:

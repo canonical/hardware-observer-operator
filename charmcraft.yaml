@@ -24,3 +24,21 @@ bases:
         channel: "20.04"
         architectures:
           - amd64
+
+actions:
+  redetect-hardware:
+    description: >
+      Redetect the hardware on the device and provide an option to
+      reinitialize the charm.
+
+      By default, this will only show the current hardware tool list and compare with new
+      detection.
+      The exporter service(s) will be reconfigured and restarted if option
+      `apply` is provided.
+    params:
+      apply:
+        type: boolean
+        description: |
+          Use the re-detected list of hardware tools as the new enable-list to reconfigure
+          and restart the exporter.
+        default: false

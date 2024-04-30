@@ -97,8 +97,8 @@ def hwinfo(*args: str) -> t.Dict[str, str]:
     if "start debug info" in output.splitlines()[0]:
         output = output.split("=========== end debug info ============")[1]
 
-    hardwares: t.Dict[str, str] = {}
+    hardware: t.Dict[str, str] = {}
     for item in output.split("\n\n"):
         key = item.splitlines()[0].strip()
-        hardwares[key] = item
-    return hardwares
+        hardware[key] = item
+    return hardware
