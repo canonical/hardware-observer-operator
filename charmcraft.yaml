@@ -31,7 +31,7 @@ actions:
       Redetect the hardware on the device and provide an option to
       reinitialize the charm.
 
-      Default will only show the current hardward tool list and compare with new
+      By default, this will only show the current hardware tool list and compare with new
       detection.
       The exporter service(s) will be reconfigured and restarted if option
       `apply` is provided.
