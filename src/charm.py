@@ -182,10 +182,6 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
             return
 
-        if self.too_many_cos_agent_relations:
-            self.model.unit.status = BlockedStatus("Cannot relate to more than one grafana-agent")
-            return
-
         config_valid, config_valid_message = self.validate_exporter_configs()
         if not config_valid:
             self.model.unit.status = BlockedStatus(config_valid_message)
@@ -322,12 +318,7 @@ class HardwareObserverCharm(ops.CharmBase):
     @property
     def exporter_enabled(self) -> bool:
         """Return True if cos-agent relation is present."""
-        return self.num_cos_agent_relations != 0
-
-    @property
-    def too_many_cos_agent_relations(self) -> bool:
-        """Return True if there're more than one cos-agent relation."""
-        return self.num_cos_agent_relations > 1
+        return self.num_cos_agent_relations == 1
 
     @property
     def redfish_conn_params_valid(self) -> Optional[bool]:
