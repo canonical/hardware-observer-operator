@@ -141,7 +141,7 @@ class HardwareObserverCharm(ops.CharmBase):
         self.model.unit.status = MaintenanceStatus("Installing exporter...")
         success = self.exporter.install(
             int(self.model.config["exporter-port"]),
-            self.model.config["exporter-log-level"],
+            str(self.model.config["exporter-log-level"]),
             self.get_redfish_conn_params(enabled_hw_tool_list),
             int(self.model.config["collect-timeout"]),
             enabled_hw_tool_list,
@@ -239,7 +239,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
             success = self.exporter.template.render_config(
                 port=int(self.model.config["exporter-port"]),
-                level=self.model.config["exporter-log-level"],
+                level=str(self.model.config["exporter-log-level"]),
                 redfish_conn_params=self.get_redfish_conn_params(
                     self.get_hw_tools_from_values(self.get_enabled_hw_tool_list_values())
                 ),
@@ -297,7 +297,7 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.error("Invalid exporter-port: port must be in [1, 65535].")
             return False, "Invalid config: 'exporter-port'"
 
-        level = self.model.config["exporter-log-level"]
+        level = str(self.model.config["exporter-log-level"])
         allowed_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if level.upper() not in allowed_choices:
             logger.error(
