@@ -30,6 +30,19 @@ class HardwareExporterSettings(ExporterSettings):
 HARDWARE_EXPORTER_SETTINGS = HardwareExporterSettings()
 
 
+class SmartCtlExporterSettings(ExporterSettings):
+    """Constant settings for SmartCtl Exporter."""
+
+    name: str = "smartctl-exporter"
+    config_path: Path = Path(f"/etc/{name}-config.yaml")
+    service_path: Path = Path(f"/etc/systemd/system/{name}.service")
+    config_template: str = f"{name}-config.yaml.j2"
+    service_template: str = f"{name}.service.j2"
+    crash_msg: str = "SmartCtl exporter crashed unexpectedly, please refer to systemd logs..."
+
+SMARTCTL_EXPORTER_SETTINGS = SmartCtlExporterSettings()
+
+
 class SystemVendor(str, Enum):
     """Different hardware system vendor."""
 
@@ -57,6 +70,8 @@ class HWTool(str, Enum):
     IPMI_SEL = "ipmi_sel"
     IPMI_SENSOR = "ipmi_sensor"
     REDFISH = "redfish"
+    SMARTCTL = "smartctl"
+    SMARTCTL_EXPORTER = "smartctl_exporter"
 
 
 TPR_RESOURCES: t.Dict[HWTool, str] = {
