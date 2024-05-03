@@ -1,25 +1,38 @@
-# This is a template `release.yaml` file for ops charms
-# This file is managed by bootstack-charms-spec and should not be modified
-# within individual charm repos. https://launchpad.net/bootstack-charms-spec
-
 name: Release to Edge
 
 on:
   push:
-    branches: [master, main]
-
-concurrency:
-  group: release
-  cancel-in-progress: true
+    branches: [ main ]
+  release:
+    types: [ published ]
 
 jobs:
   check:
     uses: ./.github/workflows/check.yaml
+    secrets: inherit
 
   release:
     needs: check
-    uses: canonical/bootstack-actions/.github/workflows/charm-release.yaml@v2
-    secrets: inherit
-    with:
-      channel: "latest/edge"
-      upload-image: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Initialize lxd  # This should dropped once it's implemented on charming-actions itself. https://github.com/canonical/charming-actions/issues/140
+        if: ${{ inputs.destructive-mode == false }}
+        run: |
+          sudo lxd init --auto
+          # The following is needed to fix network error when creating new base instance on lxd
+          sudo chmod a+wr /var/snap/lxd/common/lxd/unix.socket
+          lxc network set lxdbr0 ipv6.address none
+          sudo usermod -a -G lxd $USER
+          if [[ $(cat /etc/os-release | grep VERSION_CODENAME) == *"jammy"* ]]; then
+            sudo iptables -F FORWARD
+            sudo iptables -P FORWARD ACCEPT
+          fi
+      - name: Upload charm to charmhub
+        uses: canonical/charming-actions/upload-charm@2.4.0
+        with:
+          credentials: "${{ secrets.CHARMHUB_TOKEN }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          channel: "latest/edge"
+          destructive-mode: false
