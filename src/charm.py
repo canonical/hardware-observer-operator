@@ -12,8 +12,8 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
-from hw_tools import get_hw_tool_enable_list, HWTool, HWToolHelper
-from service import BaseExporter, HardwareExporter, SmartCtlExporter, ExporterError
+from hw_tools import HWTool, HWToolHelper, get_hw_tool_enable_list
+from service import BaseExporter, ExporterError, HardwareExporter, SmartCtlExporter
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +66,17 @@ class HardwareObserverCharm(ops.CharmBase):
 
     @property
     def exporters(self) -> List[BaseExporter]:
+        """Return list of exporters base on detected hardware."""
         exporters: List[BaseExporter] = []
-        enable_hw_tool_list = self.get_hw_tools_from_values(self.get_enabled_hw_tool_list_values())
+        enable_hw_tool_list = self.get_enable_hw_tools()
         if len(set(enable_hw_tool_list) & set(HardwareExporter.hw_tools())) > 0:
-                exporters.append(HardwareExporter(self.charm_dir, self.model.config, list(self._stored.enabled_hw_tool_list_values)))
+            exporters.append(
+                HardwareExporter(
+                    self.charm_dir,
+                    self.model.config,
+                    self.get_enable_hw_tools(),
+                )
+            )
 
         if len(set(enable_hw_tool_list) & set(SmartCtlExporter.hw_tools())) > 0:
             exporters.append(SmartCtlExporter(self.charm_dir, self.model.config))
@@ -88,10 +95,14 @@ class HardwareObserverCharm(ops.CharmBase):
         """Get HWTool objects from hw tool values."""
         return [HWTool(value) for value in hw_tool_values]
 
+    def get_enable_hw_tools(self) -> List[HWTool]:
+        """Get enable HWTools."""
+        enabled_hw_tool_list_values = self.get_enabled_hw_tool_list_values()
+        return self.get_hw_tools_from_values(enabled_hw_tool_list_values)
+
     def _on_redetect_hardware(self, event: ops.ActionEvent) -> None:
         """Detect hardware tool list and option to rerun the install hook."""
-        current_hw_tools_value_list = self.get_enabled_hw_tool_list_values()
-        current_hw_tools_str_list = [str(tool) for tool in current_hw_tools_value_list]
+        current_hw_tools_str_list = self.get_enable_hw_tools()
         current_hw_tools_str_list.sort()
 
         detected_hw_tool_list = get_hw_tool_enable_list()
@@ -123,15 +134,14 @@ class HardwareObserverCharm(ops.CharmBase):
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
 
-        enabled_hw_tool_list_values = self.get_enabled_hw_tool_list_values()
-        enabled_hw_tool_list = self.get_hw_tools_from_values(enabled_hw_tool_list_values)
+        enabled_hw_tools = self.get_enable_hw_tools()
 
         msg: str
         resource_installed: bool
 
         # Install hw tools
         resource_installed, msg = self.hw_tool_helper.install(
-            self.model.resources, enabled_hw_tool_list
+            self.model.resources, enabled_hw_tools
         )
 
         self._stored.resource_installed = resource_installed
@@ -145,6 +155,7 @@ class HardwareObserverCharm(ops.CharmBase):
             exporter_install_ok = exporter.install()
             if not exporter_install_ok:
                 resource_installed = False
+                msg = f"Exporter {exporter.exporter_name} install failed"
                 break
 
         self._stored.resource_installed = resource_installed
@@ -161,7 +172,7 @@ class HardwareObserverCharm(ops.CharmBase):
         # Remove binary tool
         self.hw_tool_helper.remove(
             self.model.resources,
-            self.get_hw_tools_from_values(self.get_enabled_hw_tool_list_values()),
+            self.get_enable_hw_tools(),
         )
         self._stored.resource_installed = False
 
@@ -186,18 +197,13 @@ class HardwareObserverCharm(ops.CharmBase):
                 self.model.unit.status = BlockedStatus(config_valid_message)
                 return
 
-        hw_tool_ok, error_msg = self.hw_tool_helper.check_installed(
-            self.get_hw_tools_from_values(self.get_enabled_hw_tool_list_values())
-        )
+        hw_tool_ok, error_msg = self.hw_tool_helper.check_installed(self.get_enable_hw_tools())
         if not hw_tool_ok:
             self.model.unit.status = BlockedStatus(error_msg)
             return
 
         # Check health of all exporters
-        exporters_health = [
-            self._check_exporter_health(exporter)
-            for exporter in self.exporters
-        ]
+        exporters_health = [self._check_exporter_health(exporter) for exporter in self.exporters]
 
         if all(exporters_health):
             self.model.unit.status = ActiveStatus("Unit is ready")
@@ -205,7 +211,7 @@ class HardwareObserverCharm(ops.CharmBase):
     def _check_exporter_health(self, exporter: BaseExporter) -> bool:
         """Check exporter health."""
         if not exporter.check_health():
-            logger.warning(f"{exporter.exporter_name} - Exporter health check failed.")
+            logger.warning("%s - Exporter health check failed.", exporter.exporter_name)
             try:
                 exporter.restart()
             except ExporterError as e:
@@ -220,7 +226,7 @@ class HardwareObserverCharm(ops.CharmBase):
     def _on_config_changed(self, event: EventBase) -> None:
         """Reconfigure charm."""
         if not self._stored.resource_installed:  # type: ignore[truthy-function]
-            logging.info(  # type: ignore[unreachable]
+            logger.info(  # type: ignore[unreachable]
                 "Config changed called before install complete, deferring event: %s",
                 event.handle,
             )
@@ -231,17 +237,16 @@ class HardwareObserverCharm(ops.CharmBase):
             if not success:
                 self.model.unit.status = BlockedStatus(message)
                 return
-
-            if self._stored.resource_installed:
-                for exporter in self.exporters:
-                    success = exporter.render_config()
-                    if success:
-                        exporter.restart()
-                    else:
-                        message = (
-                            f"Failed to configure {exporter.exporter_name}, please check if the server is healthy."
-                        )
-                        self.model.unit.status = BlockedStatus(message)
+            for exporter in self.exporters:
+                success = exporter.render_config()
+                if success:
+                    exporter.restart()
+                else:
+                    message = (
+                        f"Failed to configure {exporter.exporter_name}, "
+                        "please check if the server is healthy."
+                    )
+                    self.model.unit.status = BlockedStatus(message)
 
         self._on_update_status(event)
 
@@ -256,16 +261,15 @@ class HardwareObserverCharm(ops.CharmBase):
 
         for exporter in self.exporters:
             exporter.enable_and_start()
-            logger.info(f"Enabled and started {exporter.exporter_name} service")
+            logger.info("Enabled and started %s service", exporter.exporter_name)
 
         self._on_update_status(event)
 
     def _on_cos_agent_relation_departed(self, event: EventBase) -> None:
         """Remove the exporters when relation departed."""
-
         for exporter in self.exporters:
             exporter.disable_and_stop()
-            logger.info(f"Disabled and stopped {exporter.exporter_name} service")
+            logger.info("Disabled and stopped %s service", exporter.exporter_name)
 
         self._on_update_status(event)
 
@@ -292,11 +296,6 @@ class HardwareObserverCharm(ops.CharmBase):
     def cos_agent_related(self) -> bool:
         """Return True if cos-agent relation is present."""
         return self.num_cos_agent_relations != 0
-
-    @property
-    def too_many_cos_agent_relations(self) -> bool:
-        """Return True if there're more than one cos-agent relation."""
-        return self.num_cos_agent_relations > 1
 
 
 if __name__ == "__main__":  # pragma: nocover

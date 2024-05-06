@@ -4,23 +4,24 @@ import os
 from abc import ABC, abstractmethod
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 from time import sleep
+from typing import Any, Dict, List, Optional, Tuple
 
 from charms.operator_libs_linux.v1 import systemd
 from jinja2 import Environment, FileSystemLoader
+from ops.model import ConfigData
 from redfish import redfish_client
 from redfish.rest.v1 import InvalidCredentialsError
 
 from config import (
     HARDWARE_EXPORTER_COLLECTOR_MAPPING,
-    ExporterSettings,
     HARDWARE_EXPORTER_SETTINGS,
     SMARTCTL_EXPORTER_SETTINGS,
+    ExporterSettings,
     HWTool,
 )
 from hardware import get_bmc_address
-from hw_tools import bmc_hw_verifier, SmartCtlExporterStrategy
+from hw_tools import SmartCtlExporterStrategy
 
 logger = getLogger(__name__)
 
@@ -35,10 +36,11 @@ class ExporterError(Exception):
 class BaseExporter(ABC):
     """A class representing the exporter and the metric endpoints."""
 
-    required_config: bool
-    exporter_config_path: Path
+    # pylint: disable=too-many-instance-attributes
 
-    def __init__(self, charm_dir: Path, config: Dict, settings: ExporterSettings) -> None:
+    exporter_config_path: Optional[Path] = None
+
+    def __init__(self, charm_dir: Path, config: ConfigData, settings: ExporterSettings) -> None:
         """Initialize the Exporter class."""
         self.charm_dir = charm_dir
 
@@ -50,7 +52,7 @@ class BaseExporter(ABC):
         self.exporter_service_path = self.settings.service_path
         self.exporter_name = self.settings.name
 
-        self.level = str(config["exporter-log-level"])
+        self.log_level = str(config["exporter-log-level"])
 
     @staticmethod
     @abstractmethod
@@ -59,7 +61,18 @@ class BaseExporter(ABC):
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
-        return True, ""
+        if not 1 <= self.port <= 65535:
+            logger.error("Invalid hardware-exporter-port: port must be in [1, 65535].")
+            return False, "Invalid config: 'hardware-exporter-port'"
+
+        allowed_log_level_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        if self.log_level.upper() not in allowed_log_level_choices:
+            logger.error(
+                "Invalid exporter-log-level: log-level must be in %s (case-insensitive).",
+                allowed_log_level_choices,
+            )
+            return False, "Invalid config: 'exporter-log-level'"
+        return True, "Exporter config is valid."
 
     def resources_exist(self) -> bool:
         """Return true if required resources exist.
@@ -73,10 +86,10 @@ class BaseExporter(ABC):
 
         Overwrite this method if there are resources need to be installed.
         """
-        logger.debug(f"No required resources for {self.__class__.__name__}")
+        logger.debug("No required resources for %s", self.__class__.__name__)
         return True
 
-    def  remove_resources(self) -> bool:
+    def remove_resources(self) -> bool:
         """Remove exporter resources.
 
         Overwrite this method if there are resources need to be removed.
@@ -85,7 +98,7 @@ class BaseExporter(ABC):
 
     def remove_config(self) -> bool:
         """Remove exporter configuration file."""
-        if self.required_config and self.exporter_config_path.exists():
+        if self.exporter_config_path is not None and self.exporter_config_path.exists():
             return remove_file(self.exporter_config_path)
         return True
 
@@ -124,7 +137,7 @@ class BaseExporter(ABC):
 
     def render_config(self) -> bool:
         """Render exporter config file.."""
-        if self.required_config:
+        if self.exporter_config_path is not None:
             content = self._render_config_content()
             return write_to_file(self.exporter_config_path, content, mode=0o600)
         return True
@@ -140,7 +153,7 @@ class BaseExporter(ABC):
     def verify_render_files_exist(self) -> bool:
         """Verify if service installation is done."""
         config_file_exists = True
-        if self.required_config:
+        if self.exporter_config_path is not None:
             config_file_exists = self.exporter_config_path.exists()
         service_file_exists = self.exporter_service_path.exists()
         return service_file_exists and config_file_exists
@@ -155,7 +168,8 @@ class BaseExporter(ABC):
             logger.error("Failed to install %s resources.", self.exporter_name)
             return False
         if not self.resources_exist():
-            logger.error(f"{self.exporter_name} resources are not installed properly.")
+            logger.error("%s resources are not installed properly.", self.exporter_name)
+            # pylint: disable=too-many-instance-attributes
             return False
 
         # Render config
@@ -171,14 +185,13 @@ class BaseExporter(ABC):
             return False
 
         if not self.verify_render_files_exist():
-            logger.error(f"{self.exporter_name} is not installed properly.")
+            logger.error("%s is not installed properly.", self.exporter_name)
             return False
 
         systemd.daemon_reload()
 
         logger.info("%s installed.", self.exporter_name)
         return True
-
 
     def uninstall(self) -> bool:
         """Uninstall the exporter."""
@@ -195,20 +208,20 @@ class BaseExporter(ABC):
 
     def restart(self) -> None:
         """Restart exporter service with retry."""
-        logger.info(f"Restarting exporter - {self.exporter_name}")
+        logger.info("Restarting exporter - %s", self.exporter_name)
         try:
             for i in range(1, self.settings.health_retry_count + 1):
                 logger.warning("Restarting exporter - %d retry", i)
                 self._restart()
                 sleep(self.settings.health_retry_timeout)
                 if self.check_active():
-                    logger.info(f"Exporter - {self.exporter_name} active after restart.")
+                    logger.info("Exporter - %s active after restart.", self.exporter_name)
                     break
             if not self.check_active():
-                logger.error(f"Failed to restart exporter - {self.exporter_name}.")
+                logger.error("Failed to restart exporter - %s.", self.exporter_name)
                 raise ExporterError()
         except Exception as err:  # pylint: disable=W0718
-            logger.error(f"Exporter {self.exporter_name} crashed unexpectedly: %s", err)
+            logger.error("Exporter %s crashed unexpectedly: %s", self.exporter_name, err)
             raise ExporterError() from err
 
 
@@ -255,13 +268,13 @@ class SmartCtlExporter(BaseExporter):
 
     required_config: bool = False
 
-    def __init__(self, charm_dir: Path, config: Dict) -> None:
+    def __init__(self, charm_dir: Path, config: ConfigData) -> None:
         """Initialize the Hardware Exporter class."""
         super().__init__(charm_dir, config, SMARTCTL_EXPORTER_SETTINGS)
 
         self.port = int(config["smartctl-exporter-port"])
         self.collect_timeout = int(config["collect-timeout"])
-        self.log_level = config["exporter-log-level"]
+        self.log_level = str(config["exporter-log-level"])
         self.strategy = SmartCtlExporterStrategy()
 
     @staticmethod
@@ -277,7 +290,7 @@ class SmartCtlExporter(BaseExporter):
         self.strategy.install()
         if restart:
             systemd.service_restart(self.exporter_name)
-        logger.debug(f"Finish install resources for {self.exporter_name}")
+        logger.debug("Finish install resources for %s", self.exporter_name)
         return True
 
     def resources_exist(self) -> bool:
@@ -293,7 +306,7 @@ class HardwareExporter(BaseExporter):
 
     required_config: bool = True
 
-    def __init__(self, charm_dir: Path, config: Dict, enabled_hw_tool_list_values: List) -> None:
+    def __init__(self, charm_dir: Path, config: ConfigData, enable_hw_tools: List[HWTool]) -> None:
         """Initialize the Hardware Exporter class."""
         super().__init__(charm_dir, config, HARDWARE_EXPORTER_SETTINGS)
 
@@ -301,7 +314,7 @@ class HardwareExporter(BaseExporter):
         self.exporter_config_path = self.settings.config_path
         self.port = int(config["hardware-exporter-port"])
 
-        self.enabled_hw_tool_list = [HWTool(value) for value in enabled_hw_tool_list_values]
+        self.enabled_hw_tool_list = enable_hw_tools
 
         self.redfish_conn_params = self.get_redfish_conn_params(config)
         self.collect_timeout = int(config["collect-timeout"])
@@ -315,10 +328,10 @@ class HardwareExporter(BaseExporter):
                 collectors += collector
         content = self.config_template.render(
             PORT=self.port,
-            LEVEL=self.level,
+            LEVEL=self.log_level,
             COLLECT_TIMEOUT=self.collect_timeout,
             COLLECTORS=collectors,
-            REDFISH_ENABLE=self.redfish_conn_params != {},
+            REDFISH_ENABLE=self.redfish_conn_params,
             REDFISH_HOST=self.redfish_conn_params.get("host", ""),
             REDFISH_USERNAME=self.redfish_conn_params.get("username", ""),
             REDFISH_PASSWORD=self.redfish_conn_params.get("password", ""),
@@ -338,17 +351,9 @@ class HardwareExporter(BaseExporter):
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
-        if not 1 <= self.port <= 65535:
-            logger.error("Invalid hardware-exporter-port: port must be in [1, 65535].")
-            return False, "Invalid config: 'hardware-exporter-port'"
-
-        allowed_level_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-        if self.level.upper() not in allowed_level_choices:
-            logger.error(
-                "Invalid exporter-log-level: level must be in %s (case-insensitive).",
-                allowed_level_choices,
-            )
-            return False, "Invalid config: 'exporter-log-level'"
+        valid, msg = super().validate_exporter_configs()
+        if not valid:
+            return valid, msg
 
         # Note we need to use `is False` because `None` means redfish is not
         # available.
@@ -375,8 +380,10 @@ class HardwareExporter(BaseExporter):
                 base_url=redfish_conn_params.get("host", ""),
                 username=redfish_conn_params.get("username", ""),
                 password=redfish_conn_params.get("password", ""),
-                timeout=redfish_conn_params.get("timeout", self.settings.redfish_timeout),
-                max_retry=self.settings.redfish_max_retry,
+                timeout=redfish_conn_params.get(
+                    "timeout", self.settings.redfish_timeout  # type: ignore
+                ),
+                max_retry=self.settings.redfish_max_retry,  # type: ignore
             )
             redfish_obj.login(auth="session")
         except InvalidCredentialsError as e:
@@ -394,7 +401,7 @@ class HardwareExporter(BaseExporter):
 
         return result
 
-    def get_redfish_conn_params(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def get_redfish_conn_params(self, config: ConfigData) -> Dict[str, Any]:
         """Get redfish connection parameters if redfish is available."""
         if HWTool.REDFISH not in self.enabled_hw_tool_list:
             logger.warning("Redfish unavailable, disregarding redfish config options...")

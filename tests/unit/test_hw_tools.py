@@ -1,6 +1,8 @@
 import stat
 import subprocess
+import tempfile
 import unittest
+from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
 
@@ -22,6 +24,7 @@ from checksum import (
 from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor, SystemVendor
 from hw_tools import (
     APTStrategyABC,
+    FailtoInstallResourceError,
     HWToolHelper,
     IPMIDCMIStrategy,
     IPMISELStrategy,
@@ -31,6 +34,8 @@ from hw_tools import (
     ResourceFileSizeZeroError,
     SAS2IRCUStrategy,
     SAS3IRCUStrategy,
+    SmartCtlExporterStrategy,
+    SmartCtlStrategy,
     SSACLIStrategy,
     StorCLIStrategy,
     StrategyABC,
@@ -40,6 +45,7 @@ from hw_tools import (
     bmc_hw_verifier,
     check_deb_pkg_installed,
     copy_to_snap_common_bin,
+    disk_hw_verifier,
     file_is_empty,
     get_hw_tool_enable_list,
     install_deb,
@@ -728,14 +734,123 @@ class TestIPMIDCMIStrategy(unittest.TestCase):
         mock_apt.remove_package.assert_not_called()
 
 
+class TestSmartCtlStrategy(unittest.TestCase):
+    @mock.patch("apt_helpers.get_candidate_version")
+    @mock.patch("apt_helpers.apt")
+    def test_install(self, mock_apt, mock_candidate_version):
+        strategy = SmartCtlStrategy()
+        mock_candidate_version.return_value = "some-candidate-version"
+        strategy.install()
+
+        mock_apt.add_package.assert_called_with(
+            "smartmontools", version="some-candidate-version", update_cache=False
+        )
+
+    @mock.patch("hw_tools.apt")
+    def test_remove(self, mock_apt):
+        strategy = SmartCtlStrategy()
+        strategy.remove()
+
+        mock_apt.remove_package.assert_not_called()
+
+    @mock.patch("hw_tools.check_deb_pkg_installed")
+    def test_check(self, mock_check_deb_method):
+        strategy = SmartCtlStrategy()
+        strategy.check()
+
+        mock_check_deb_method.assert_called_with("smartmontools")
+
+
+class TestSmartCtlExporterStrategy(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    @mock.patch("hw_tools.logger")
+    @mock.patch("hw_tools.requests.get")
+    @mock.patch("hw_tools.tarfile.open")
+    @mock.patch("hw_tools.make_executable")
+    def test_install_success(
+        self,
+        mock_make_executable,
+        mock_tar_open,
+        mock_requests_get,
+        mock_logger,
+    ):
+        strategy = SmartCtlExporterStrategy()
+        strategy._resource_dir = Path(self.temp_dir.name)
+        strategy._exporter_path = Path(self.temp_dir.name) / "smartctl_exporter"
+
+        mock_response = mock.MagicMock(status_code=HTTPStatus.OK)
+        mock_response.content = b"dummy content"
+        mock_requests_get.return_value = mock_response
+        mock_member = mock.MagicMock(name="member")
+        mock_member.name = "smartctl_exporter"
+        mock_member_file = mock.MagicMock()
+        mock_member_file.read.return_value = b"dummy content"
+        mock_tar_open.return_value.__enter__.return_value.getmembers.return_value = [mock_member]
+        mock_tar_open.return_value.__enter__.return_value.extractfile.return_value = (
+            mock_member_file  # noqa: E501
+        )
+
+        strategy.install()
+
+        mock_logger.debug.assert_called_with("Install SmartCtlExporter")
+        mock_requests_get.assert_called_with(strategy._release, timeout=60)
+        # mock_tar_open.assert_called_with(fileobj=BytesIO(b"dummy content"), mode="r:gz")
+        mock_make_executable.assert_called_with(strategy._exporter_path)
+        self.assertTrue(strategy._resource_dir.exists())
+
+    @mock.patch("hw_tools.logger")
+    @mock.patch("hw_tools.requests.get")
+    def test_install_failure(self, mock_requests_get, mock_logger):
+        strategy = SmartCtlExporterStrategy()
+        strategy._resource_dir = Path(self.temp_dir.name)
+        strategy._exporter_path = Path(self.temp_dir.name) / "smartctl_exporter"
+
+        mock_response = mock.MagicMock(status_code=HTTPStatus.NOT_FOUND)
+        mock_requests_get.return_value = mock_response
+
+        with self.assertRaises(FailtoInstallResourceError):
+            strategy.install()
+
+        mock_logger.debug.assert_called_with("Install SmartCtlExporter")
+
+    @mock.patch("hw_tools.logger")
+    @mock.patch("hw_tools.shutil.rmtree")
+    def test_remove(self, mock_shutil_rmtree, mock_logger):
+        strategy = SmartCtlExporterStrategy()
+
+        strategy.remove()
+
+        mock_logger.debug.assert_called_with("Remove SmartCtlExporter")
+        mock_shutil_rmtree.assert_called_with(strategy._resource_dir)
+
+    @mock.patch("hw_tools.logger")
+    def test_check(self, mock_logger):
+        strategy = SmartCtlExporterStrategy()
+        strategy._exporter_path = mock.MagicMock()
+        strategy._exporter_path.is_file.return_value = True
+
+        result = strategy.check()
+        self.assertTrue(result)
+
+        mock_logger.debug.assert_called_with("Check SmartCtlExporter resources")
+        strategy._exporter_path.is_file.assert_called()
+
+
+@mock.patch("hw_tools.disk_hw_verifier", return_value=[7, 8, 9])
 @mock.patch("hw_tools.bmc_hw_verifier", return_value=[1, 2, 3])
 @mock.patch("hw_tools.raid_hw_verifier", return_value=[4, 5, 6])
-def test_get_hw_tool_enable_list(mock_raid_verifier, mock_bmc_hw_verifier):
+def test_get_hw_tool_enable_list(mock_raid_verifier, mock_bmc_hw_verifier, mock_disk_hw_verifier):
     get_hw_tool_enable_list.cache_clear()
     output = get_hw_tool_enable_list()
     mock_raid_verifier.assert_called()
     mock_bmc_hw_verifier.assert_called()
-    assert output == [4, 5, 6, 1, 2, 3]
+    mock_disk_hw_verifier.assert_called()
+    assert output == [4, 5, 6, 1, 2, 3, 7, 8, 9]
 
 
 @mock.patch("hw_tools._raid_hw_verifier_hwinfo", return_value=set([4, 5, 6]))
@@ -851,6 +966,18 @@ def test_raid_hw_verifier_hwinfo(mock_hwinfo, hwinfo_output, expect):
     output = _raid_hw_verifier_hwinfo()
     case = unittest.TestCase()
     case.assertCountEqual(output, expect)
+
+
+class TestDiskHWVerifier(unittest.TestCase):
+    @mock.patch("hw_tools.lshw", return_value=[True])
+    def test_disk_available(self, mock_lshw):
+        tools = disk_hw_verifier()
+        self.assertEqual(tools, [HWTool.SMARTCTL])
+
+    @mock.patch("hw_tools.lshw", return_value=[])
+    def test_disk_not_available(self, mock_lshw):
+        tools = disk_hw_verifier()
+        self.assertEqual(tools, [])
 
 
 class TestIPMIHWVerifier(unittest.TestCase):

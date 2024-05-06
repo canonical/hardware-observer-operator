@@ -3,16 +3,16 @@
 Define strategy for install, remove and verifier for different hardware.
 """
 
-import logging
 import io
+import logging
 import os
 import shutil
 import stat
 import subprocess
 import tarfile
 from abc import ABCMeta, abstractmethod
-from http import HTTPStatus
 from functools import lru_cache
+from http import HTTPStatus
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
@@ -62,10 +62,12 @@ class ResourceFileSizeZeroError(Exception):
         """Init."""
         self.message = f"Tool: {tool} path: {path} size is zero"
 
+
 class FailtoInstallResourceError(Exception):
     """Exception raised when a hardware tool installation fails."""
 
     def __init__(self, tool: HWTool):
+        """Init."""
         super().__init__(f"Installation failed for tool: {tool}")
 
 
@@ -366,6 +368,7 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
         """Check package status."""
         return True
 
+
 class SmartCtlStrategy(APTStrategyABC):
     """Strategy for installing ipmi."""
 
@@ -384,22 +387,27 @@ class SmartCtlStrategy(APTStrategyABC):
         """Check package status."""
         return check_deb_pkg_installed(self.pkg)
 
+
 class SmartCtlExporterStrategy(StrategyABC):  # pylint: disable=R0903
     """Install smartctl exporter binary."""
 
     _name = HWTool.SMARTCTL_EXPORTER
 
     _resource_dir = Path("/opt/SmartCtlExporter/")
-    _release = "https://github.com/prometheus-community/smartctl_exporter/releases/download/v0.12.0/smartctl_exporter-0.12.0.linux-amd64.tar.gz"
+    _release = (
+        "https://github.com/prometheus-community/"
+        "smartctl_exporter/releases/download/v0.12.0/smartctl_exporter-0.12.0.linux-amd64.tar.gz"
+    )
     _exporter_name = "smartctl_exporter"
     _exporter_path = Path(_resource_dir / "smartctl_exporter")
 
     def install(self) -> None:
+        """Install exporter binary from internet."""
         logger.debug("Install SmartCtlExporter")
         self._resource_dir.mkdir(parents=True, exist_ok=True)
 
         success = False
-        resp = requests.get(self._release)
+        resp = requests.get(self._release, timeout=60)
         if resp.status_code == HTTPStatus.OK:
             fileobj = io.BytesIO(resp.content)
             with tarfile.open(fileobj=fileobj, mode="r:gz") as tar:
@@ -407,21 +415,23 @@ class SmartCtlExporterStrategy(StrategyABC):  # pylint: disable=R0903
                     if member.name.endswith(self._exporter_name):
                         with open(self._exporter_path, "wb") as outfile:
                             member_file = tar.extractfile(member)
-                            outfile.write(member_file.read())
-                            success = True
+                            if member_file:
+                                outfile.write(member_file.read())
+                                success = True
                         if success:
                             make_executable(self._exporter_path)
         if not success:
             raise FailtoInstallResourceError(self._name)
 
     def remove(self) -> None:
+        """Remove downloaded exporter binary."""
         logger.debug("Remove SmartCtlExporter")
         shutil.rmtree(self._resource_dir)
 
     def check(self) -> bool:
         """Check package status."""
         logger.debug("Check SmartCtlExporter resources")
-        return Path(self._exporter_path).is_file()
+        return self._exporter_path.is_file()
 
 
 def _raid_hw_verifier_hwinfo() -> Set[HWTool]:
