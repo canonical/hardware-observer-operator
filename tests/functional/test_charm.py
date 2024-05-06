@@ -542,10 +542,10 @@ class TestCharm:
         assert results.get("stdout").rstrip("\n") == expected_file_mode
 
     async def test_config_changed_port(self, app, unit, ops_test):
-        """Test changing the config option: exporter-port."""
+        """Test changing the config option: hardware-exporter-port."""
         new_port = "10001"
         await asyncio.gather(
-            app.set_config({"exporter-port": new_port}),
+            app.set_config({"hardware-exporter-port": new_port}),
             ops_test.model.wait_for_idle(apps=[APP_NAME]),
         )
 
@@ -555,7 +555,7 @@ class TestCharm:
         config = yaml.safe_load(results.get("stdout").strip())
         assert config["port"] == int(new_port)
 
-        await app.reset_config(["exporter-port"])
+        await app.reset_config(["hardware-exporter-port"])
 
     async def test_config_changed_log_level(self, app, unit, ops_test):
         """Test changing the config option: exporter-log-level."""
