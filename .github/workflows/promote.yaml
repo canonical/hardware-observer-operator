@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       destination-channel:
-        description: 'Destination Channel'
+        description: 'Destination Channel, e.g. latest/candidate'
         required: true
       origin-channel:
-        description: 'Origin Channel'
+        description: 'Origin Channel, e.g. latest/edge'
         required: true
 
 jobs:

@@ -18,21 +18,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Initialize lxd  # This should dropped once it's implemented on charming-actions itself. https://github.com/canonical/charming-actions/issues/140
-        if: ${{ inputs.destructive-mode == false }}
-        run: |
-          sudo lxd init --auto
-          # The following is needed to fix network error when creating new base instance on lxd
-          sudo chmod a+wr /var/snap/lxd/common/lxd/unix.socket
-          lxc network set lxdbr0 ipv6.address none
-          sudo usermod -a -G lxd $USER
-          if [[ $(cat /etc/os-release | grep VERSION_CODENAME) == *"jammy"* ]]; then
-            sudo iptables -F FORWARD
-            sudo iptables -P FORWARD ACCEPT
-          fi
+        uses: canonical/setup-lxd@v0.1.1
       - name: Upload charm to charmhub
         uses: canonical/charming-actions/upload-charm@2.4.0
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
           channel: "latest/edge"
+          # Note(rgildein): Right now we are not using destructive-mode, since our charmcraft.yaml is designed with a single build-on and the ability to run-on multiple bases. Running with destructive-mode would require aligning the base defined in this job with the one defined in charmcraft.yaml (build-on).
           destructive-mode: false
