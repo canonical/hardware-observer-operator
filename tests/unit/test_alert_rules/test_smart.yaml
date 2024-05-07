@@ -1,0 +1,65 @@
+rule_files:
+  - ../../../src/prometheus_alert_rules/smart.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_critical_warning{device="sda", instance="ubuntu-0"}'
+        values: '1x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: SmartctlCriticalWarning
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-0
+              device: sda
+            exp_annotations:
+              summary: SMARTCTL critical warning. (instance ubuntu-0)
+              description: |
+                Critical warnings present for the state of the controller.
+                  VALUE = 1
+                  LABELS = map[__name__:smartctl_device_critical_warning device:sda instance:ubuntu-0]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_smart_status{device="sda", instance="ubuntu-1"}'
+        values: '0x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: SmartctlDeviceSmartStatusFail
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-1
+              device: sda
+            exp_annotations:
+              summary: SMART status for device is 0. (instance ubuntu-1)
+              description: |
+                SMART status for a device is 0.
+                  VALUE = 0
+                  LABELS = map[__name__:smartctl_device_smart_status device:sda instance:ubuntu-1]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_smartctl_exit_status{device="sda", instance="ubuntu-2"}'
+        values: '2x15'
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: SmartctlExitStatusFail
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-2
+              device: sda
+            exp_annotations:
+              summary: SMARTCTL exit status is bad. (instance ubuntu-2)
+              description: |
+                SMARTCTL exit status for a device is not 0.
+                  VALUE = 2
+                  LABELS = map[__name__:smartctl_device_smartctl_exit_status device:sda instance:ubuntu-2]
