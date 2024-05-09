@@ -11,14 +11,14 @@ tests:
 
     alert_rule_test:
       - eval_time: 0m
-        alertname: SmartctlCriticalWarning
+        alertname: SMARTCriticalWarning
         exp_alerts:
           - exp_labels:
               severity: critical
               instance: ubuntu-0
               device: sda
             exp_annotations:
-              summary: SMARTCTL critical warning. (instance ubuntu-0)
+              summary: SMART controller has a warning that is critical. (instance ubuntu-0)
               description: |
                 Critical warnings present for the state of the controller.
                   VALUE = 1
@@ -31,7 +31,7 @@ tests:
 
     alert_rule_test:
       - eval_time: 0m
-        alertname: SmartctlDeviceSmartStatusFail
+        alertname: SMARTDeviceSmartStatusFail
         exp_alerts:
           - exp_labels:
               severity: critical
@@ -51,7 +51,7 @@ tests:
 
     alert_rule_test:
       - eval_time: 0m
-        alertname: SmartctlExitStatusFail
+        alertname: SMARTExitStatusFail
         exp_alerts:
           - exp_labels:
               severity: warning

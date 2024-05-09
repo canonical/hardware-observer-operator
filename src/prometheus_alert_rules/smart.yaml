@@ -2,19 +2,19 @@ groups:
 - name: SMART
   rules:
 
-  - alert: SmartctlCriticalWarning
+  - alert: SMARTCriticalWarning
     expr: smartctl_device_critical_warning > 0
     for: 0m
     labels:
       severity: critical
     annotations:
-      summary: SMARTCTL critical warning. (instance {{ $labels.instance }})
+      summary: SMART controller has a warning that is critical. (instance {{ $labels.instance }})
       description: |
         Critical warnings present for the state of the controller.
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
 
-  - alert: SmartctlDeviceSmartStatusFail
+  - alert: SMARTDeviceSmartStatusFail
     expr: smartctl_device_smart_status == 0
     for: 0m
     labels:
@@ -26,7 +26,7 @@ groups:
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
 
-  - alert: SmartctlExitStatusFail
+  - alert: SMARTExitStatusFail
     expr: smartctl_device_smartctl_exit_status != 0
     for: 0m
     labels:
