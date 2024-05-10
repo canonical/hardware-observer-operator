@@ -57,13 +57,13 @@ class BaseExporter(ABC):
     @staticmethod
     @abstractmethod
     def hw_tools() -> List[HWTool]:
-        """Return list of watch hardware tool."""
+        """Return list hardware tools to watch."""
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
         if not 1 <= self.port <= 65535:
-            logger.error("Invalid hardware-exporter-port: port must be in [1, 65535].")
-            return False, "Invalid config: 'hardware-exporter-port'"
+            logger.error("Invalid exporter port: port must be in [1, 65535].")
+            return False, "Invalid config: exporter's port"
 
         allowed_log_level_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if self.log_level.upper() not in allowed_log_level_choices:
@@ -196,10 +196,10 @@ class BaseExporter(ABC):
     def uninstall(self) -> bool:
         """Uninstall the exporter."""
         logger.info("Uninstalling %s.", self.exporter_name)
-        service_success = self.remove_service()
-        config_success = self.render_config()
-        resources_success = self.remove_resources()
-        if not (service_success and config_success and resources_success):
+        service_removed = self.remove_service()
+        config_removed = self.render_config()
+        resources_removed = self.remove_resources()
+        if not (service_removed and config_removed and resources_removed):
             logger.error("Failed to uninstall %s.", self.exporter_name)
             return False
         systemd.daemon_reload()
@@ -279,7 +279,7 @@ class SmartCtlExporter(BaseExporter):
 
     @staticmethod
     def hw_tools() -> List[HWTool]:
-        """Return list of watch hardware tool."""
+        """Return list hardware tools to watch."""
         return [HWTool.SMARTCTL]
 
     def install_resources(self) -> bool:
@@ -341,13 +341,13 @@ class HardwareExporter(BaseExporter):
 
     def render_service(self) -> bool:
         """Render required files for service."""
-        service_success = self._render_service(
+        service_rendered = self._render_service(
             {
                 "CHARMDIR": str(self.charm_dir),
                 "CONFIG_FILE": str(self.exporter_config_path),
             }
         )
-        return service_success
+        return service_rendered
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
@@ -415,7 +415,7 @@ class HardwareExporter(BaseExporter):
 
     @staticmethod
     def hw_tools() -> List[HWTool]:
-        """Return list of watch hardware tool."""
+        """Return list hardware tools to watch."""
         return [
             HWTool.STORCLI,
             HWTool.SSACLI,

@@ -66,7 +66,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
     @property
     def exporters(self) -> List[BaseExporter]:
-        """Return list of exporters base on detected hardware."""
+        """Return list of exporters based on detected hardware."""
         exporters: List[BaseExporter] = []
         enable_hw_tool_list = self.get_enable_hw_tools()
         if len(set(enable_hw_tool_list) & set(HardwareExporter.hw_tools())) > 0:
@@ -150,7 +150,7 @@ class HardwareObserverCharm(ops.CharmBase):
             self.model.unit.status = BlockedStatus(msg)
             return
 
-        # Install exporters service and resources
+        # Install exporter services and resources
         for exporter in self.exporters:
             exporter_install_ok = exporter.install()
             if not exporter_install_ok:
