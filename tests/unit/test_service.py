@@ -210,7 +210,7 @@ class TestBaseExporter(unittest.TestCase):
     def test_validate_exporter_config_failed_port(self):
         self.exporter.port = 70000
         self.assertEqual(
-            (False, "Invalid config: 'hardware-exporter-port'"),
+            (False, "Invalid config: exporter's port"),
             self.exporter.validate_exporter_configs(),
         )
 

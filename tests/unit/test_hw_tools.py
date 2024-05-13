@@ -24,7 +24,6 @@ from checksum import (
 from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor, SystemVendor
 from hw_tools import (
     APTStrategyABC,
-    FailtoInstallResourceError,
     HWToolHelper,
     IPMIDCMIStrategy,
     IPMISELStrategy,
@@ -32,6 +31,7 @@ from hw_tools import (
     PercCLIStrategy,
     ResourceChecksumError,
     ResourceFileSizeZeroError,
+    ResourceInstallationError,
     SAS2IRCUStrategy,
     SAS3IRCUStrategy,
     SmartCtlExporterStrategy,
@@ -764,6 +764,7 @@ class TestSmartCtlStrategy(unittest.TestCase):
 class TestSmartCtlExporterStrategy(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.temp_dir.name)
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -780,8 +781,8 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
         mock_logger,
     ):
         strategy = SmartCtlExporterStrategy()
-        strategy._resource_dir = Path(self.temp_dir.name)
-        strategy._exporter_path = Path(self.temp_dir.name) / "smartctl_exporter"
+        strategy._resource_dir = self.tmp_path
+        strategy._exporter_path = self.tmp_path / "smartctl_exporter"
 
         mock_response = mock.MagicMock(status_code=HTTPStatus.OK)
         mock_response.content = b"dummy content"
@@ -807,13 +808,13 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
     @mock.patch("hw_tools.requests.get")
     def test_install_failure(self, mock_requests_get, mock_logger):
         strategy = SmartCtlExporterStrategy()
-        strategy._resource_dir = Path(self.temp_dir.name)
-        strategy._exporter_path = Path(self.temp_dir.name) / "smartctl_exporter"
+        strategy._resource_dir = self.tmp_path
+        strategy._exporter_path = self.tmp_path / "smartctl_exporter"
 
         mock_response = mock.MagicMock(status_code=HTTPStatus.NOT_FOUND)
         mock_requests_get.return_value = mock_response
 
-        with self.assertRaises(FailtoInstallResourceError):
+        with self.assertRaises(ResourceInstallationError):
             strategy.install()
 
         mock_logger.debug.assert_called_with("Install SmartCtlExporter")

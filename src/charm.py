@@ -69,7 +69,7 @@ class HardwareObserverCharm(ops.CharmBase):
         """Return list of exporters based on detected hardware."""
         exporters: List[BaseExporter] = []
         enable_hw_tool_list = self.get_enable_hw_tools()
-        if len(set(enable_hw_tool_list) & set(HardwareExporter.hw_tools())) > 0:
+        if set(enable_hw_tool_list) & set(HardwareExporter.hw_tools()):
             exporters.append(
                 HardwareExporter(
                     self.charm_dir,
@@ -78,7 +78,7 @@ class HardwareObserverCharm(ops.CharmBase):
                 )
             )
 
-        if len(set(enable_hw_tool_list) & set(SmartCtlExporter.hw_tools())) > 0:
+        if set(enable_hw_tool_list) & set(SmartCtlExporter.hw_tools()):
             exporters.append(SmartCtlExporter(self.charm_dir, self.model.config))
 
         return exporters
@@ -155,14 +155,11 @@ class HardwareObserverCharm(ops.CharmBase):
             exporter_install_ok = exporter.install()
             if not exporter_install_ok:
                 resource_installed = False
+                self._stored.resource_installed = resource_installed
                 msg = f"Exporter {exporter.exporter_name} install failed"
-                break
-
-        self._stored.resource_installed = resource_installed
-        if not resource_installed:
-            logger.warning(msg)
-            self.model.unit.status = BlockedStatus(msg)
-            return
+                logger.warning(msg)
+                self.model.unit.status = BlockedStatus(msg)
+                return
 
         self._on_update_status(event)
 

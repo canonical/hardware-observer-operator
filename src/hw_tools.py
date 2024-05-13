@@ -63,7 +63,7 @@ class ResourceFileSizeZeroError(Exception):
         self.message = f"Tool: {tool} path: {path} size is zero"
 
 
-class FailtoInstallResourceError(Exception):
+class ResourceInstallationError(Exception):
     """Exception raised when a hardware tool installation fails."""
 
     def __init__(self, tool: HWTool):
@@ -311,7 +311,7 @@ class SSACLIStrategy(APTStrategyABC):
         apt.add_package(self.pkg, update_cache=True)
 
     def remove(self) -> None:
-        # Skip removing because we afriad this cause dependency error
+        # Skip removing because this may cause dependency error
         # for other services on the same machine.
         logger.info("SSACLIStrategy skip removing %s", self.pkg)
 
@@ -329,7 +329,7 @@ class IPMIStrategy(APTStrategyABC):
         apt_helpers.add_pkg_with_candidate_version(self.pkg)
 
     def remove(self) -> None:
-        # Skip removing because we afriad this cause dependency error
+        # Skip removing because this may cause dependency error
         # for other services on the same machine.
         logger.info("%s skip removing %s", self._name, self.pkg)
 
@@ -379,7 +379,7 @@ class SmartCtlStrategy(APTStrategyABC):
         apt_helpers.add_pkg_with_candidate_version(self.pkg)
 
     def remove(self) -> None:
-        # Skip removing because we afriad this cause dependency error
+        # Skip removing because this may cause dependency error
         # for other services on the same machine.
         logger.info("%s skip removing %s", self._name, self.pkg)
 
@@ -421,7 +421,7 @@ class SmartCtlExporterStrategy(StrategyABC):  # pylint: disable=R0903
                         if success:
                             make_executable(self._exporter_path)
         if not success:
-            raise FailtoInstallResourceError(self._name)
+            raise ResourceInstallationError(self._name)
 
     def remove(self) -> None:
         """Remove downloaded exporter binary."""
@@ -579,9 +579,9 @@ def bmc_hw_verifier() -> List[HWTool]:
 
 
 def disk_hw_verifier() -> List[HWTool]:
-    """Verify if the disk is exists on the machine."""
+    """Verify if the disk exists on the machine."""
     lshw_storage = lshw(class_filter="disk")
-    if len(lshw_storage) > 0:
+    if lshw_storage:
         return [HWTool.SMARTCTL]
     return []
 

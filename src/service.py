@@ -197,7 +197,7 @@ class BaseExporter(ABC):
         """Uninstall the exporter."""
         logger.info("Uninstalling %s.", self.exporter_name)
         service_removed = self.remove_service()
-        config_removed = self.render_config()
+        config_removed = self.remove_config()
         resources_removed = self.remove_resources()
         if not (service_removed and config_removed and resources_removed):
             logger.error("Failed to uninstall %s.", self.exporter_name)
