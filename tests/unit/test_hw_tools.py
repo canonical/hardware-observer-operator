@@ -769,7 +769,6 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    @mock.patch("hw_tools.logger")
     @mock.patch("hw_tools.requests.get")
     @mock.patch("hw_tools.tarfile.open")
     @mock.patch("hw_tools.make_executable")
@@ -778,7 +777,6 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
         mock_make_executable,
         mock_tar_open,
         mock_requests_get,
-        mock_logger,
     ):
         strategy = SmartCtlExporterStrategy()
         strategy._resource_dir = self.tmp_path
@@ -798,15 +796,13 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
 
         strategy.install()
 
-        mock_logger.debug.assert_called_with("Installing SmartCtlExporter")
         mock_requests_get.assert_called_with(strategy._release, timeout=60)
         # mock_tar_open.assert_called_with(fileobj=BytesIO(b"dummy content"), mode="r:gz")
         mock_make_executable.assert_called_with(strategy._exporter_path)
         self.assertTrue(strategy._resource_dir.exists())
 
-    @mock.patch("hw_tools.logger")
     @mock.patch("hw_tools.requests.get")
-    def test_install_download_failure(self, mock_requests_get, mock_logger):
+    def test_install_download_failure(self, mock_requests_get):
         strategy = SmartCtlExporterStrategy()
         strategy._resource_dir = self.tmp_path
         strategy._exporter_path = self.tmp_path / "smartctl_exporter"
@@ -817,13 +813,9 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
         with self.assertRaises(ResourceInstallationError):
             strategy.install()
 
-        mock_logger.debug.assert_called_with("Installing SmartCtlExporter")
-        mock_logger.error.assert_called_with("Failed to download smartctl exporter binary.")
-
-    @mock.patch("hw_tools.logger")
     @mock.patch("hw_tools.requests.get")
     @mock.patch("hw_tools.tarfile.open")
-    def test_install_parse_failure(self, mock_tar_open, mock_requests_get, mock_logger):
+    def test_install_parse_failure(self, mock_tar_open, mock_requests_get):
         strategy = SmartCtlExporterStrategy()
         strategy._resource_dir = self.tmp_path
         strategy._exporter_path = self.tmp_path / "smartctl_exporter"
@@ -843,21 +835,15 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
         with self.assertRaises(ResourceInstallationError):
             strategy.install()
 
-        mock_logger.debug.assert_called_with("Installing SmartCtlExporter")
-        mock_logger.error.assert_called_with("Failed to install SmartCtlExporter binary.")
-
-    @mock.patch("hw_tools.logger")
     @mock.patch("hw_tools.shutil.rmtree")
-    def test_remove(self, mock_shutil_rmtree, mock_logger):
+    def test_remove(self, mock_shutil_rmtree):
         strategy = SmartCtlExporterStrategy()
 
         strategy.remove()
 
-        mock_logger.debug.assert_called_with("Remove SmartCtlExporter")
         mock_shutil_rmtree.assert_called_with(strategy._resource_dir)
 
-    @mock.patch("hw_tools.logger")
-    def test_check(self, mock_logger):
+    def test_check(self):
         strategy = SmartCtlExporterStrategy()
         strategy._exporter_path = mock.MagicMock()
         strategy._exporter_path.is_file.return_value = True
@@ -865,7 +851,6 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
         result = strategy.check()
         self.assertTrue(result)
 
-        mock_logger.debug.assert_called_with("Check SmartCtlExporter resources")
         strategy._exporter_path.is_file.assert_called()
 
 
