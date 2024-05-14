@@ -10,8 +10,8 @@ tests:
         values: '1x15'
 
     alert_rule_test:
-      - eval_time: 0m
-        alertname: SMARTCriticalWarning
+      - eval_time: 20m
+        alertname: SmartCriticalWarning
         exp_alerts:
           - exp_labels:
               severity: critical
@@ -30,8 +30,8 @@ tests:
         values: '0x15'
 
     alert_rule_test:
-      - eval_time: 0m
-        alertname: SMARTDeviceSmartStatusFail
+      - eval_time: 10m
+        alertname: SmartDeviceSmartStatusFail
         exp_alerts:
           - exp_labels:
               severity: critical
@@ -50,16 +50,59 @@ tests:
         values: '2x15'
 
     alert_rule_test:
-      - eval_time: 0m
-        alertname: SMARTExitStatusFail
+      - eval_time: 10m
+        alertname: SmartExitStatusFail
         exp_alerts:
           - exp_labels:
               severity: warning
               instance: ubuntu-2
               device: sda
             exp_annotations:
-              summary: SMARTCTL exit status is bad. (instance ubuntu-2)
+              summary: SMART exit status is non-zero. (instance ubuntu-2)
               description: |
-                SMARTCTL exit status for a device is not 0.
+                SMART exit status for a device is not 0.
                   VALUE = 2
                   LABELS = map[__name__:smartctl_device_smartctl_exit_status device:sda instance:ubuntu-2]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_temperature{device="sda", instance="ubuntu-2"}'
+        values: '85x15'
+
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: SmartDeviceTemperatureCritical
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-2
+              device: sda
+            exp_annotations:
+              summary: SMART device temperature critical. (instance ubuntu-2)
+              description: |
+                Device temperature is critical.
+                  VALUE = 85
+                  LABELS = map[__name__:smartctl_device_temperature device:sda instance:ubuntu-2]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_attribute{device="sda", attribute_id="5", attribute_name="Reallocated_Sectors_Count", instance="ubuntu-2"}'
+        values: '2x15'
+
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SmartAttributeWarning
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-2
+              device: sda
+              attribute_id: 5
+              attribute_name: Reallocated_Sectors_Count
+            exp_annotations:
+              summary: SMART device attribute correlating with drive failure has its raw value greater than zero. (instance ubuntu-2)
+              description: |
+                SMART raw value for attribute "Reallocated_Sectors_Count" with id "5"
+                on device "sda" is greater than 0.
+                  VALUE = 2
+                  LABELS = map[__name__:smartctl_device_attribute attribute_id:5 attribute_name:Reallocated_Sectors_Count device:sda instance:ubuntu-2]

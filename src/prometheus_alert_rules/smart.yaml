@@ -2,9 +2,9 @@ groups:
 - name: SMART
   rules:
 
-  - alert: SMARTCriticalWarning
+  - alert: SmartCriticalWarning
     expr: smartctl_device_critical_warning > 0
-    for: 0m
+    for: 15m
     labels:
       severity: critical
     annotations:
@@ -14,9 +14,9 @@ groups:
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
 
-  - alert: SMARTDeviceSmartStatusFail
+  - alert: SmartDeviceSmartStatusFail
     expr: smartctl_device_smart_status == 0
-    for: 0m
+    for: 2m
     labels:
       severity: critical
     annotations:
@@ -26,14 +26,51 @@ groups:
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
 
-  - alert: SMARTExitStatusFail
+  - alert: SmartExitStatusFail
     expr: smartctl_device_smartctl_exit_status != 0
-    for: 0m
+    for: 2m
     labels:
       severity: warning
     annotations:
-      summary: SMARTCTL exit status is bad. (instance {{ $labels.instance }})
+      summary: SMART exit status is non-zero. (instance {{ $labels.instance }})
       description: |
-        SMARTCTL exit status for a device is not 0.
+        SMART exit status for a device is not 0.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: SmartNvmeWearoutIndicator
+    expr: smartctl_device_available_spare{device=~"nvme.*"} < smartctl_device_available_spare_threshold{device=~"nvme.*"}
+    for: 15m
+    labels:
+      severity: critical
+    annotations:
+      summary: SMART available spare space below threshold for NVMe device. (instance {{ $labels.instance }})
+      description: |
+        SMART available spare space below threshold for NVMe device.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: SmartDeviceTemperatureCritical
+    expr: smartctl_device_temperature > 80
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: SMART device temperature critical. (instance {{ $labels.instance }})
+      description: |
+        Device temperature is critical.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: SmartAttributeWarning
+    expr: smartctl_device_attribute{attribute_id=~"5|187|188|197|198"} > 0
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: SMART device attribute correlating with drive failure has its raw value greater than zero. (instance {{ $labels.instance }})
+      description: |
+        SMART raw value for attribute "{{ $labels.attribute_name }}" with id "{{ $labels.attribute_id }}"
+        on device "{{ $labels.device }}" is greater than 0.
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
