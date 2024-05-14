@@ -798,7 +798,7 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
 
         strategy.install()
 
-        mock_logger.debug.assert_called_with("Install SmartCtlExporter")
+        mock_logger.debug.assert_called_with("Installing SmartCtlExporter")
         mock_requests_get.assert_called_with(strategy._release, timeout=60)
         # mock_tar_open.assert_called_with(fileobj=BytesIO(b"dummy content"), mode="r:gz")
         mock_make_executable.assert_called_with(strategy._exporter_path)
@@ -806,7 +806,7 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
 
     @mock.patch("hw_tools.logger")
     @mock.patch("hw_tools.requests.get")
-    def test_install_failure(self, mock_requests_get, mock_logger):
+    def test_install_download_failure(self, mock_requests_get, mock_logger):
         strategy = SmartCtlExporterStrategy()
         strategy._resource_dir = self.tmp_path
         strategy._exporter_path = self.tmp_path / "smartctl_exporter"
@@ -817,7 +817,34 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
         with self.assertRaises(ResourceInstallationError):
             strategy.install()
 
-        mock_logger.debug.assert_called_with("Install SmartCtlExporter")
+        mock_logger.debug.assert_called_with("Installing SmartCtlExporter")
+        mock_logger.error.assert_called_with("Failed to download smartctl exporter binary.")
+
+    @mock.patch("hw_tools.logger")
+    @mock.patch("hw_tools.requests.get")
+    @mock.patch("hw_tools.tarfile.open")
+    def test_install_parse_failure(self, mock_tar_open, mock_requests_get, mock_logger):
+        strategy = SmartCtlExporterStrategy()
+        strategy._resource_dir = self.tmp_path
+        strategy._exporter_path = self.tmp_path / "smartctl_exporter"
+
+        mock_response = mock.MagicMock(status_code=HTTPStatus.OK)
+        mock_response.content = b"dummy content"
+        mock_requests_get.return_value = mock_response
+        mock_member = mock.MagicMock(name="member")
+        mock_member.name = "random name"
+        mock_member_file = mock.MagicMock()
+        mock_member_file.read.return_value = b"dummy content"
+        mock_tar_open.return_value.__enter__.return_value.getmembers.return_value = [mock_member]
+        mock_tar_open.return_value.__enter__.return_value.extractfile.return_value = (
+            mock_member_file  # noqa: E501
+        )
+
+        with self.assertRaises(ResourceInstallationError):
+            strategy.install()
+
+        mock_logger.debug.assert_called_with("Installing SmartCtlExporter")
+        mock_logger.error.assert_called_with("Failed to install SmartCtlExporter binary.")
 
     @mock.patch("hw_tools.logger")
     @mock.patch("hw_tools.shutil.rmtree")

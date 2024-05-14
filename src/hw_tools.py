@@ -403,24 +403,28 @@ class SmartCtlExporterStrategy(StrategyABC):  # pylint: disable=R0903
 
     def install(self) -> None:
         """Install exporter binary from internet."""
-        logger.debug("Install SmartCtlExporter")
+        logger.debug("Installing SmartCtlExporter")
         self._resource_dir.mkdir(parents=True, exist_ok=True)
 
-        success = False
         resp = requests.get(self._release, timeout=60)
-        if resp.status_code == HTTPStatus.OK:
-            fileobj = io.BytesIO(resp.content)
-            with tarfile.open(fileobj=fileobj, mode="r:gz") as tar:
-                for member in tar.getmembers():
-                    if member.name.endswith(self._exporter_name):
-                        with open(self._exporter_path, "wb") as outfile:
-                            member_file = tar.extractfile(member)
-                            if member_file:
-                                outfile.write(member_file.read())
-                                success = True
-                        if success:
-                            make_executable(self._exporter_path)
+        if resp.status_code != HTTPStatus.OK:
+            logger.error("Failed to download smartctl exporter binary.")
+            raise ResourceInstallationError(self._name)
+
+        success = False
+        fileobj = io.BytesIO(resp.content)
+        with tarfile.open(fileobj=fileobj, mode="r:gz") as tar:
+            for member in tar.getmembers():
+                if member.name.endswith(self._exporter_name):
+                    with open(self._exporter_path, "wb") as outfile:
+                        member_file = tar.extractfile(member)
+                        if member_file:
+                            outfile.write(member_file.read())
+                            success = True
+                    if success:
+                        make_executable(self._exporter_path)
         if not success:
+            logger.error("Failed to install SmartCtlExporter binary.")
             raise ResourceInstallationError(self._name)
 
     def remove(self) -> None:
