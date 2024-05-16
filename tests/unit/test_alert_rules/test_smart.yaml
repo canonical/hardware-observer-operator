@@ -7,7 +7,7 @@ tests:
   - interval: 1m
     input_series:
       - series: 'smartctl_device_critical_warning{device="sda", instance="ubuntu-0"}'
-        values: '4x15'
+        values: '6x15' # 6 = 0b0110
 
     alert_rule_test:
       - eval_time: 20m
@@ -20,14 +20,24 @@ tests:
             exp_annotations:
               summary: SMART alert for critical warning attribute on an NVMe controller due to degradation in drive reliability. (instance ubuntu-0)
               description: |
-                Drive reliability is degraded. Bit 02 of critical warning SMART attribute is set.
-                  VALUE = 4
-                  LABELS = map[__name__:smartctl_device_critical_warning device:sda instance:ubuntu-0]
+                Drive reliability is degraded. Bit 2 of critical warning SMART attribute is set.
+                  VALUE = 6
+                  LABELS = map[device:sda instance:ubuntu-0]
 
   - interval: 1m
     input_series:
       - series: 'smartctl_device_critical_warning{device="sda", instance="ubuntu-0"}'
-        values: '8x15'
+        values: '10x15' # 10 = 0b1010
+
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: SmartDriveReliabilityDegraded
+        exp_alerts: # alerts shouldn't fire since bit 2 isn't set
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_critical_warning{device="sda", instance="ubuntu-0"}'
+        values: '9x15' # 9 = 0b1001
 
     alert_rule_test:
       - eval_time: 20m
@@ -40,9 +50,19 @@ tests:
             exp_annotations:
               summary: SMART alert for critical warning attribute on an NVMe controller due to drive being in read-only mode. (instance ubuntu-0)
               description: |
-                Drive is in read-only mode. Bit 03 of critical warning SMART attribute is set.
-                  VALUE = 8
-                  LABELS = map[__name__:smartctl_device_critical_warning device:sda instance:ubuntu-0]
+                Drive is in read-only mode. Bit 3 of critical warning SMART attribute is set.
+                  VALUE = 9
+                  LABELS = map[device:sda instance:ubuntu-0]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_critical_warning{device="sda", instance="ubuntu-0"}'
+        values: '5x15' # 5 = 0b0101
+
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: SmartDriveinReadOnlyMode
+        exp_alerts: # alerts shouldn't fire since bit 3 isn't set
 
   - interval: 1m
     input_series:
@@ -67,7 +87,7 @@ tests:
   - interval: 1m
     input_series:
       - series: 'smartctl_device_smartctl_exit_status{device="sda", instance="ubuntu-2"}'
-        values: '8x10'
+        values: '75x10' # 75 = 0b01001011
 
     alert_rule_test:
       - eval_time: 10m
@@ -81,13 +101,23 @@ tests:
               summary: smartctl exit status returned "DISK FAILING". (instance ubuntu-2)
               description: |
                 smartctl exit status returned "DISK FAILING". Bit 3 of smartctl exit status is set.
-                  VALUE = 8
-                  LABELS = map[__name__:smartctl_device_smartctl_exit_status device:sda instance:ubuntu-2]
+                  VALUE = 11
+                  LABELS = map[device:sda instance:ubuntu-2]
 
   - interval: 1m
     input_series:
       - series: 'smartctl_device_smartctl_exit_status{device="sda", instance="ubuntu-2"}'
-        values: '16x10'
+        values: '67x10' # 67 = 0b01000011
+
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SmartExitStatusDiskFail
+        exp_alerts: # alerts shouldn't fire since bit 3 isn't set
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_smartctl_exit_status{device="sda", instance="ubuntu-2"}'
+        values: '82x10' # 82 = 0b01010010
 
     alert_rule_test:
       - eval_time: 10m
@@ -101,8 +131,18 @@ tests:
               summary: smartctl exit status reports pre-fail attribute for device is below threshold. (instance ubuntu-2)
               description: |
                 smartctl exit status pre-fail attribute is below threshold. Bit 4 of smartctl exit status is set.
-                  VALUE = 16
-                  LABELS = map[__name__:smartctl_device_smartctl_exit_status device:sda instance:ubuntu-2]
+                  VALUE = 18
+                  LABELS = map[device:sda instance:ubuntu-2]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_smartctl_exit_status{device="sda", instance="ubuntu-2"}'
+        values: '66x10' # 66 = 0b01000010
+
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SmartExitStatusPrefailBelowThreshold
+        exp_alerts: # alerts shouldn't fire since bit 4 isn't set
 
   - interval: 1m
     input_series:

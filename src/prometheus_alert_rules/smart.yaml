@@ -3,26 +3,30 @@ groups:
   rules:
 
   - alert: SmartDriveReliabilityDegraded
-    expr: smartctl_device_critical_warning == 4
+    # isolate the least significant three bits with % 8
+    # check whether bit 2 (starts from bit 0) has been set with the >= 4 comparison
+    expr: smartctl_device_critical_warning % 8 >= 4
     for: 15m
     labels:
       severity: critical
     annotations:
       summary: SMART alert for critical warning attribute on an NVMe controller due to degradation in drive reliability. (instance {{ $labels.instance }})
       description: |
-        Drive reliability is degraded. Bit 02 of critical warning SMART attribute is set.
+        Drive reliability is degraded. Bit 2 of critical warning SMART attribute is set.
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
 
   - alert: SmartDriveinReadOnlyMode
-    expr: smartctl_device_critical_warning == 8
+    # isolate the least significant four bits with % 16
+    # check whether bit 3 (starts from bit 0) has been set with the >= 8 comparison
+    expr: smartctl_device_critical_warning % 16 >= 8
     for: 15m
     labels:
       severity: critical
     annotations:
       summary: SMART alert for critical warning attribute on an NVMe controller due to drive being in read-only mode. (instance {{ $labels.instance }})
       description: |
-        Drive is in read-only mode. Bit 03 of critical warning SMART attribute is set.
+        Drive is in read-only mode. Bit 3 of critical warning SMART attribute is set.
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
 
@@ -39,7 +43,9 @@ groups:
           LABELS = {{ $labels }}
 
   - alert: SmartExitStatusDiskFail
-    expr: smartctl_device_smartctl_exit_status == 8
+    # isolate the least significant four bits with % 16
+    # check whether bit 3 (starts from bit 0) has been set with the >= 8 comparison
+    expr: smartctl_device_smartctl_exit_status % 16 >= 8
     for: 2m
     labels:
       severity: critical
@@ -51,7 +57,9 @@ groups:
           LABELS = {{ $labels }}
 
   - alert: SmartExitStatusPrefailBelowThreshold
-    expr: smartctl_device_smartctl_exit_status == 16
+    # isolate the least significant four bits with % 32
+    # check whether bit 4 (starts from bit 0) has been set with the >= 16 comparison
+    expr: smartctl_device_smartctl_exit_status % 32 >= 16
     for: 2m
     labels:
       severity: warning
