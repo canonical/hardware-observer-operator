@@ -11,7 +11,7 @@ tests:
 
     alert_rule_test:
       - eval_time: 20m
-        alertname: SmartDriveReliabilityDegraded
+        alertname: SmartNVMeDriveReliabilityDegraded
         exp_alerts:
           - exp_labels:
               severity: critical
@@ -31,7 +31,7 @@ tests:
 
     alert_rule_test:
       - eval_time: 20m
-        alertname: SmartDriveReliabilityDegraded
+        alertname: SmartNMVeDriveReliabilityDegraded
         exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
   - interval: 1m
@@ -41,7 +41,7 @@ tests:
 
     alert_rule_test:
       - eval_time: 20m
-        alertname: SmartDriveinReadOnlyMode
+        alertname: SmartNVMeDriveinReadOnlyMode
         exp_alerts:
           - exp_labels:
               severity: critical
@@ -61,7 +61,7 @@ tests:
 
     alert_rule_test:
       - eval_time: 20m
-        alertname: SmartDriveinReadOnlyMode
+        alertname: SmartNVMeDriveinReadOnlyMode
         exp_alerts: # alerts shouldn't fire since bit 3 isn't set
 
   - interval: 1m
@@ -153,7 +153,7 @@ tests:
 
     alert_rule_test:
       - eval_time: 20m
-        alertname: SmartNvmeWearoutIndicator
+        alertname: SmartNVMeWearoutIndicator
         exp_alerts:
           - exp_labels:
               severity: critical

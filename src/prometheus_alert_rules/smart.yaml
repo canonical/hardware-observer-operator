@@ -2,7 +2,7 @@ groups:
 - name: SMART
   rules:
 
-  - alert: SmartDriveReliabilityDegraded
+  - alert: SmartNVMeDriveReliabilityDegraded
     # isolate the least significant three bits with % 8
     # check whether bit 2 (starts from bit 0) has been set with the >= 4 comparison
     expr: smartctl_device_critical_warning % 8 >= 4
@@ -16,7 +16,7 @@ groups:
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
 
-  - alert: SmartDriveinReadOnlyMode
+  - alert: SmartNVMeDriveinReadOnlyMode
     # isolate the least significant four bits with % 16
     # check whether bit 3 (starts from bit 0) has been set with the >= 8 comparison
     expr: smartctl_device_critical_warning % 16 >= 8
@@ -70,7 +70,7 @@ groups:
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
 
-  - alert: SmartNvmeWearoutIndicator
+  - alert: SmartNVMeWearoutIndicator
     expr: smartctl_device_available_spare{device=~"nvme.*"} < smartctl_device_available_spare_threshold{device=~"nvme.*"}
     for: 15m
     labels:
@@ -95,6 +95,7 @@ groups:
           LABELS = {{ $labels }}
 
   - alert: SmartAttributeWarning
+    # based on https://www.backblaze.com/blog/what-smart-stats-indicate-hard-drive-failures/
     expr: smartctl_device_attribute{attribute_id=~"5|187|188|197|198"} > 0
     for: 2m
     labels:
