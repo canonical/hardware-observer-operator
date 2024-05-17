@@ -35,7 +35,8 @@ class HardwareObserverCharm(ops.CharmBase):
             self,
             refresh_events=[self.on.config_changed, self.on.upgrade_charm],
             metrics_endpoints=[
-                {"path": "/metrics", "port": int(self.model.config["hardware-exporter-port"])}
+                {"path": "/metrics", "port": int(self.model.config["hardware-exporter-port"])},
+                {"path": "/metrics", "port": int(self.model.config["smartctl-exporter-port"])},
             ],
             # Setting scrape_timeout as collect_timeout in the `duration` format specified in
             # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration

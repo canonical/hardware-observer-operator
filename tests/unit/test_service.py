@@ -593,6 +593,21 @@ class TestSmartMetricExporter(unittest.TestCase):
         }
         self.exporter = service.SmartCtlExporter(search_path, self.mock_config)
 
+    def test_render_service(self):
+        """Test render service."""
+        self.exporter._render_service = mock.MagicMock()
+        self.exporter._render_service.return_value = "some result"
+
+        result = self.exporter.render_service()
+        self.assertEqual(result, "some result")
+
+        self.exporter._render_service.assert_called_with(
+            {
+                "PORT": str(self.exporter.port),
+                "LEVEL": self.exporter.log_level,
+            }
+        )
+
     def test_hw_tools(self):
         self.assertEqual(self.exporter.hw_tools(), [HWTool.SMARTCTL])
 

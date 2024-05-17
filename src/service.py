@@ -277,6 +277,16 @@ class SmartCtlExporter(BaseExporter):
         self.log_level = str(config["exporter-log-level"])
         self.strategy = SmartCtlExporterStrategy()
 
+    def render_service(self) -> bool:
+        """Render required files for service."""
+        service_rendered = self._render_service(
+            {
+                "PORT": str(self.port),
+                "LEVEL": self.log_level,
+            }
+        )
+        return service_rendered
+
     @staticmethod
     def hw_tools() -> List[HWTool]:
         """Return list hardware tools to watch."""
