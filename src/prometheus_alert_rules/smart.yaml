@@ -5,6 +5,7 @@ groups:
   - alert: SmartNVMeDriveReliabilityDegraded
     # isolate the least significant three bits with % 8
     # check whether bit 2 (starts from bit 0) has been set with the >= 4 comparison
+    # refer: https://en.wikipedia.org/wiki/Self-Monitoring,_Analysis_and_Reporting_Technology#Known_NVMe_S.M.A.R.T._attributes
     expr: smartctl_device_critical_warning % 8 >= 4
     for: 15m
     labels:
@@ -19,6 +20,7 @@ groups:
   - alert: SmartNVMeDriveinReadOnlyMode
     # isolate the least significant four bits with % 16
     # check whether bit 3 (starts from bit 0) has been set with the >= 8 comparison
+    # refer: https://en.wikipedia.org/wiki/Self-Monitoring,_Analysis_and_Reporting_Technology#Known_NVMe_S.M.A.R.T._attributes
     expr: smartctl_device_critical_warning % 16 >= 8
     for: 15m
     labels:
@@ -45,6 +47,7 @@ groups:
   - alert: SmartExitStatusDiskFail
     # isolate the least significant four bits with % 16
     # check whether bit 3 (starts from bit 0) has been set with the >= 8 comparison
+    # refer: https://www.smartmontools.org/browser/trunk/smartmontools/smartctl.8.in#EXIT_STATUS
     expr: smartctl_device_smartctl_exit_status % 16 >= 8
     for: 2m
     labels:
@@ -59,6 +62,7 @@ groups:
   - alert: SmartExitStatusPrefailBelowThreshold
     # isolate the least significant four bits with % 32
     # check whether bit 4 (starts from bit 0) has been set with the >= 16 comparison
+    # refer: https://www.smartmontools.org/browser/trunk/smartmontools/smartctl.8.in#EXIT_STATUS
     expr: smartctl_device_smartctl_exit_status % 32 >= 16
     for: 2m
     labels:
@@ -79,18 +83,6 @@ groups:
       summary: SMART alert for available spare space below threshold for NVMe device. (instance {{ $labels.instance }})
       description: |
         Available spare space below threshold for NVMe device.
-          VALUE = {{ $value }}
-          LABELS = {{ $labels }}
-
-  - alert: SmartDeviceTemperatureCritical
-    expr: smartctl_device_temperature > 80
-    for: 2m
-    labels:
-      severity: critical
-    annotations:
-      summary: SMART alert for critical device temperature. (instance {{ $labels.instance }})
-      description: |
-        Device temperature is critical.
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
 
