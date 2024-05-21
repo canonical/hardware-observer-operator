@@ -9,6 +9,12 @@ options:
     description: |
       Start the prometheus hardware exporter at "hardware-exporter-port". By default,
       it will start at port 10200.
+  smartctl-exporter-port:
+    type: int
+    default: 10201
+    description: |
+      Start the prometheus smartctl exporter at "smartctl-exporter-port". By default,
+      it will start at port 10201.
   exporter-log-level:
     type: string
     default: "INFO"
