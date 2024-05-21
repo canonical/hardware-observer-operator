@@ -11,22 +11,17 @@ import ops
 import ops.testing
 from ops.model import ActiveStatus, BlockedStatus
 from parameterized import parameterized
-from redfish.rest.v1 import InvalidCredentialsError
 
 import charm
 from charm import ExporterError, HardwareObserverCharm
 from config import HWTool
+from service import HardwareExporter
 
 
 class TestCharm(unittest.TestCase):
     def setUp(self):
         self.harness = ops.testing.Harness(HardwareObserverCharm)
         self.addCleanup(self.harness.cleanup)
-
-        get_bmc_address_patcher = mock.patch.object(charm, "get_bmc_address")
-        self.mock_get_bmc_address = get_bmc_address_patcher.start()
-        self.mock_get_bmc_address.return_value = "127.0.0.1"
-        self.addCleanup(get_bmc_address_patcher.stop)
 
         get_hw_tool_enable_list_patcher = mock.patch.object(charm, "get_hw_tool_enable_list")
         self.mock_get_hw_tool_enable_list = get_hw_tool_enable_list_patcher.start()
@@ -38,17 +33,9 @@ class TestCharm(unittest.TestCase):
         ]
         self.addCleanup(get_hw_tool_enable_list_patcher.stop)
 
-        redfish_client_patcher = mock.patch("charm.redfish_client")
-        redfish_client_patcher.start()
-        self.addCleanup(redfish_client_patcher.stop)
-
         requests_patcher = mock.patch("hw_tools.requests")
         requests_patcher.start()
         self.addCleanup(requests_patcher.stop)
-
-    @classmethod
-    def setUpClass(cls):
-        pass
 
     def _get_notice_count(self, hook):
         """Return the notice count for a given charm hook."""
@@ -64,417 +51,328 @@ class TestCharm(unittest.TestCase):
         self.harness.begin()
         self.assertFalse(self.harness.charm._stored.resource_installed)
 
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_install(self, mock_hw_tool_helper, mock_exporter) -> None:
-        """Test install event handler."""
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = True
+    @parameterized.expand(
+        [
+            (
+                "Enable two exporters",
+                [HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                ["hardware-exporter", "smartctl-exporter"],
+            )
+        ]
+    )
+    @mock.patch("charm.SmartCtlExporter.__init__", return_value=None)
+    @mock.patch("charm.HardwareExporter.__init__", return_value=None)
+    def test_exporters(self, _, enable_tools, expect, mock_hw_exporter, mock_smart_exporter):
         self.harness.begin()
-        self.harness.charm._stored.enabled_hw_tool_list_values = []
-        self.harness.charm.on.install.emit()
+        self.harness.charm.get_enable_hw_tools = mock.MagicMock()
+        self.harness.charm.get_enable_hw_tools.return_value = enable_tools
+        self.harness.charm._stored.enabled_hw_tool_list_values = [
+            tool.value for tool in enable_tools
+        ]
 
-        self.assertTrue(self.harness.charm._stored.resource_installed)
+        exporters = self.harness.charm.exporters
+        self.harness.charm.get_enable_hw_tools.assert_called()
 
-        self.harness.charm.exporter.install.assert_called_once()
+        if "hardware-exporter" in expect:
+            self.assertTrue(
+                any([isinstance(exporter, HardwareExporter) for exporter in exporters])
+            )
+            mock_hw_exporter.assert_called_with(
+                self.harness.charm.charm_dir,
+                self.harness.charm.model.config,
+                self.harness.charm._stored.enabled_hw_tool_list_values,
+            )
+        if "smartctl-exporter" in expect:
+            self.assertTrue(
+                any([isinstance(exporter, HardwareExporter) for exporter in exporters])
+            )
+            mock_smart_exporter.assert_called_with(
+                self.harness.charm.charm_dir,
+                self.harness.charm.model.config,
+            )
+
+    @parameterized.expand(
+        [
+            (
+                "happy case",
+                "install",
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                (True, ""),
+                [mock.MagicMock(), mock.MagicMock()],
+                [True, True],
+            ),
+            (
+                "happy case",
+                "upgrade",
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                (True, ""),
+                [mock.MagicMock(), mock.MagicMock()],
+                [True, True],
+            ),
+            (
+                "missing resource",
+                "install",
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                (False, "miss something"),
+                [mock.MagicMock(), mock.MagicMock()],
+                [True, True],
+            ),
+            (
+                "missing resource",
+                "upgrade",
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                (False, "miss something"),
+                [mock.MagicMock(), mock.MagicMock()],
+                [True, True],
+            ),
+            (
+                "Exporter install fail",
+                "install",
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                (True, ""),
+                [mock.MagicMock(), mock.MagicMock()],
+                [False, True],
+            ),
+            (
+                "Exporter install fail",
+                "upgrade",
+                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                (True, ""),
+                [mock.MagicMock(), mock.MagicMock()],
+                [False, True],
+            ),
+        ]
+    )
+    def test_install_or_upgrade(
+        self,
+        _,
+        event,
+        hw_tools,
+        hw_tool_helper_install_return,
+        mock_exporters,
+        mock_exporter_install_returns,
+    ) -> None:
+        with mock.patch(
+            "charm.HardwareObserverCharm.exporters",
+            new_callable=mock.PropertyMock(
+                return_value=mock_exporters,
+            ),
+        ) as mock_exporters:
+            self.harness.begin()
+            self.harness.charm.hw_tool_helper = mock.MagicMock()
+            self.harness.charm.hw_tool_helper.install.return_value = hw_tool_helper_install_return
+            self.harness.charm.get_enable_hw_tools = mock.MagicMock()
+            self.harness.charm.get_enable_hw_tools.return_value = hw_tools
+            self.harness.charm._on_update_status = mock.MagicMock()
+
+            for mock_exporter, return_val in zip(
+                self.harness.charm.exporters, mock_exporter_install_returns
+            ):
+                mock_exporter.install.return_value = return_val
+
+            if event == "install":
+                self.harness.charm.on.install.emit()
+            else:
+                self.harness.charm.on.upgrade_charm.emit()
+
         self.harness.charm.hw_tool_helper.install.assert_called_with(
             self.harness.charm.model.resources,
-            self.harness.charm._stored.enabled_hw_tool_list_values,
+            hw_tools,
         )
 
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_upgrade_charm(self, mock_hw_tool_helper, mock_exporter) -> None:
-        """Test upgrade_charm event handler."""
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = True
-        self.harness.begin()
-        self.harness.charm._stored.enabled_hw_tool_list_values = []
-        self.harness.charm.on.install.emit()
+        store_resource = False
+        if hw_tool_helper_install_return[0]:
+            if all(mock_exporter_install_returns):
+                for mock_exporter in mock_exporters:
+                    mock_exporter.install.assert_called()
+                store_resource = True
 
-        self.assertTrue(self.harness.charm._stored.resource_installed)
+        self.assertEqual(self.harness.charm._stored.resource_installed, store_resource)
+        if store_resource:
+            self.harness.charm._on_update_status.assert_called()
 
-        self.harness.charm.exporter.install.assert_called_once()
-        self.harness.charm.hw_tool_helper.install.assert_called_with(
+    def test_remove(self):
+        mock_exporters = [mock.MagicMock(), mock.MagicMock()]
+        with mock.patch(
+            "charm.HardwareObserverCharm.exporters",
+            new_callable=mock.PropertyMock(
+                return_value=mock_exporters,
+            ),
+        ) as mock_exporters:
+            self.harness.begin()
+            self.harness.charm.hw_tool_helper = mock.MagicMock()
+
+            self.harness.charm.get_enable_hw_tools = mock.MagicMock()
+            self.harness.charm.get_enable_hw_tools.return_value = [
+                HWTool.IPMI_SENSOR,
+                HWTool.IPMI_SEL,
+                HWTool.SMARTCTL,
+            ]
+
+            self.harness.charm.on.remove.emit()
+
+        self.harness.charm.hw_tool_helper.remove.assert_called_with(
             self.harness.charm.model.resources,
-            self.harness.charm._stored.enabled_hw_tool_list_values,
+            [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
         )
+        for mock_exporter in mock_exporters:
+            mock_exporter.uninstall.assert_called()
+        self.assertFalse(self.harness.charm._stored.resource_installed)
 
-        self.harness.charm.unit.status = ActiveStatus("Install complete")
-
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_install_missing_resources(self, mock_hw_tool_helper, mock_exporter) -> None:
-        """Test install event handler when resources are missing."""
-        mock_hw_tool_helper.return_value.install.return_value = (
-            False,
-            "Missing resources: ['storcli-deb']",
-        )
-        self.harness.begin()
-        self.harness.charm.on.install.emit()
-
-        self.assertEqual(
-            self.harness.charm.unit.status, BlockedStatus("Missing resources: ['storcli-deb']")
-        )
-
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_install_redfish_unavailable(self, mock_hw_tool_helper, mock_exporter) -> None:
-        """Test install event handler when redfish is unavailable."""
-        mock_enabled_hw_tool_list = [
-            HWTool.IPMI_SENSOR,
-            HWTool.IPMI_SEL,
-            HWTool.IPMI_DCMI,
+    @parameterized.expand(
+        [
+            (
+                "happy case",
+                True,
+                True,
+                [mock.MagicMock(), mock.MagicMock()],
+                [(True, ""), (True, "")],
+                (True, ""),
+                [True, True],
+            ),
+            (
+                "resouce_install not True",
+                False,
+                True,
+                [mock.MagicMock(), mock.MagicMock()],
+                [(True, ""), (True, "")],
+                (True, ""),
+                [True, True],
+            ),
+            (
+                "No cos_agent_related",
+                True,
+                False,
+                [mock.MagicMock(), mock.MagicMock()],
+                [(True, ""), (True, "")],
+                (True, ""),
+                [True, True],
+            ),
+            (
+                "Exporter config invalid",
+                True,
+                True,
+                [mock.MagicMock(), mock.MagicMock()],
+                [(False, "Some invalid msg"), (True, "")],
+                (True, ""),
+                [True, True],
+            ),
+            (
+                "hw tools install not ok",
+                True,
+                True,
+                [mock.MagicMock(), mock.MagicMock()],
+                [(True, ""), (True, "")],
+                (False, "hw tools not installed"),
+                [True, True],
+            ),
+            (
+                "Exporter not health",
+                True,
+                True,
+                [mock.MagicMock(), mock.MagicMock()],
+                [(True, ""), (True, "")],
+                (True, ""),
+                [True, False],
+            ),
         ]
-        self.mock_get_hw_tool_enable_list.return_value = mock_enabled_hw_tool_list
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = True
-        self.harness.begin()
-        self.harness.charm.on.install.emit()
+    )
+    def test_update_status(  # noqa: C901
+        self,
+        _,
+        resource_installed,
+        cos_agent_related,
+        mock_exporters,
+        mock_exporter_validate_exporter_configs_returns,
+        hw_tool_check_installed,
+        mock_exporter_healths,
+    ):
+        for mock_exporter, config_valid, health in zip(
+            mock_exporters,
+            mock_exporter_validate_exporter_configs_returns,
+            mock_exporter_healths,
+        ):
+            mock_exporter.validate_exporter_configs.return_value = config_valid
+            mock_exporter.check_health.return_value = health
+            mock_exporter.restart.side_effect = ExporterError
 
-        self.assertTrue(self.harness.charm._stored.resource_installed)
+        with (
+            mock.patch(
+                "charm.HardwareObserverCharm.exporters",
+                new_callable=mock.PropertyMock(
+                    return_value=mock_exporters,
+                ),
+            ),
+        ):
+            if cos_agent_related:
+                self.harness.add_relation("cos-agent", "grafana-agent")
+            self.harness.begin()
 
-        self.harness.charm.exporter.install.assert_called_with(
-            10200,  # default in config.yaml
-            "INFO",  # default in config.yaml
-            {},
-            10,  # default int config.yaml
-            mock_enabled_hw_tool_list,
-        )
+            self.harness.charm.model.unit.status = BlockedStatus("Random status")
+            self.harness.charm._stored.resource_installed = resource_installed
+            self.harness.charm.hw_tool_helper = mock.MagicMock()
+            self.harness.charm.hw_tool_helper.check_installed.return_value = (
+                hw_tool_check_installed
+            )
 
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_exporter_install_fail(self, mock_hw_tool_helper, mock_exporter) -> None:
-        """Test exporter install failure."""
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = False
-        self.harness.begin()
-        self.harness.charm.validate_exporter_configs = mock.Mock()
-        self.harness.charm.validate_exporter_configs.return_value = (False, "error")
-        self.harness.charm.on.install.emit()
-
-        self.assertTrue(self.harness.charm._stored.resource_installed)
-
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            BlockedStatus("Failed to install exporter, please refer to `juju debug-log`"),
-        )
-
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_update_status_all_green(self, mock_hw_tool_helper, mock_exporter):
-        """Test update_status event handler when everything is okay."""
-        self.mock_get_hw_tool_enable_list.return_value = [
-            HWTool.IPMI_SENSOR,
-            HWTool.IPMI_SEL,
-            HWTool.IPMI_DCMI,
-        ]
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = True
-        rid = self.harness.add_relation("cos-agent", "grafana-agent")
-        self.harness.begin()
-        self.harness.charm.on.install.emit()
-        self.harness.add_relation_unit(rid, "grafana-agent/0")
-
-        self.harness.charm.on.update_status.emit()
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
-
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_update_status_check_installed_false(self, mock_hw_tool_helper, mock_exporter):
-        """Test update_status event handler when hw tool checks failed."""
-        self.mock_get_hw_tool_enable_list.return_value = [
-            HWTool.IPMI_SENSOR,
-            HWTool.IPMI_SEL,
-            HWTool.IPMI_DCMI,
-        ]
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_hw_tool_helper.return_value.check_installed.return_value = (False, "error")
-        mock_exporter.return_value.install.return_value = True
-        rid = self.harness.add_relation("cos-agent", "grafana-agent")
-        self.harness.begin()
-        self.harness.charm.on.install.emit()
-        self.harness.add_relation_unit(rid, "grafana-agent/0")
-
-        self.harness.charm.on.update_status.emit()
-        self.assertEqual(self.harness.charm.unit.status, BlockedStatus("error"))
-
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_update_status_exporter_crashed(self, mock_hw_tool_helper, mock_exporter):
-        """Test update_status."""
-        self.mock_get_hw_tool_enable_list.return_value = [
-            HWTool.IPMI_SENSOR,
-            HWTool.IPMI_SEL,
-            HWTool.IPMI_DCMI,
-        ]
-        mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
-        mock_exporter.return_value.check_health.return_value = False
-        mock_exporter.return_value.restart.side_effect = Exception()
-        self.harness.add_relation("cos-agent", "grafana-agent")
-        self.harness.begin()
-        self.harness.charm._stored.resource_installed = True
-        with self.assertRaises(ExporterError):
             self.harness.charm.on.update_status.emit()
 
-    @mock.patch("charm.HWToolHelper")
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    def test_config_changed(self, mock_exporter, mock_hw_tool_helper):
-        """Test config change event renders config file."""
-        self.harness.begin()
-        self.harness.charm._stored.resource_installed = True
-        self.harness.charm.num_cos_agent_relations = 1  # exporter enabled
-        self.harness.charm.hw_tool_helper.check_installed.return_value = (
-            True,
-            "",
-        )  # hw tool install ok
+        if not resource_installed:
+            self.assertEqual(
+                self.harness.charm.model.unit.status,
+                BlockedStatus("Random status"),
+            )
+            return
 
-        new_config = {"exporter-port": 80, "exporter-log-level": "DEBUG"}
-        self.harness.update_config(new_config)
-        self.harness.charm.on.config_changed.emit()
+        if not cos_agent_related:
+            self.assertEqual(
+                self.harness.charm.model.unit.status,
+                BlockedStatus("Missing relation: [cos-agent]"),
+            )
+            return
 
-        self.harness.charm.exporter.template.render_config.assert_called()
+        if not all([res[0] for res in mock_exporter_validate_exporter_configs_returns]):
+            for valid_config, mock_exporter in zip(
+                mock_exporter_validate_exporter_configs_returns,
+                mock_exporters,
+            ):
+                ok = valid_config[0]
+                msg = valid_config[1]
+                if ok:
+                    mock_exporter.validate_exporter_configs.assert_called()
+                else:
+                    self.assertEqual(
+                        self.harness.charm.model.unit.status,
+                        BlockedStatus(msg),
+                    )
+                    break
+            return
 
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
-
-    @mock.patch("charm.HWToolHelper")
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    def test_config_changed_without_cos_agent_relation(self, mock_exporter, mock_hw_tool_helper):
-        """Test config change event don't render config file if cos_agent relation is missing."""
-        self.harness.begin()
-        self.harness.charm._stored.resource_installed = True
-        self.harness.charm.num_cos_agent_relations = 0  # exporter disabled
-        self.harness.charm.hw_tool_helper.check_installed.return_value = (
-            True,
-            "",
-        )  # hw tool install ok
-
-        new_config = {"exporter-port": 80, "exporter-log-level": "DEBUG"}
-        self.harness.update_config(new_config)
-        self.harness.charm.on.config_changed.emit()
-
-        self.harness.charm.exporter.template.render_config.assert_not_called()
-
-        self.assertEqual(
-            self.harness.charm.unit.status, BlockedStatus("Missing relation: [cos-agent]")
+        self.harness.charm.hw_tool_helper.check_installed.assert_called_with(
+            self.harness.charm.get_enable_hw_tools()
         )
+        if not hw_tool_check_installed[0]:
+            self.assertEqual(
+                self.harness.charm.model.unit.status,
+                BlockedStatus("hw tools not installed"),
+            )
+            return
 
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    def test_config_changed_before_install_complete(self, mock_exporter):
-        """Test config change event is deferred if charm not installed."""
-        self.harness.begin()
-        self.harness.charm._stored.resource_installed = False
-
-        self.harness.charm.on.config_changed.emit()
-        self.assertEqual(self._get_notice_count("config_changed"), 1)
-
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_upgrade_force_reconfig_exporter(self, mock_hw_tool_helper, mock_exporter) -> None:
-        """Test upgrade event handler will reconfigure exporter."""
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = True
-        self.harness.begin()
-        self.harness.charm._stored.exporter_installed = True
-        self.harness.charm._stored.enabled_hw_tool_list_values = []
-        self.harness.charm.on.upgrade_charm.emit()
-
-        self.assertTrue(self.harness.charm._stored.resource_installed)
-        self.assertTrue(self.harness.charm._stored.exporter_installed)
-
-        self.harness.charm.exporter.install.assert_called_once()
-        self.harness.charm.hw_tool_helper.install.assert_called_with(
-            self.harness.charm.model.resources,
-            self.harness.charm._stored.enabled_hw_tool_list_values,
-        )
-
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_update_status_config_invalid(self, mock_hw_tool_helper, mock_exporter):
-        """Test update_status event handler when config is invalid."""
-        self.mock_get_hw_tool_enable_list.return_value = [
-            HWTool.IPMI_SENSOR,
-            HWTool.IPMI_SEL,
-            HWTool.IPMI_DCMI,
-        ]
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = True
-        rid = self.harness.add_relation("cos-agent", "grafana-agent")
-        self.harness.begin()
-        self.harness.charm.on.install.emit()
-        self.harness.add_relation_unit(rid, "grafana-agent/0")
-
-        self.harness.charm.validate_exporter_configs = mock.MagicMock()
-        self.harness.charm.validate_exporter_configs.return_value = (False, "config fail message")
-
-        self.harness.charm.on.update_status.emit()
-        self.assertEqual(self.harness.charm.unit.status, BlockedStatus("config fail message"))
-
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_config_changed_update_alert_rules(self, mock_hw_tool_helper, mock_exporter):
-        """Test config changed will update alert rule."""
-        self.mock_get_hw_tool_enable_list.return_value = [
-            HWTool.IPMI_SENSOR,
-            HWTool.IPMI_SEL,
-            HWTool.IPMI_DCMI,
-        ]
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = True
-        rid = self.harness.add_relation("cos-agent", "grafana-agent")
-        self.harness.begin()
-        self.harness.charm.on.install.emit()
-        self.harness.add_relation_unit(rid, "grafana-agent/0")
-        self.harness.charm.on.update_status.emit()
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
-
-        relation_data = self.harness.get_relation_data(rid, "hardware-observer/0")
-        metrics_alert_rules = json.loads(relation_data["config"]).get("metrics_alert_rules")
-
-        with mock.patch(
-            "charm.COSAgentProvider._metrics_alert_rules", new_callable=mock.PropertyMock
-        ) as mock_alert_rules:
-            fake_metrics_alert_rules = {}
-            mock_alert_rules.return_value = fake_metrics_alert_rules
-            self.harness.charm.on.config_changed.emit()
-
-        relation_data = self.harness.get_relation_data(rid, "hardware-observer/0")
-        updated_metrics_alert_rules = json.loads(relation_data["config"]).get(
-            "metrics_alert_rules"
-        )
-        self.assertEqual(updated_metrics_alert_rules, fake_metrics_alert_rules)
-        self.assertNotEqual(updated_metrics_alert_rules, metrics_alert_rules)
-
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_upgrade_charm_update_alert_rules(self, mock_hw_tool_helper, mock_exporter):
-        """Test upgrade charm event updates alert rule."""
-        self.mock_get_hw_tool_enable_list.return_value = [
-            HWTool.IPMI_SENSOR,
-            HWTool.IPMI_SEL,
-            HWTool.IPMI_DCMI,
-        ]
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = True
-        rid = self.harness.add_relation("cos-agent", "grafana-agent")
-        self.harness.begin()
-        self.harness.charm.on.install.emit()
-        self.harness.add_relation_unit(rid, "grafana-agent/0")
-        self.harness.charm.on.update_status.emit()
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
-
-        relation_data = self.harness.get_relation_data(rid, "hardware-observer/0")
-        metrics_alert_rules = json.loads(relation_data["config"]).get("metrics_alert_rules")
-
-        with mock.patch(
-            "charm.COSAgentProvider._metrics_alert_rules", new_callable=mock.PropertyMock
-        ) as mock_alert_rules:
-            fake_metrics_alert_rules = {}
-            mock_alert_rules.return_value = fake_metrics_alert_rules
-            self.harness.charm.on.upgrade_charm.emit()
-
-        relation_data = self.harness.get_relation_data(rid, "hardware-observer/0")
-        updated_metrics_alert_rules = json.loads(relation_data["config"]).get(
-            "metrics_alert_rules"
-        )
-        self.assertEqual(updated_metrics_alert_rules, fake_metrics_alert_rules)
-        self.assertNotEqual(updated_metrics_alert_rules, metrics_alert_rules)
-
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    def test_install_redfish_enabled_with_correct_credential(
-        self, mock_hw_tool_helper, mock_exporter
-    ) -> None:
-        """Test install event when redfish is available and credential is correct."""
-        mock_enabled_hw_tool_list = [
-            HWTool.REDFISH,
-        ]
-        self.mock_get_hw_tool_enable_list.return_value = mock_enabled_hw_tool_list
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = True
-        self.harness.begin()
-        self.harness.charm.on.install.emit()
-
-        self.assertTrue(self.harness.charm._stored.resource_installed)
-
-        self.harness.charm.exporter.install.assert_called_with(
-            10200,  # default in config.yaml
-            "INFO",  # default in config.yaml
-            self.harness.charm.get_redfish_conn_params(mock_enabled_hw_tool_list),
-            10,  # default int config.yaml
-            mock_enabled_hw_tool_list,
-        )
-
-    @parameterized.expand([(InvalidCredentialsError), (Exception)])
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    @mock.patch("charm.redfish_client", return_value=mock.MagicMock())
-    def test_install_redfish_enabled_with_incorrect_credential(
-        self, test_exception, mock_redfish_client, mock_hw_tool_helper, mock_exporter
-    ) -> None:
-        """Test event install when redfish is available but credential is wrong."""
-        self.mock_get_hw_tool_enable_list.return_value = [
-            HWTool.REDFISH,
-        ]
-        mock_redfish_client.side_effect = test_exception()
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = True
-        rid = self.harness.add_relation("cos-agent", "grafana-agent")
-        self.harness.begin()
-        self.harness.add_relation_unit(rid, "grafana-agent/0")
-        self.harness.charm.on.install.emit()
-
-        self.assertTrue(self.harness.charm._stored.resource_installed)
-
-        # ensure exporter is installed (not started/enabled)
-        # even when redfish credentials are wrong
-        mock_exporter.return_value.install.assert_called_once()
-        mock_exporter.reset_mock()
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            BlockedStatus("Invalid config: 'redfish-username' or 'redfish-password'"),
-        )
-
-    @parameterized.expand([(InvalidCredentialsError), (Exception)])
-    @mock.patch("charm.Exporter", return_value=mock.MagicMock())
-    @mock.patch("charm.HWToolHelper", return_value=mock.MagicMock())
-    @mock.patch("charm.redfish_client", return_value=mock.MagicMock())
-    @mock.patch("charm.HardwareObserverCharm._stored")
-    def test_config_changed_redfish_enabled_with_incorrect_credential(
-        self, test_exception, mock_stored, mock_redfish_client, mock_hw_tool_helper, mock_exporter
-    ) -> None:
-        """Test event config changed when redfish is available but credential is wrong."""
-        mock_stored.enabled_hw_tool_list_values = [
-            "ipmi_sensor",
-            "ipmi_sel",
-            "ipmi_dcmi",
-            "redfish",
-        ]
-        mock_hw_tool_helper.return_value.install.return_value = (True, "")
-        mock_hw_tool_helper.return_value.check_installed.return_value = (True, "")
-        mock_exporter.return_value.install.return_value = True
-        rid = self.harness.add_relation("cos-agent", "grafana-agent")
-        self.harness.begin()
-        self.harness.add_relation_unit(rid, "grafana-agent/0")
-
-        mock_redfish_client.side_effect = test_exception()
-        new_config = {
-            "exporter-port": 80,
-            "exporter-log-level": "DEBUG",
-            "collect-timeout": 10,
-            "redfish-username": "redfish",
-            "redfish-password": "redfish",
-        }
-        self.harness.update_config(new_config)
-        self.harness.charm.on.config_changed.emit()
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            BlockedStatus("Invalid config: 'redfish-username' or 'redfish-password'"),
-        )
+        if all(mock_exporter_healths):
+            self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
+        else:
+            for mock_exporter, health in zip(
+                mock_exporters,
+                mock_exporter_healths,
+            ):
+                if health:
+                    mock_exporter.restart.assert_not_called()
+                else:
+                    msg = (
+                        f"Exporter {mock_exporter.exporter_name} "
+                        f"crashed unexpectedly: {ExporterError()}"
+                    )
+                    self.assertEqual(self.harness.charm.unit.status, BlockedStatus(msg))
 
     @parameterized.expand(
         [
@@ -577,51 +475,312 @@ class TestCharm(unittest.TestCase):
         else:
             self.harness.charm._on_install_or_upgrade.assert_not_called()
 
-    def test_get_redfish_conn_params_when_redfish_is_available(self):
-        """Test get_redfish_conn_params when Redfish is available."""
-        self.harness.begin()
-        result = self.harness.charm.get_redfish_conn_params([HWTool.REDFISH])
-        expected_result = {
-            "host": "https://127.0.0.1",
-            "username": "",
-            "password": "",
-            "timeout": 10,
-        }
-        self.assertEqual(result, expected_result)
-
-        # redfish client timeout is also set with the value from collect-timeout
-        new_config = {
-            "redfish-username": "redfish",
-            "redfish-password": "redfish",
-            "collect-timeout": 20,
-        }
-        self.harness.update_config(new_config)
-        expected_result = {
-            "host": "https://127.0.0.1",
-            "username": "redfish",
-            "password": "redfish",
-            "timeout": 20,
-        }
-        result = self.harness.charm.get_redfish_conn_params([HWTool.REDFISH])
-        self.assertEqual(result, expected_result)
-
-    def test_get_redfish_conn_params_when_redfish_is_absent(self):
-        """Test get_redfish_conn_params when Redfish is absent."""
-        # Redfish isn't present
-        self.mock_get_hw_tool_enable_list.return_value = [
-            HWTool.IPMI_SENSOR,
-            HWTool.IPMI_SEL,
-            HWTool.IPMI_DCMI,
+    @parameterized.expand(
+        [
+            (
+                "happy case",
+                True,
+                True,
+                (True, ""),
+                [mock.MagicMock(), mock.MagicMock()],
+                [(True, ""), (True, "")],
+            ),
+            (
+                "No resource_installed",
+                False,
+                True,
+                (True, ""),
+                [mock.MagicMock(), mock.MagicMock()],
+                [(True, ""), (True, "")],
+            ),
+            (
+                "No cos_agent_related",
+                True,
+                False,
+                (True, ""),
+                [mock.MagicMock(), mock.MagicMock()],
+                [(True, ""), (True, "")],
+            ),
+            (
+                "invalid config",
+                True,
+                True,
+                (False, "invalid msg"),
+                [mock.MagicMock(), mock.MagicMock()],
+                [(True, ""), (True, "")],
+            ),
+            (
+                "Exporter render_config failed",
+                True,
+                True,
+                (True, ""),
+                [mock.MagicMock(), mock.MagicMock()],
+                [True, False],
+            ),
         ]
-        self.harness.begin()
-        result = self.harness.charm.get_redfish_conn_params([])
-        self.assertEqual(result, {})
+    )
+    @mock.patch("charm.logger")
+    def test_config_changed(
+        self,
+        _,
+        resource_installed,
+        cos_agent_related,
+        validate_configs_return,
+        mock_exporters,
+        mock_exporters_render_config_returns,
+        mock_logger,
+    ):
+        for mock_exporter, render_config_return in zip(
+            mock_exporters,
+            mock_exporters_render_config_returns,
+        ):
+            mock_exporter.render_config.return_value = render_config_return
 
-        new_config = {
-            "redfish-username": "redfish",
-            "redfish-password": "redfish",
-            "collect-timeout": 20,
-        }
-        self.harness.update_config(new_config)
-        result = self.harness.charm.get_redfish_conn_params([])
-        self.assertEqual(result, {})
+        with (
+            mock.patch(
+                "charm.HardwareObserverCharm.exporters",
+                new_callable=mock.PropertyMock(
+                    return_value=mock_exporters,
+                ),
+            ),
+        ):
+            if cos_agent_related:
+                self.harness.add_relation("cos-agent", "grafana-agent")
+            self.harness.begin()
+            self.harness.charm._stored.resource_installed = resource_installed
+            self.harness.charm.validate_configs = mock.MagicMock()
+            self.harness.charm.validate_configs.return_value = validate_configs_return
+            self.harness.charm._on_update_status = mock.MagicMock()
+
+            self.harness.charm.on.config_changed.emit()
+
+            if not resource_installed:
+                mock_logger.info.assert_called()
+            if not cos_agent_related:
+                self.harness.charm.validate_configs.assert_not_called()
+                self.harness.charm._on_update_status.assert_called()
+                return
+            if not validate_configs_return[0]:
+                self.assertEqual(self.harness.charm.unit.status, BlockedStatus("invalid msg"))
+                self.harness.charm.exporters[0].render_config.assert_not_called()
+                return
+            if not all(mock_exporters_render_config_returns):
+                for mock_exporter, render_config_return in zip(
+                    mock_exporters,
+                    mock_exporters_render_config_returns,
+                ):
+                    if render_config_return:
+                        mock_exporter.restart.assert_called()
+                    else:
+                        message = (
+                            f"Failed to configure {mock_exporter.exporter_name}, "
+                            f"please check if the server is healthy."
+                        )
+                        self.assertEqual(self.harness.charm.unit.status, BlockedStatus(message))
+                self.harness.charm._on_update_status.assert_called()
+            self.harness.charm._on_update_status.assert_called()
+
+    def test_config_changed_update_alert_rules(self):
+        """Test config changed will update alert rule."""
+        mock_exporter = mock.MagicMock()
+        mock_exporter.install.return_value = True
+        mock_exporter.validate_exporter_configs.return_value = (True, "")
+        mock_exporter.check_health.return_value = True
+        mock_exporters = [mock_exporter]
+
+        with (
+            mock.patch(
+                "charm.HardwareObserverCharm.exporters",
+                new_callable=mock.PropertyMock(
+                    return_value=mock_exporters,
+                ),
+            ),
+        ):
+            rid = self.harness.add_relation("cos-agent", "grafana-agent")
+
+            self.harness.begin()
+
+            self.harness.charm.hw_tool_helper = mock.MagicMock()
+            self.harness.charm.hw_tool_helper.install.return_value = (True, "")
+            self.harness.charm.hw_tool_helper.check_installed.return_value = (True, "")
+
+            self.harness.charm.get_enable_hw_tools = mock.MagicMock()
+            self.harness.charm.get_enable_hw_tools.return_value = [
+                HWTool.IPMI_SENSOR,
+                HWTool.IPMI_SEL,
+                HWTool.IPMI_DCMI,
+            ]
+
+            self.harness.charm.on.install.emit()
+            self.harness.add_relation_unit(rid, "grafana-agent/0")
+            self.harness.charm.on.update_status.emit()
+            self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
+
+            relation_data = self.harness.get_relation_data(rid, "hardware-observer/0")
+            metrics_alert_rules = json.loads(relation_data["config"]).get("metrics_alert_rules")
+
+            with mock.patch(
+                "charm.COSAgentProvider._metrics_alert_rules", new_callable=mock.PropertyMock
+            ) as mock_alert_rules:
+                fake_metrics_alert_rules = {}
+                mock_alert_rules.return_value = fake_metrics_alert_rules
+                self.harness.charm.on.config_changed.emit()
+
+            relation_data = self.harness.get_relation_data(rid, "hardware-observer/0")
+            updated_metrics_alert_rules = json.loads(relation_data["config"]).get(
+                "metrics_alert_rules"
+            )
+            self.assertEqual(updated_metrics_alert_rules, fake_metrics_alert_rules)
+            self.assertNotEqual(updated_metrics_alert_rules, metrics_alert_rules)
+
+    def test_upgrade_charm_update_alert_rules(self):
+        """Test config changed will update alert rule."""
+        mock_exporter = mock.MagicMock()
+        mock_exporter.install.return_value = True
+        mock_exporter.validate_exporter_configs.return_value = (True, "")
+        mock_exporter.check_health.return_value = True
+        mock_exporters = [mock_exporter]
+
+        with (
+            mock.patch(
+                "charm.HardwareObserverCharm.exporters",
+                new_callable=mock.PropertyMock(
+                    return_value=mock_exporters,
+                ),
+            ),
+        ):
+            rid = self.harness.add_relation("cos-agent", "grafana-agent")
+
+            self.harness.begin()
+
+            self.harness.charm.hw_tool_helper = mock.MagicMock()
+            self.harness.charm.hw_tool_helper.install.return_value = (True, "")
+            self.harness.charm.hw_tool_helper.check_installed.return_value = (True, "")
+
+            self.harness.charm.get_enable_hw_tools = mock.MagicMock()
+            self.harness.charm.get_enable_hw_tools.return_value = [
+                HWTool.IPMI_SENSOR,
+                HWTool.IPMI_SEL,
+                HWTool.IPMI_DCMI,
+            ]
+
+            self.harness.charm.on.install.emit()
+            self.harness.add_relation_unit(rid, "grafana-agent/0")
+            self.harness.charm.on.update_status.emit()
+            self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
+
+            relation_data = self.harness.get_relation_data(rid, "hardware-observer/0")
+            metrics_alert_rules = json.loads(relation_data["config"]).get("metrics_alert_rules")
+
+            with mock.patch(
+                "charm.COSAgentProvider._metrics_alert_rules", new_callable=mock.PropertyMock
+            ) as mock_alert_rules:
+                fake_metrics_alert_rules = {}
+                mock_alert_rules.return_value = fake_metrics_alert_rules
+                self.harness.charm.on.upgrade_charm.emit()
+
+            relation_data = self.harness.get_relation_data(rid, "hardware-observer/0")
+            updated_metrics_alert_rules = json.loads(relation_data["config"]).get(
+                "metrics_alert_rules"
+            )
+            self.assertEqual(updated_metrics_alert_rules, fake_metrics_alert_rules)
+            self.assertNotEqual(updated_metrics_alert_rules, metrics_alert_rules)
+
+    @parameterized.expand(
+        [
+            ("happy case", True),
+            ("No resource_installed", False),
+        ]
+    )
+    def test_on_relation_joined(self, _, resource_installed):
+        mock_exporters = [mock.MagicMock()]
+        with (
+            mock.patch(
+                "charm.HardwareObserverCharm.exporters",
+                new_callable=mock.PropertyMock(
+                    return_value=mock_exporters,
+                ),
+            ),
+        ):
+            self.harness.begin()
+            self.harness.charm._on_update_status = mock.MagicMock()
+            self.harness.charm._stored.resource_installed = resource_installed
+
+            rid = self.harness.add_relation("cos-agent", "grafana-agent")
+            self.harness.add_relation_unit(rid, "grafana-agent/0")
+
+        if not resource_installed:
+            self.harness.charm._on_update_status.assert_not_called()
+            return
+        for mock_exporter in mock_exporters:
+            mock_exporter.enable_and_start.assert_called()
+        self.harness.charm._on_update_status.assert_called()
+
+    @parameterized.expand(
+        [
+            ("happy case", True),
+        ]
+    )
+    def test_relation_departed(self, _, resource_installed):
+        mock_exporters = [mock.MagicMock()]
+        with (
+            mock.patch(
+                "charm.HardwareObserverCharm.exporters",
+                new_callable=mock.PropertyMock(
+                    return_value=mock_exporters,
+                ),
+            ),
+        ):
+            self.harness.begin()
+            self.harness.charm._on_update_status = mock.MagicMock()
+
+            rid = self.harness.add_relation("cos-agent", "grafana-agent")
+            self.harness.add_relation_unit(rid, "grafana-agent/0")
+            rid = self.harness.remove_relation(rid)
+
+        for mock_exporter in mock_exporters:
+            mock_exporter.disable_and_stop.assert_called()
+        self.harness.charm._on_update_status.assert_called()
+
+    @parameterized.expand(
+        [
+            (
+                "happy case",
+                [10000, 10001],
+                [(True, ""), (True, "")],
+                (True, "Charm config is valid."),
+            ),
+            (
+                "exporter invalied",
+                [10000, 10001],
+                [(True, ""), (False, "Invalied msg")],
+                (False, "Invalied msg"),
+            ),
+            (
+                "happy case",
+                [10000, 10000],
+                [(True, ""), (True, "")],
+                (False, "Ports must be unique for each exporter."),
+            ),
+        ]
+    )
+    def test_validate_configs(
+        self, _, mock_exporter_ports, mock_exporter_validate_exporter_configs_returns, expect
+    ):
+        mock_exporters = [mock.MagicMock(), mock.MagicMock()]
+        for mock_exporter, port, return_val in zip(
+            mock_exporters, mock_exporter_ports, mock_exporter_validate_exporter_configs_returns
+        ):
+            mock_exporter.validate_exporter_configs.return_value = return_val
+            mock_exporter.port = port
+        with (
+            mock.patch(
+                "charm.HardwareObserverCharm.exporters",
+                new_callable=mock.PropertyMock(
+                    return_value=mock_exporters,
+                ),
+            ),
+        ):
+            self.harness.begin()
+            result = self.harness.charm.validate_configs()
+            self.assertEqual(result, expect)

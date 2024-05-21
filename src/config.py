@@ -3,17 +3,23 @@
 import typing as t
 from enum import Enum
 from pathlib import Path
-from pydantic import BaseModel
+
+from pydantic import BaseModel  # pylint: disable = no-name-in-module
 
 
-class ExporterSettings(BaseModel):
-    """Constant settings common across exporters"""
+class ExporterSettings(BaseModel):  # pylint: disable = too-few-public-methods
+    """Constant settings common across exporters."""
 
     health_retry_count: int = 3
     health_retry_timeout: int = 3
+    service_template: str
+    service_path: Path
+    name: str
+    config_template: str
+    config_path: Path
 
 
-class HardwareExporterSettings(ExporterSettings):
+class HardwareExporterSettings(ExporterSettings):  # pylint: disable = too-few-public-methods
     """Constant settings for Hardware Exporter."""
 
     name: str = "hardware-exporter"
@@ -28,6 +34,20 @@ class HardwareExporterSettings(ExporterSettings):
 
 
 HARDWARE_EXPORTER_SETTINGS = HardwareExporterSettings()
+
+
+class SmartCtlExporterSettings(ExporterSettings):  # pylint: disable = too-few-public-methods
+    """Constant settings for SmartCtl Exporter."""
+
+    name: str = "smartctl-exporter"
+    config_path: Path = Path(f"/etc/{name}-config.yaml")
+    service_path: Path = Path(f"/etc/systemd/system/{name}.service")
+    config_template: str = f"{name}-config.yaml.j2"
+    service_template: str = f"{name}.service.j2"
+    crash_msg: str = "SmartCtl exporter crashed unexpectedly, please refer to systemd logs..."
+
+
+SMARTCTL_EXPORTER_SETTINGS = SmartCtlExporterSettings()
 
 
 class SystemVendor(str, Enum):
@@ -57,6 +77,8 @@ class HWTool(str, Enum):
     IPMI_SEL = "ipmi_sel"
     IPMI_SENSOR = "ipmi_sensor"
     REDFISH = "redfish"
+    SMARTCTL = "smartctl"
+    SMARTCTL_EXPORTER = "smartctl_exporter"
 
 
 TPR_RESOURCES: t.Dict[HWTool, str] = {
