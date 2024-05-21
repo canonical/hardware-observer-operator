@@ -296,12 +296,10 @@ class TestCharm(unittest.TestCase):
             mock_exporter.check_health.return_value = health
             mock_exporter.restart.side_effect = ExporterError
 
-        with (
-            mock.patch(
-                "charm.HardwareObserverCharm.exporters",
-                new_callable=mock.PropertyMock(
-                    return_value=mock_exporters,
-                ),
+        with mock.patch(
+            "charm.HardwareObserverCharm.exporters",
+            new_callable=mock.PropertyMock(
+                return_value=mock_exporters,
             ),
         ):
             if cos_agent_related:
@@ -536,12 +534,10 @@ class TestCharm(unittest.TestCase):
         ):
             mock_exporter.render_config.return_value = render_config_return
 
-        with (
-            mock.patch(
-                "charm.HardwareObserverCharm.exporters",
-                new_callable=mock.PropertyMock(
-                    return_value=mock_exporters,
-                ),
+        with mock.patch(
+            "charm.HardwareObserverCharm.exporters",
+            new_callable=mock.PropertyMock(
+                return_value=mock_exporters,
             ),
         ):
             if cos_agent_related:
@@ -588,12 +584,10 @@ class TestCharm(unittest.TestCase):
         mock_exporter.check_health.return_value = True
         mock_exporters = [mock_exporter]
 
-        with (
-            mock.patch(
-                "charm.HardwareObserverCharm.exporters",
-                new_callable=mock.PropertyMock(
-                    return_value=mock_exporters,
-                ),
+        with mock.patch(
+            "charm.HardwareObserverCharm.exporters",
+            new_callable=mock.PropertyMock(
+                return_value=mock_exporters,
             ),
         ):
             rid = self.harness.add_relation("cos-agent", "grafana-agent")
@@ -641,12 +635,10 @@ class TestCharm(unittest.TestCase):
         mock_exporter.check_health.return_value = True
         mock_exporters = [mock_exporter]
 
-        with (
-            mock.patch(
-                "charm.HardwareObserverCharm.exporters",
-                new_callable=mock.PropertyMock(
-                    return_value=mock_exporters,
-                ),
+        with mock.patch(
+            "charm.HardwareObserverCharm.exporters",
+            new_callable=mock.PropertyMock(
+                return_value=mock_exporters,
             ),
         ):
             rid = self.harness.add_relation("cos-agent", "grafana-agent")
@@ -694,12 +686,10 @@ class TestCharm(unittest.TestCase):
     )
     def test_on_relation_joined(self, _, resource_installed):
         mock_exporters = [mock.MagicMock()]
-        with (
-            mock.patch(
-                "charm.HardwareObserverCharm.exporters",
-                new_callable=mock.PropertyMock(
-                    return_value=mock_exporters,
-                ),
+        with mock.patch(
+            "charm.HardwareObserverCharm.exporters",
+            new_callable=mock.PropertyMock(
+                return_value=mock_exporters,
             ),
         ):
             self.harness.begin()
@@ -723,12 +713,10 @@ class TestCharm(unittest.TestCase):
     )
     def test_relation_departed(self, _, resource_installed):
         mock_exporters = [mock.MagicMock()]
-        with (
-            mock.patch(
-                "charm.HardwareObserverCharm.exporters",
-                new_callable=mock.PropertyMock(
-                    return_value=mock_exporters,
-                ),
+        with mock.patch(
+            "charm.HardwareObserverCharm.exporters",
+            new_callable=mock.PropertyMock(
+                return_value=mock_exporters,
             ),
         ):
             self.harness.begin()
@@ -773,12 +761,10 @@ class TestCharm(unittest.TestCase):
         ):
             mock_exporter.validate_exporter_configs.return_value = return_val
             mock_exporter.port = port
-        with (
-            mock.patch(
-                "charm.HardwareObserverCharm.exporters",
-                new_callable=mock.PropertyMock(
-                    return_value=mock_exporters,
-                ),
+        with mock.patch(
+            "charm.HardwareObserverCharm.exporters",
+            new_callable=mock.PropertyMock(
+                return_value=mock_exporters,
             ),
         ):
             self.harness.begin()
