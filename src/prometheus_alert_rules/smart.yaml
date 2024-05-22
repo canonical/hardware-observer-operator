@@ -1,0 +1,101 @@
+groups:
+- name: SMART
+  rules:
+
+  - alert: SmartNVMeDriveReliabilityDegraded
+    # isolate the least significant three bits with % 8
+    # check whether bit 2 (starts from bit 0) has been set with the >= 4 comparison
+    # refer: https://en.wikipedia.org/wiki/Self-Monitoring,_Analysis_and_Reporting_Technology#Known_NVMe_S.M.A.R.T._attributes
+    expr: smartctl_device_critical_warning % 8 >= 4
+    for: 15m
+    labels:
+      severity: critical
+    annotations:
+      summary: SMART alert for critical warning attribute on an NVMe controller due to degradation in drive reliability. (instance {{ $labels.instance }})
+      description: |
+        Drive reliability is degraded. Bit 2 of critical warning SMART attribute is set.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: SmartNVMeDriveinReadOnlyMode
+    # isolate the least significant four bits with % 16
+    # check whether bit 3 (starts from bit 0) has been set with the >= 8 comparison
+    # refer: https://en.wikipedia.org/wiki/Self-Monitoring,_Analysis_and_Reporting_Technology#Known_NVMe_S.M.A.R.T._attributes
+    expr: smartctl_device_critical_warning % 16 >= 8
+    for: 15m
+    labels:
+      severity: critical
+    annotations:
+      summary: SMART alert for critical warning attribute on an NVMe controller due to drive being in read-only mode. (instance {{ $labels.instance }})
+      description: |
+        Drive is in read-only mode. Bit 3 of critical warning SMART attribute is set.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: SmartHealthStatusFail
+    expr: smartctl_device_smart_status == 0
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: SMART health status failed for device. (instance {{ $labels.instance }})
+      description: |
+        SMART health status failed for device. This means either that the device has already failed, or that it is predicting its own failure within the next 24 hours.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: SmartExitStatusDiskFail
+    # isolate the least significant four bits with % 16
+    # check whether bit 3 (starts from bit 0) has been set with the >= 8 comparison
+    # refer: https://www.smartmontools.org/browser/trunk/smartmontools/smartctl.8.in#EXIT_STATUS
+    expr: smartctl_device_smartctl_exit_status % 16 >= 8
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: smartctl exit status returned "DISK FAILING". (instance {{ $labels.instance }})
+      description: |
+        smartctl exit status returned "DISK FAILING". Bit 3 of smartctl exit status is set.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: SmartExitStatusPrefailBelowThreshold
+    # isolate the least significant four bits with % 32
+    # check whether bit 4 (starts from bit 0) has been set with the >= 16 comparison
+    # refer: https://www.smartmontools.org/browser/trunk/smartmontools/smartctl.8.in#EXIT_STATUS
+    expr: smartctl_device_smartctl_exit_status % 32 >= 16
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: smartctl exit status reports pre-fail attribute for device is below threshold. (instance {{ $labels.instance }})
+      description: |
+        smartctl exit status pre-fail attribute is below threshold. Bit 4 of smartctl exit status is set.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: SmartNVMeWearoutIndicator
+    expr: smartctl_device_available_spare{device=~"nvme.*"} < smartctl_device_available_spare_threshold{device=~"nvme.*"}
+    for: 15m
+    labels:
+      severity: critical
+    annotations:
+      summary: SMART alert for available spare space below threshold for NVMe device. (instance {{ $labels.instance }})
+      description: |
+        Available spare space below threshold for NVMe device.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
+
+  - alert: SmartAttributeWarning
+    # based on https://www.backblaze.com/blog/what-smart-stats-indicate-hard-drive-failures/
+    expr: smartctl_device_attribute{attribute_id=~"5|187|188|197|198"} > 0
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: SMART device attribute correlating with drive failure has its raw value greater than zero. (instance {{ $labels.instance }})
+      description: |
+        SMART raw value for attribute "{{ $labels.attribute_name }}" with id "{{ $labels.attribute_id }}"
+        on device "{{ $labels.device }}" is greater than 0.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
