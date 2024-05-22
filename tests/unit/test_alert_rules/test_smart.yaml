@@ -1,0 +1,190 @@
+rule_files:
+  - ../../../src/prometheus_alert_rules/smart.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_critical_warning{device="sda", instance="ubuntu-0"}'
+        values: '6x15' # 6 = 0b0110
+
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: SmartNVMeDriveReliabilityDegraded
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-0
+              device: sda
+            exp_annotations:
+              summary: SMART alert for critical warning attribute on an NVMe controller due to degradation in drive reliability. (instance ubuntu-0)
+              description: |
+                Drive reliability is degraded. Bit 2 of critical warning SMART attribute is set.
+                  VALUE = 6
+                  LABELS = map[device:sda instance:ubuntu-0]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_critical_warning{device="sda", instance="ubuntu-0"}'
+        values: '10x15' # 10 = 0b1010
+
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: SmartNMVeDriveReliabilityDegraded
+        exp_alerts: # alerts shouldn't fire since bit 2 isn't set
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_critical_warning{device="sda", instance="ubuntu-0"}'
+        values: '9x15' # 9 = 0b1001
+
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: SmartNVMeDriveinReadOnlyMode
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-0
+              device: sda
+            exp_annotations:
+              summary: SMART alert for critical warning attribute on an NVMe controller due to drive being in read-only mode. (instance ubuntu-0)
+              description: |
+                Drive is in read-only mode. Bit 3 of critical warning SMART attribute is set.
+                  VALUE = 9
+                  LABELS = map[device:sda instance:ubuntu-0]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_critical_warning{device="sda", instance="ubuntu-0"}'
+        values: '5x15' # 5 = 0b0101
+
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: SmartNVMeDriveinReadOnlyMode
+        exp_alerts: # alerts shouldn't fire since bit 3 isn't set
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_smart_status{device="sda", instance="ubuntu-1"}'
+        values: '0x15'
+
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SmartHealthStatusFail
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-1
+              device: sda
+            exp_annotations:
+              summary: SMART health status failed for device. (instance ubuntu-1)
+              description: |
+                SMART health status failed for device. This means either that the device has already failed, or that it is predicting its own failure within the next 24 hours.
+                  VALUE = 0
+                  LABELS = map[__name__:smartctl_device_smart_status device:sda instance:ubuntu-1]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_smartctl_exit_status{device="sda", instance="ubuntu-2"}'
+        values: '75x10' # 75 = 0b01001011
+
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SmartExitStatusDiskFail
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-2
+              device: sda
+            exp_annotations:
+              summary: smartctl exit status returned "DISK FAILING". (instance ubuntu-2)
+              description: |
+                smartctl exit status returned "DISK FAILING". Bit 3 of smartctl exit status is set.
+                  VALUE = 11
+                  LABELS = map[device:sda instance:ubuntu-2]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_smartctl_exit_status{device="sda", instance="ubuntu-2"}'
+        values: '67x10' # 67 = 0b01000011
+
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SmartExitStatusDiskFail
+        exp_alerts: # alerts shouldn't fire since bit 3 isn't set
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_smartctl_exit_status{device="sda", instance="ubuntu-2"}'
+        values: '82x10' # 82 = 0b01010010
+
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SmartExitStatusPrefailBelowThreshold
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-2
+              device: sda
+            exp_annotations:
+              summary: smartctl exit status reports pre-fail attribute for device is below threshold. (instance ubuntu-2)
+              description: |
+                smartctl exit status pre-fail attribute is below threshold. Bit 4 of smartctl exit status is set.
+                  VALUE = 18
+                  LABELS = map[device:sda instance:ubuntu-2]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_smartctl_exit_status{device="sda", instance="ubuntu-2"}'
+        values: '66x10' # 66 = 0b01000010
+
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SmartExitStatusPrefailBelowThreshold
+        exp_alerts: # alerts shouldn't fire since bit 4 isn't set
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_available_spare{device="nvme", instance="ubuntu-2"}'
+        values: '4x15'
+      - series: 'smartctl_device_available_spare_threshold{device="nvme", instance="ubuntu-2"}'
+        values: '5x15'
+
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: SmartNVMeWearoutIndicator
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-2
+              device: nvme
+            exp_annotations:
+              summary: SMART alert for available spare space below threshold for NVMe device. (instance ubuntu-2)
+              description: |
+                Available spare space below threshold for NVMe device.
+                  VALUE = 4
+                  LABELS = map[__name__:smartctl_device_available_spare device:nvme instance:ubuntu-2]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_attribute{device="sda", attribute_id="5", attribute_name="Reallocated_Sectors_Count", instance="ubuntu-2"}'
+        values: '2x10'
+
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SmartAttributeWarning
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-2
+              device: sda
+              attribute_id: 5
+              attribute_name: Reallocated_Sectors_Count
+            exp_annotations:
+              summary: SMART device attribute correlating with drive failure has its raw value greater than zero. (instance ubuntu-2)
+              description: |
+                SMART raw value for attribute "Reallocated_Sectors_Count" with id "5"
+                on device "sda" is greater than 0.
+                  VALUE = 2
+                  LABELS = map[__name__:smartctl_device_attribute attribute_id:5 attribute_name:Reallocated_Sectors_Count device:sda instance:ubuntu-2]
