@@ -533,7 +533,7 @@ class TestCharmWithHW:
 
 @pytest.mark.realhw
 class TestCharm:
-    """Perform basic functional tests that require a service to be present."""
+    """Perform tests that require one or more exporters to be present."""
 
     async def test_config_file_permissions(self, unit, ops_test):
         """Check config file permissions are set correctly."""
