@@ -15,7 +15,7 @@ These include:
 
 and more.
 
-Running these tests is as simple as executing the `make functional31` command (for the juju 3.1 tests) or the `make functional` command (for the juju 2.9 tests).
+Running these tests is as simple as executing the `make functional` command.
 
 ## Hardware Dependent Tests
 These are the tests that depend on real hardware to be executed. This is performed manually when required, for example - validating the charm's full functionality before a new release.
@@ -51,6 +51,9 @@ $ juju add-cloud manual-cloud --client
 
 Select cloud type: manual
 ssh connection string for controller: user@$IP_CONTROLLER
+
+# Bootstrap controller on the machine
+$ juju bootstrap manual-cloud manual-controller
 
 # Add model and machine
 $ juju add-model test
@@ -89,7 +92,7 @@ The supported collectors can be found by checking the output of the `lshw` comma
 
 After ensuring the prerequisite steps are complete, the final command to run the tests would look something like this:
 ```
-FUNC_ARGS="--model test --collectors ipmi_dcmi ipmi_sel ipmi_sensor redfish mega_raid" make functional31
+FUNC_ARGS="--model test --collectors ipmi_dcmi ipmi_sel ipmi_sensor redfish mega_raid" make functional
 ```
 
 This would pass the required collectors to tox which then sends it to the pytest command and starts the hardware dependent tests.
