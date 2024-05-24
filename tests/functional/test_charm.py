@@ -157,6 +157,7 @@ async def test_required_resources(ops_test: OpsTest, provided_collectors, requir
         assert unit.workload_status_message == AppStatus.MISSING_RELATION
 
 
+@pytest.mark.realhw
 @pytest.mark.abort_on_fail
 async def test_cos_agent_relation(ops_test: OpsTest, provided_collectors):
     """Test adding relation with grafana-agent."""
@@ -530,8 +531,9 @@ class TestCharmWithHW:
         )
 
 
+@pytest.mark.realhw
 class TestCharm:
-    """Perform basic functional testing of the charm without having the actual hardware."""
+    """Perform tests that require one or more exporters to be present."""
 
     async def test_config_file_permissions(self, unit, ops_test):
         """Check config file permissions are set correctly."""
