@@ -4,19 +4,50 @@ import typing as t
 from enum import Enum
 from pathlib import Path
 
-# Exporter
-EXPORTER_NAME = "hardware-exporter"
-EXPORTER_CONFIG_PATH = Path(f"/etc/{EXPORTER_NAME}-config.yaml")
-EXPORTER_SERVICE_PATH = Path(f"/etc/systemd/system/{EXPORTER_NAME}.service")
-EXPORTER_CONFIG_TEMPLATE = f"{EXPORTER_NAME}-config.yaml.j2"
-EXPORTER_SERVICE_TEMPLATE = f"{EXPORTER_NAME}.service.j2"
-EXPORTER_HEALTH_RETRY_COUNT = 3
-EXPORTER_HEALTH_RETRY_TIMEOUT = 3
-EXPORTER_CRASH_MSG = "Exporter crashed unexpectedly, please refer to systemd logs..."
+from pydantic import BaseModel  # pylint: disable = no-name-in-module
 
-# Redfish
-REDFISH_TIMEOUT = 10
-REDFISH_MAX_RETRY = 2
+
+class ExporterSettings(BaseModel):  # pylint: disable = too-few-public-methods
+    """Constant settings common across exporters."""
+
+    health_retry_count: int = 3
+    health_retry_timeout: int = 3
+    service_template: str
+    service_path: Path
+    name: str
+    config_template: str
+    config_path: Path
+
+
+class HardwareExporterSettings(ExporterSettings):  # pylint: disable = too-few-public-methods
+    """Constant settings for Hardware Exporter."""
+
+    name: str = "hardware-exporter"
+    config_path: Path = Path(f"/etc/{name}-config.yaml")
+    service_path: Path = Path(f"/etc/systemd/system/{name}.service")
+    config_template: str = f"{name}-config.yaml.j2"
+    service_template: str = f"{name}.service.j2"
+    crash_msg: str = "Hardware exporter crashed unexpectedly, please refer to systemd logs..."
+
+    redfish_timeout: int = 10
+    redfish_max_retry: int = 2
+
+
+HARDWARE_EXPORTER_SETTINGS = HardwareExporterSettings()
+
+
+class SmartCtlExporterSettings(ExporterSettings):  # pylint: disable = too-few-public-methods
+    """Constant settings for SmartCtl Exporter."""
+
+    name: str = "smartctl-exporter"
+    config_path: Path = Path(f"/etc/{name}-config.yaml")
+    service_path: Path = Path(f"/etc/systemd/system/{name}.service")
+    config_template: str = f"{name}-config.yaml.j2"
+    service_template: str = f"{name}.service.j2"
+    crash_msg: str = "SmartCtl exporter crashed unexpectedly, please refer to systemd logs..."
+
+
+SMARTCTL_EXPORTER_SETTINGS = SmartCtlExporterSettings()
 
 
 class SystemVendor(str, Enum):
@@ -46,6 +77,8 @@ class HWTool(str, Enum):
     IPMI_SEL = "ipmi_sel"
     IPMI_SENSOR = "ipmi_sensor"
     REDFISH = "redfish"
+    SMARTCTL = "smartctl"
+    SMARTCTL_EXPORTER = "smartctl_exporter"
 
 
 TPR_RESOURCES: t.Dict[HWTool, str] = {
@@ -55,7 +88,7 @@ TPR_RESOURCES: t.Dict[HWTool, str] = {
     HWTool.SAS3IRCU: "sas3ircu-bin",
 }
 
-EXPORTER_COLLECTOR_MAPPING = {
+HARDWARE_EXPORTER_COLLECTOR_MAPPING = {
     HWTool.STORCLI: ["collector.mega_raid"],
     HWTool.PERCCLI: ["collector.poweredge_raid"],
     HWTool.SAS2IRCU: ["collector.lsi_sas_2"],
@@ -70,4 +103,4 @@ EXPORTER_COLLECTOR_MAPPING = {
 TOOLS_DIR = Path("/usr/sbin")
 
 # SNAP environment
-SNAP_COMMON = Path(f"/var/snap/{EXPORTER_NAME}/common")
+SNAP_COMMON = Path(f"/var/snap/{HARDWARE_EXPORTER_SETTINGS.name}/common")

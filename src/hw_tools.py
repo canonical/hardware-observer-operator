@@ -3,13 +3,16 @@
 Define strategy for install, remove and verifier for different hardware.
 """
 
+import io
 import logging
 import os
 import shutil
 import stat
 import subprocess
+import tarfile
 from abc import ABCMeta, abstractmethod
 from functools import lru_cache
+from http import HTTPStatus
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
@@ -28,7 +31,7 @@ from checksum import (
     validate_checksum,
 )
 from config import (
-    REDFISH_TIMEOUT,
+    HARDWARE_EXPORTER_SETTINGS,
     SNAP_COMMON,
     TOOLS_DIR,
     TPR_RESOURCES,
@@ -58,6 +61,14 @@ class ResourceFileSizeZeroError(Exception):
     def __init__(self, tool: HWTool, path: Path):
         """Init."""
         self.message = f"Tool: {tool} path: {path} size is zero"
+
+
+class ResourceInstallationError(Exception):
+    """Exception raised when a hardware tool installation fails."""
+
+    def __init__(self, tool: HWTool):
+        """Init."""
+        super().__init__(f"Installation failed for tool: {tool}")
 
 
 def copy_to_snap_common_bin(source: Path, filename: str) -> None:
@@ -300,7 +311,7 @@ class SSACLIStrategy(APTStrategyABC):
         apt.add_package(self.pkg, update_cache=True)
 
     def remove(self) -> None:
-        # Skip removing because we afriad this cause dependency error
+        # Skip removing because this may cause dependency error
         # for other services on the same machine.
         logger.info("SSACLIStrategy skip removing %s", self.pkg)
 
@@ -318,7 +329,7 @@ class IPMIStrategy(APTStrategyABC):
         apt_helpers.add_pkg_with_candidate_version(self.pkg)
 
     def remove(self) -> None:
-        # Skip removing because we afriad this cause dependency error
+        # Skip removing because this may cause dependency error
         # for other services on the same machine.
         logger.info("%s skip removing %s", self._name, self.pkg)
 
@@ -356,6 +367,75 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
     def check(self) -> bool:
         """Check package status."""
         return True
+
+
+class SmartCtlStrategy(APTStrategyABC):
+    """Strategy for installing ipmi."""
+
+    pkg = "smartmontools"
+    _name = HWTool.SMARTCTL
+
+    def install(self) -> None:
+        apt_helpers.add_pkg_with_candidate_version(self.pkg)
+
+    def remove(self) -> None:
+        # Skip removing because this may cause dependency error
+        # for other services on the same machine.
+        logger.info("%s skip removing %s", self._name, self.pkg)
+
+    def check(self) -> bool:
+        """Check package status."""
+        return check_deb_pkg_installed(self.pkg)
+
+
+class SmartCtlExporterStrategy(StrategyABC):  # pylint: disable=R0903
+    """Install smartctl exporter binary."""
+
+    _name = HWTool.SMARTCTL_EXPORTER
+
+    _resource_dir = Path("/opt/SmartCtlExporter/")
+    _release = (
+        "https://github.com/prometheus-community/"
+        "smartctl_exporter/releases/download/v0.12.0/smartctl_exporter-0.12.0.linux-amd64.tar.gz"
+    )
+    _exporter_name = "smartctl_exporter"
+    _exporter_path = Path(_resource_dir / "smartctl_exporter")
+
+    def install(self) -> None:
+        """Install exporter binary from internet."""
+        logger.debug("Installing SmartCtlExporter")
+        self._resource_dir.mkdir(parents=True, exist_ok=True)
+
+        resp = requests.get(self._release, timeout=60)
+        if resp.status_code != HTTPStatus.OK:
+            logger.error("Failed to download smartctl exporter binary.")
+            raise ResourceInstallationError(self._name)
+
+        success = False
+        fileobj = io.BytesIO(resp.content)
+        with tarfile.open(fileobj=fileobj, mode="r:gz") as tar:
+            for member in tar.getmembers():
+                if member.name.endswith(self._exporter_name):
+                    with open(self._exporter_path, "wb") as outfile:
+                        member_file = tar.extractfile(member)
+                        if member_file:
+                            outfile.write(member_file.read())
+                            success = True
+                    if success:
+                        make_executable(self._exporter_path)
+        if not success:
+            logger.error("Failed to install SmartCtlExporter binary.")
+            raise ResourceInstallationError(self._name)
+
+    def remove(self) -> None:
+        """Remove downloaded exporter binary."""
+        logger.debug("Remove SmartCtlExporter")
+        shutil.rmtree(self._resource_dir)
+
+    def check(self) -> bool:
+        """Check package status."""
+        logger.debug("Check SmartCtlExporter resources")
+        return self._exporter_path.is_file()
 
 
 def _raid_hw_verifier_hwinfo() -> Set[HWTool]:
@@ -441,7 +521,9 @@ def redfish_available() -> bool:
     bmc_address = get_bmc_address()
     health_check_endpoint = f"https://{bmc_address}:443/redfish/v1/"
     try:
-        response = requests.get(health_check_endpoint, verify=False, timeout=REDFISH_TIMEOUT)
+        response = requests.get(
+            health_check_endpoint, verify=False, timeout=HARDWARE_EXPORTER_SETTINGS.redfish_timeout
+        )
         response.raise_for_status()
         data = response.json()
         # only check if the data is empty dict or not
@@ -500,6 +582,14 @@ def bmc_hw_verifier() -> List[HWTool]:
     return tools
 
 
+def disk_hw_verifier() -> List[HWTool]:
+    """Verify if the disk exists on the machine."""
+    lshw_storage = lshw(class_filter="disk")
+    if lshw_storage:
+        return [HWTool.SMARTCTL]
+    return []
+
+
 # Using cache here to avoid repeat call.
 # The lru_cache should be cleaned every time the hook been triggered.
 @lru_cache
@@ -507,7 +597,8 @@ def get_hw_tool_enable_list() -> List[HWTool]:
     """Return HWTool enable list."""
     raid_enable_list = raid_hw_verifier()
     bmc_enable_list = bmc_hw_verifier()
-    return raid_enable_list + bmc_enable_list
+    disk_enable_list = disk_hw_verifier()
+    return raid_enable_list + bmc_enable_list + disk_enable_list
 
 
 class HWToolHelper:
@@ -526,6 +617,7 @@ class HWToolHelper:
             IPMIDCMIStrategy(),
             IPMISENSORStrategy(),
             RedFishStrategy(),
+            SmartCtlStrategy(),
         ]
 
     def fetch_tools(  # pylint: disable=W0102
@@ -585,8 +677,8 @@ class HWToolHelper:
         for strategy in self.strategies:
             if strategy.name not in hw_enable_list:
                 continue
-            # TPRStrategy
             try:
+                # TPRStrategy
                 if isinstance(strategy, TPRStrategyABC):
                     path = fetch_tools.get(strategy.name)  # pylint: disable=W0212
                     if path:

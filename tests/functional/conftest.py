@@ -3,7 +3,7 @@ import logging
 import pytest
 from utils import RESOURCES_DIR, Resource
 
-from config import EXPORTER_COLLECTOR_MAPPING, TPR_RESOURCES, HWTool
+from config import HARDWARE_EXPORTER_COLLECTOR_MAPPING, TPR_RESOURCES, HWTool
 
 log = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def resources() -> list[Resource]:
         Resource(
             resource_name=TPR_RESOURCES.get(HWTool.STORCLI),
             file_name="storcli.deb",
-            collector_name=EXPORTER_COLLECTOR_MAPPING.get(HWTool.STORCLI)[0].replace(
+            collector_name=HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(HWTool.STORCLI)[0].replace(
                 "collector.", ""
             ),
             bin_name=HWTool.STORCLI.value,
@@ -99,7 +99,7 @@ def resources() -> list[Resource]:
         Resource(
             resource_name=TPR_RESOURCES.get(HWTool.PERCCLI),
             file_name="perccli.deb",
-            collector_name=EXPORTER_COLLECTOR_MAPPING.get(HWTool.PERCCLI)[0].replace(
+            collector_name=HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(HWTool.PERCCLI)[0].replace(
                 "collector.", ""
             ),
             bin_name=HWTool.PERCCLI.value,
@@ -107,7 +107,7 @@ def resources() -> list[Resource]:
         Resource(
             resource_name=TPR_RESOURCES.get(HWTool.SAS2IRCU),
             file_name="sas2ircu",
-            collector_name=EXPORTER_COLLECTOR_MAPPING.get(HWTool.SAS2IRCU)[0].replace(
+            collector_name=HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(HWTool.SAS2IRCU)[0].replace(
                 "collector.", ""
             ),
             bin_name=HWTool.SAS2IRCU.value,
@@ -115,7 +115,7 @@ def resources() -> list[Resource]:
         Resource(
             resource_name=TPR_RESOURCES.get(HWTool.SAS3IRCU),
             file_name="sas3ircu",
-            collector_name=EXPORTER_COLLECTOR_MAPPING.get(HWTool.SAS3IRCU)[0].replace(
+            collector_name=HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(HWTool.SAS3IRCU)[0].replace(
                 "collector.", ""
             ),
             bin_name=HWTool.SAS3IRCU.value,
