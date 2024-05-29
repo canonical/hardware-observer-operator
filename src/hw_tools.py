@@ -324,9 +324,17 @@ class IPMIStrategy(APTStrategyABC):
     """Strategy for installing ipmi."""
 
     pkg = "freeipmi-tools"
+    ipmiseld_pkg = "freeipmi-ipmiseld"
 
     def install(self) -> None:
         apt_helpers.add_pkg_with_candidate_version(self.pkg)
+        apt_helpers.add_pkg_with_candidate_version(self.ipmiseld_pkg)
+        try:
+            result = subprocess.check_output("ipmiseld", universal_newlines=True)
+            logger.debug(result)
+            logger.info("Start ipmiseld success")
+        except subprocess.CalledProcessError as exc:
+            raise RuntimeError("Failed to start ipmiseld") from exc
 
     def remove(self) -> None:
         # Skip removing because this may cause dependency error

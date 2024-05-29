@@ -682,8 +682,11 @@ class TestIPMISENSORStrategy(unittest.TestCase):
         mock_candidate_version.return_value = "some-candidate-version"
         strategy.install()
 
-        mock_apt.add_package.assert_called_with(
+        mock_apt.add_package.assert_any_call(
             "freeipmi-tools", version="some-candidate-version", update_cache=False
+        )
+        mock_apt.add_package.assert_any_call(
+            "freeipmi-ipmiseld", version="some-candidate-version", update_cache=False
         )
 
     @mock.patch("hw_tools.apt")
@@ -692,6 +695,19 @@ class TestIPMISENSORStrategy(unittest.TestCase):
         strategy.remove()
 
         mock_apt.remove_package.assert_not_called()
+
+    @mock.patch(
+        "hardware.subprocess.check_output",
+        side_effect=subprocess.CalledProcessError(-1, "cmd"),
+        return_value="[{}]",
+    )
+    @mock.patch("apt_helpers.get_candidate_version")
+    @mock.patch("apt_helpers.apt")
+    def test_install_exception(self, mock_apt, mock_candidate_version, mock_subprocess):
+        strategy = IPMISENSORStrategy()
+        mock_candidate_version.return_value = "some-candidate-version"
+        with self.assertRaises(RuntimeError):
+            strategy.install()
 
 
 class TestIPMISELStrategy(unittest.TestCase):
@@ -702,8 +718,11 @@ class TestIPMISELStrategy(unittest.TestCase):
         mock_candidate_version.return_value = "some-candidate-version"
         strategy.install()
 
-        mock_apt.add_package.assert_called_with(
+        mock_apt.add_package.assert_any_call(
             "freeipmi-tools", version="some-candidate-version", update_cache=False
+        )
+        mock_apt.add_package.assert_any_call(
+            "freeipmi-ipmiseld", version="some-candidate-version", update_cache=False
         )
 
     @mock.patch("hw_tools.apt")
@@ -722,8 +741,11 @@ class TestIPMIDCMIStrategy(unittest.TestCase):
         mock_candidate_version.return_value = "some-candidate-version"
         strategy.install()
 
-        mock_apt.add_package.assert_called_with(
+        mock_apt.add_package.assert_any_call(
             "freeipmi-tools", version="some-candidate-version", update_cache=False
+        )
+        mock_apt.add_package.assert_any_call(
+            "freeipmi-ipmiseld", version="some-candidate-version", update_cache=False
         )
 
     @mock.patch("hw_tools.apt")
