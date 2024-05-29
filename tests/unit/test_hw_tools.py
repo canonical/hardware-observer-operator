@@ -734,9 +734,10 @@ class TestIPMISELStrategy(unittest.TestCase):
 
 
 class TestIPMIDCMIStrategy(unittest.TestCase):
+    @mock.patch("subprocess.check_output")
     @mock.patch("apt_helpers.get_candidate_version")
     @mock.patch("apt_helpers.apt")
-    def test_install(self, mock_apt, mock_candidate_version):
+    def test_install(self, mock_apt, mock_candidate_version, mock_check_output):
         strategy = IPMIDCMIStrategy()
         mock_candidate_version.return_value = "some-candidate-version"
         strategy.install()
