@@ -675,9 +675,10 @@ class TestSSACLIStrategy(unittest.TestCase):
 
 
 class TestIPMISENSORStrategy(unittest.TestCase):
+    @mock.patch("subprocess.check_output")
     @mock.patch("apt_helpers.get_candidate_version")
     @mock.patch("apt_helpers.apt")
-    def test_install(self, mock_apt, mock_candidate_version):
+    def test_install(self, mock_apt, mock_candidate_version, mock_check_output):
         strategy = IPMISENSORStrategy()
         mock_candidate_version.return_value = "some-candidate-version"
         strategy.install()
@@ -711,9 +712,10 @@ class TestIPMISENSORStrategy(unittest.TestCase):
 
 
 class TestIPMISELStrategy(unittest.TestCase):
+    @mock.patch("subprocess.check_output")
     @mock.patch("apt_helpers.get_candidate_version")
     @mock.patch("apt_helpers.apt")
-    def test_install(self, mock_apt, mock_candidate_version):
+    def test_install(self, mock_apt, mock_candidate_version, mock_check_output):
         strategy = IPMISELStrategy()
         mock_candidate_version.return_value = "some-candidate-version"
         strategy.install()
