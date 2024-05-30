@@ -324,17 +324,9 @@ class IPMIStrategy(APTStrategyABC):
     """Strategy for installing ipmi."""
 
     pkg = "freeipmi-tools"
-    ipmiseld_pkg = "freeipmi-ipmiseld"
 
     def install(self) -> None:
         apt_helpers.add_pkg_with_candidate_version(self.pkg)
-        apt_helpers.add_pkg_with_candidate_version(self.ipmiseld_pkg)
-        try:
-            result = subprocess.check_output("ipmiseld", universal_newlines=True)
-            logger.debug(result)
-            logger.info("Start ipmiseld success")
-        except subprocess.CalledProcessError as exc:
-            raise RuntimeError("Failed to start ipmiseld") from exc
 
     def remove(self) -> None:
         # Skip removing because this may cause dependency error
@@ -356,6 +348,25 @@ class IPMISELStrategy(IPMIStrategy):
     """Strategy for installing ipmi."""
 
     _name = HWTool.IPMI_SEL
+
+    # Ipmiseld is not included in freeipmi-tools package
+    # install it in another package.
+    ipmiseld_pkg = "freeipmi-ipmiseld"
+
+    def install(self) -> None:
+        super().install()
+        apt_helpers.add_pkg_with_candidate_version(self.ipmiseld_pkg)
+
+    def remove(self) -> None:
+        # Skip removing because this may cause dependency error
+        # for other services on the same machine.
+        logger.info("%s skip removing %s", self._name, self.ipmiseld_pkg)
+
+    def check(self) -> bool:
+        """Check package status."""
+        parent_pkg_installed = super().check()
+        child_pkg_installed = check_deb_pkg_installed(self.ipmiseld_pkg)
+        return parent_pkg_installed and child_pkg_installed
 
 
 class IPMIDCMIStrategy(IPMIStrategy):
