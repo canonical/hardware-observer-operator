@@ -1,0 +1,161 @@
+{
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": 27,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+      {
+        "datasource": {
+          "type": "loki",
+          "uid": "P0E1708AB45903052"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Line"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 1500
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 20,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "id": 1,
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": false,
+              "displayName": "Line"
+            }
+          ]
+        },
+        "pluginVersion": "9.5.3",
+        "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "P0E1708AB45903052"
+            },
+            "editorMode": "builder",
+            "expr": "{instance=\"$instance_var\"} |= `systemd`",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ],
+        "title": "Panel Title",
+        "type": "table"
+      }
+    ],
+    "refresh": "",
+    "schemaVersion": 38,
+    "style": "dark",
+    "tags": [],
+    "templating": {
+      "list": [
+        {
+          "current": {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "P0E1708AB45903052"
+          },
+          "definition": "",
+          "hide": 0,
+          "includeAll": true,
+          "label": "Instance",
+          "multi": false,
+          "name": "instance_var",
+          "options": [],
+          "query": {
+            "label": "instance",
+            "refId": "LokiVariableQueryEditor-VariableQuery",
+            "stream": "",
+            "type": 1
+          },
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 1,
+          "type": "query"
+        }
+      ]
+    },
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "sel dashboard",
+    "uid": "af13efcd-5d18-43b6-90a0-a0ce98ca44ab",
+    "version": 8,
+    "weekStart": ""
+  }
