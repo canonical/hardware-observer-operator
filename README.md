@@ -27,6 +27,8 @@ Appropriate collectors and alert rules are installed based on the availability o
 - LSI SAS-3 controller
 - HPE Smart Array controller
 
+Additionally, Hardware-observer now integrates the [smartctl-exporter](https://github.com/prometheus-community/smartctl_exporter), which collects and exports smartctl metrics to Prometheus. 
+
 This charm is ideal for monitoring hardware resources when used in conjunction with the [Canonical Observability Stack](https://charmhub.io/topics/canonical-observability-stack).
 
 ## Uploading Resources
