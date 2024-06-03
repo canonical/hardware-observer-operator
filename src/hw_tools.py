@@ -349,7 +349,7 @@ class IPMISELStrategy(IPMIStrategy):
 
     _name = HWTool.IPMI_SEL
 
-    # The ipmiseld daemon polls the system event log (SEL) 
+    # The ipmiseld daemon polls the system event log (SEL)
     # of specified hosts and stores the logs into the local syslog.
     # Grafana agent will then forward the logs to Loki.
     ipmiseld_pkg = "freeipmi-ipmiseld"

@@ -6,7 +6,6 @@ import asyncio
 import inspect
 import logging
 import os
-import subprocess
 from enum import Enum
 from pathlib import Path
 from uuid import uuid4
