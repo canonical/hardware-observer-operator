@@ -345,13 +345,16 @@ class IPMISENSORStrategy(IPMIStrategy):
 
 
 class IPMISELStrategy(IPMIStrategy):
-    """Strategy for installing ipmi."""
+    """Strategy for installing ipmi.
+
+    The ipmiseld daemon polls the system event log (SEL)
+    of specified hosts and stores the logs into the local syslog.
+
+    Grafana agent will then forward the logs to Loki.
+    """
 
     _name = HWTool.IPMI_SEL
 
-    # The ipmiseld daemon polls the system event log (SEL)
-    # of specified hosts and stores the logs into the local syslog.
-    # Grafana agent will then forward the logs to Loki.
     ipmiseld_pkg = "freeipmi-ipmiseld"
 
     def install(self) -> None:
