@@ -239,9 +239,12 @@ class TestCharmWithHW:
         )
         assert provided_collectors == collectors_in_config, error_msg
 
-    async def test_redfish_client_timeout_config(self, app, unit, ops_test):
+    async def test_redfish_client_timeout_config(self, app, unit, ops_test, provided_collectors):
         """Test whether the redfish client's timeout depends on collect-timeout charm config."""
-        new_timeout = 20
+        if "redfish" not in provided_collectors:
+            pytest.skip("redfish not in provided collectors, skipping test")
+
+        new_timeout = "20"
         await asyncio.gather(
             app.set_config({"collect-timeout": new_timeout}),
             ops_test.model.wait_for_idle(apps=[APP_NAME]),
