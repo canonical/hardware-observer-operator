@@ -44,6 +44,8 @@ class HardwareObserverCharm(ops.CharmBase):
         )
 
         self._stored.set_default(
+            # resource_installed is a flag that tracks the installation state for
+            # the juju resources and also the different exporters
             resource_installed=False,
             # Storing only the values from `HWTool` because entire HWTool
             # cannot be stored in _stored. Only simple types can be stored.
