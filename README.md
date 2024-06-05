@@ -15,8 +15,12 @@ Use links instead.
 ## Overview
 [Charmhub Page](https://charmhub.io/hardware-observer)
 
-Hardware-observer is a [subordinate machine charm](https://juju.is/docs/sdk/charm-taxonomy#heading--subordinate-charms) that provides monitoring and alerting of hardware resources on bare-metal infrastructure.
+Hardware-observer is a [subordinate machine charm](https://juju.is/docs/sdk/charm-taxonomy#heading--subordinate-charms) that provides monitoring and alerting of hardware resources on bare-metal infrastructure. This charm leverages the following exporters to provide detailed metrics:
 
+- **Prometheus Hardware Exporter**: For collecting metrics from BMCs and RAID controllers.
+- **Smartctl Exporter**: For collecting SMART metrics from storage devices.
+
+### Prometheus Hardware Exporter
 Hardware-observer collects and exports Prometheus metrics from BMCs (using the IPMI and newer Redfish protocols) and various SAS and RAID controllers through the use of the [prometheus-hardware-exporter](https://github.com/canonical/prometheus-hardware-exporter) project. It additionally configures Prometheus alert rules that are fired when the status of any metric is suboptimal.
 
 Appropriate collectors and alert rules are installed based on the availability of one or more of the RAID/SAS controllers mentioned below:
@@ -27,7 +31,8 @@ Appropriate collectors and alert rules are installed based on the availability o
 - LSI SAS-3 controller
 - HPE Smart Array controller
 
-Additionally, Hardware-observer now integrates the [smartctl-exporter](https://github.com/prometheus-community/smartctl_exporter), which collects and exports smartctl metrics to Prometheus. 
+### Smartctl Exporter
+The Smartctl Exporter integrates with the Hardware-observer to provide monitoring of storage device health via SMART data. Metrics are collected and exported to Prometheus using the [smartctl-exporter](https://github.com/prometheus-community/smartctl_exporter).
 
 This charm is ideal for monitoring hardware resources when used in conjunction with the [Canonical Observability Stack](https://charmhub.io/topics/canonical-observability-stack).
 
