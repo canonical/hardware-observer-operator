@@ -323,19 +323,19 @@ class SSACLIStrategy(APTStrategyABC):
 class IPMIStrategy(APTStrategyABC):
     """Strategy for installing ipmi."""
 
-    pkg = "freeipmi-tools"
+    freeipmi_pkg = "freeipmi-tools"
 
     def install(self) -> None:
-        apt_helpers.add_pkg_with_candidate_version(self.pkg)
+        apt_helpers.add_pkg_with_candidate_version(self.freeipmi_pkg)
 
     def remove(self) -> None:
         # Skip removing because this may cause dependency error
         # for other services on the same machine.
-        logger.info("%s skip removing %s", self._name, self.pkg)
+        logger.info("%s skip removing %s", self._name, self.freeipmi_pkg)
 
     def check(self) -> bool:
         """Check package status."""
-        return check_deb_pkg_installed(self.pkg)
+        return check_deb_pkg_installed(self.freeipmi_pkg)
 
 
 class IPMISENSORStrategy(IPMIStrategy):
@@ -345,9 +345,33 @@ class IPMISENSORStrategy(IPMIStrategy):
 
 
 class IPMISELStrategy(IPMIStrategy):
-    """Strategy for installing ipmi."""
+    """Strategy for installing ipmi.
+
+    The ipmiseld daemon polls the system event log (SEL)
+    of specified hosts and stores the logs into the local syslog.
+
+    Grafana agent will then forward the logs to Loki.
+    """
 
     _name = HWTool.IPMI_SEL
+
+    ipmiseld_pkg = "freeipmi-ipmiseld"
+
+    def install(self) -> None:
+        super().install()
+        apt_helpers.add_pkg_with_candidate_version(self.ipmiseld_pkg)
+
+    def remove(self) -> None:
+        # Skip removing because this may cause dependency error
+        # for other services on the same machine.
+        super().remove()
+        logger.info("%s skip removing %s", self._name, self.ipmiseld_pkg)
+
+    def check(self) -> bool:
+        """Check package status."""
+        parent_pkg_installed = super().check()
+        child_pkg_installed = check_deb_pkg_installed(self.ipmiseld_pkg)
+        return parent_pkg_installed and child_pkg_installed
 
 
 class IPMIDCMIStrategy(IPMIStrategy):

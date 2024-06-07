@@ -239,9 +239,12 @@ class TestCharmWithHW:
         )
         assert provided_collectors == collectors_in_config, error_msg
 
-    async def test_redfish_client_timeout_config(self, app, unit, ops_test):
+    async def test_redfish_client_timeout_config(self, app, unit, ops_test, provided_collectors):
         """Test whether the redfish client's timeout depends on collect-timeout charm config."""
-        new_timeout = 20
+        if "redfish" not in provided_collectors:
+            pytest.skip("redfish not in provided collectors, skipping test")
+
+        new_timeout = "20"
         await asyncio.gather(
             app.set_config({"collect-timeout": new_timeout}),
             ops_test.model.wait_for_idle(apps=[APP_NAME]),
@@ -398,6 +401,13 @@ class TestCharmWithHW:
         }
         if not assert_metrics(metrics.get("ipmi_sel"), expected_metric_values):
             pytest.fail("Expected metrics not present!")
+
+        check_active_cmd = "systemctl is-active ipmiseld"
+        logging.info("Check whether ipmiseld service is active.")
+        for unit in ops_test.model.applications[APP_NAME].units:
+            results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
+            assert results.get("return-code") == 0
+            assert results.get("stdout").strip() == "active"
 
     @pytest.mark.parametrize("version", ["1", "2"])
     async def test_lsi_sas_metrics(self, ops_test, unit, provided_collectors, version):
