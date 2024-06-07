@@ -702,8 +702,11 @@ class TestIPMISELStrategy(unittest.TestCase):
         mock_candidate_version.return_value = "some-candidate-version"
         strategy.install()
 
-        mock_apt.add_package.assert_called_with(
+        mock_apt.add_package.assert_any_call(
             "freeipmi-tools", version="some-candidate-version", update_cache=False
+        )
+        mock_apt.add_package.assert_any_call(
+            "freeipmi-ipmiseld", version="some-candidate-version", update_cache=False
         )
 
     @mock.patch("hw_tools.apt")

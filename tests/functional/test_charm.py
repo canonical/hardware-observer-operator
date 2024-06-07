@@ -402,6 +402,13 @@ class TestCharmWithHW:
         if not assert_metrics(metrics.get("ipmi_sel"), expected_metric_values):
             pytest.fail("Expected metrics not present!")
 
+        check_active_cmd = "systemctl is-active ipmiseld"
+        logging.info("Check whether ipmiseld service is active.")
+        for unit in ops_test.model.applications[APP_NAME].units:
+            results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
+            assert results.get("return-code") == 0
+            assert results.get("stdout").strip() == "active"
+
     @pytest.mark.parametrize("version", ["1", "2"])
     async def test_lsi_sas_metrics(self, ops_test, unit, provided_collectors, version):
         """Tests for lsi_sas_{1,2} specific metrics."""
