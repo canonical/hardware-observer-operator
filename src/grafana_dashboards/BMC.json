@@ -102,7 +102,7 @@
               "uid": "P0E1708AB45903052"
             },
             "editorMode": "builder",
-            "expr": "{instance=\"$instance_var\"} |= `systemd`",
+            "expr": "{instance=\"$instance_var\"} |= `ipmiseld`",
             "queryType": "range",
             "refId": "A"
           }
@@ -154,7 +154,7 @@
     },
     "timepicker": {},
     "timezone": "",
-    "title": "sel dashboard",
+    "title": "BMC dashboard",
     "uid": "af13efcd-5d18-43b6-90a0-a0ce98ca44ab",
     "version": 8,
     "weekStart": ""
