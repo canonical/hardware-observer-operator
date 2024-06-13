@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 129,
+  "id": 212,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -37,7 +37,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "width": 300
           },
           "mappings": [],
           "thresholds": {
@@ -63,11 +64,15 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 1500
+                "value": 300
               },
               {
                 "id": "displayName",
-                "value": "Log Message"
+                "value": "Full Log"
+              },
+              {
+                "id": "custom.hidden",
+                "value": true
               }
             ]
           },
@@ -79,7 +84,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 300
+                "value": 3080
               },
               {
                 "id": "custom.hidden",
@@ -100,6 +105,10 @@
               {
                 "id": "displayName",
                 "value": "Viewed Time"
+              },
+              {
+                "id": "custom.hidden",
+                "value": true
               }
             ]
           },
@@ -118,12 +127,71 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 202
+              },
+              {
+                "id": "displayName",
+                "value": "Log Time"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "msg"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              },
+              {
+                "id": "displayName",
+                "value": "Log Message"
+              },
+              {
+                "id": "custom.width"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instance"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Instance"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
               "options": "id"
             },
             "properties": [
               {
                 "id": "custom.hidden",
                 "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Instance"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 214
               }
             ]
           }
@@ -147,12 +215,7 @@
           "show": false
         },
         "showHeader": true,
-        "sortBy": [
-          {
-            "desc": false,
-            "displayName": "Line"
-          }
-        ]
+        "sortBy": []
       },
       "pluginVersion": "9.5.3",
       "targets": [
@@ -162,12 +225,82 @@
             "uid": "P0E1708AB45903052"
           },
           "editorMode": "builder",
-          "expr": "{instance=\"$instance_var\"} |= `ipmiseld`",
+          "expr": "{instance=\"$instance_var\"} |= `ipmiseld` | regexp `(?P<time>\\w+ \\s*\\d{1,2} \\d+:\\d+:\\d+) (?P<msg>.*)`",
           "queryType": "range",
           "refId": "A"
         }
       ],
       "title": "System Event Log",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "format": "json",
+            "jsonPaths": [
+              {
+                "path": "time"
+              }
+            ],
+            "keepTime": false,
+            "replace": false,
+            "source": "labels"
+          }
+        },
+        {
+          "id": "extractFields",
+          "options": {
+            "format": "json",
+            "jsonPaths": [
+              {
+                "path": "instance"
+              }
+            ],
+            "source": "labels"
+          }
+        },
+        {
+          "id": "extractFields",
+          "options": {
+            "format": "json",
+            "jsonPaths": [
+              {
+                "path": "msg"
+              }
+            ],
+            "source": "labels"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "Line": 3,
+              "Time": 5,
+              "id": 7,
+              "instance": 0,
+              "labels": 4,
+              "msg": 2,
+              "time": 1,
+              "tsNs": 6
+            },
+            "renameByName": {}
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "dateFormat": "MMM DD HH:mm:ss",
+                "destinationType": "time",
+                "targetField": "time"
+              }
+            ],
+            "fields": {}
+          }
+        }
+      ],
       "type": "table"
     }
   ],
@@ -339,9 +472,9 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "selected": true,
+          "text": "juju-daed64-0.lxd",
+          "value": "juju-daed64-0.lxd"
         },
         "datasource": {
           "type": "loki",
@@ -349,7 +482,7 @@
         },
         "definition": "",
         "hide": 0,
-        "includeAll": true,
+        "includeAll": false,
         "label": "Instance",
         "multi": false,
         "name": "instance_var",
@@ -375,7 +508,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "BMC dashboard",
-  "uid": "f57f783c-ebf6-4875-9b64-6ccc0149d8f2",
-  "version": 7,
+  "uid": "e6bece55-5fd0-4411-9806-d55b6969ed09",
+  "version": 9,
   "weekStart": ""
 }
