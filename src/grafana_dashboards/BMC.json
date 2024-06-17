@@ -25,7 +25,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P0E1708AB45903052"
+        "uid": "${lokids}"
       },
       "fieldConfig": {
         "defaults": {
@@ -234,7 +234,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P0E1708AB45903052"
+            "uid": "${lokids}"
           },
           "editorMode": "builder",
           "expr": "{instance=\"$instance_var\"} |= `ipmiseld` | pattern `<raw>\"<_>\"` | regexp `(?P<time>\\w+\\s*\\d{1,2} \\d+:\\d+:\\d+) (?P<host>.+?) (?P<pid>\\S+): (SEL System Event: (?P<second_time>\\w{3}-\\d{2}-\\d{4}, \\d{2}:\\d{2}:\\d{2}), )?(?P<msg>.*)` | line_format `{{ if .second_time }}{{ .second_time | replace \"-\" \" \" }}{{ else }}{{ .time }}{{ end }}`",
@@ -483,7 +483,7 @@
         },
         "datasource": {
           "type": "loki",
-          "uid": "${loki}"
+          "uid": "${lokids}"
         },
         "definition": "",
         "hide": 0,
