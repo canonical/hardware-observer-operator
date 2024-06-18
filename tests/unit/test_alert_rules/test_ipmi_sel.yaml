@@ -70,6 +70,7 @@ tests:
               severity: warning
               name: ipmiseld.service
               instance: ubuntu-3
+              state: failed
             exp_annotations:
               summary: IPMISELD service is not active. (instance ubuntu-3)
               description: |
@@ -81,6 +82,7 @@ tests:
               severity: warning
               name: ipmiseld.service
               instance: ubuntu-4
+              state: inactive
             exp_annotations:
               summary: IPMISELD service is not active. (instance ubuntu-4)
               description: |
