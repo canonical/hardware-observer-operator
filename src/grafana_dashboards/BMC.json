@@ -18,14 +18,13 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 287,
   "links": [],
   "liveNow": false,
   "panels": [
     {
       "datasource": {
         "type": "loki",
-        "uid": "${lokids}"
+        "uid": "P0E1708AB45903052"
       },
       "fieldConfig": {
         "defaults": {
@@ -64,7 +63,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 300
+                "value": 200
               },
               {
                 "id": "displayName",
@@ -76,7 +75,7 @@
               },
               {
                 "id": "displayName",
-                "value": "Log Time"
+                "value": "Timestamp"
               }
             ]
           },
@@ -140,7 +139,7 @@
               },
               {
                 "id": "displayName",
-                "value": "Log Message"
+                "value": "Message"
               },
               {
                 "id": "custom.width"
@@ -156,6 +155,10 @@
               {
                 "id": "displayName",
                 "value": "Instance"
+              },
+              {
+                "id": "custom.width",
+                "value": 200
               }
             ]
           },
@@ -204,6 +207,10 @@
               {
                 "id": "custom.width",
                 "value": 210
+              },
+              {
+                "id": "displayName",
+                "value": "Process"
               }
             ]
           }
@@ -227,7 +234,12 @@
           "show": false
         },
         "showHeader": true,
-        "sortBy": []
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Log Message"
+          }
+        ]
       },
       "pluginVersion": "9.5.3",
       "targets": [
@@ -237,7 +249,7 @@
             "uid": "${lokids}"
           },
           "editorMode": "builder",
-          "expr": "{instance=\"$instance_var\"} |= `ipmiseld` | pattern `<raw>\"<_>\"` | regexp `(?P<time>\\w+\\s*\\d{1,2} \\d+:\\d+:\\d+) (?P<host>.+?) (?P<pid>\\S+): (SEL System Event: (?P<second_time>\\w{3}-\\d{2}-\\d{4}, \\d{2}:\\d{2}:\\d{2}), )?(?P<msg>.*)` | line_format `{{ if .second_time }}{{ .second_time | replace \"-\" \" \" }}{{ else }}{{ .time }}{{ end }}`",
+          "expr": "{instance=\"$instance_var\"} |= `ipmiseld` | pattern `<raw>\"<_>\"` | regexp `(?P<log_time>\\w+\\s*\\d{1,2} \\d+:\\d+:\\d+) (?P<host>.+?) (?P<pid>\\S+): (SEL System Event: (?P<bmc_time>\\w{3}-\\d{2}-\\d{4}, \\d{2}:\\d{2}:\\d{2}), )?(?P<msg>.*)` | line_format `{{ if .bmc_time }}{{ .bmc_time | replace \"-\" \" \" }}{{ else }}{{ .log_time }}{{ end }}`",
           "queryType": "range",
           "refId": "A"
         }
@@ -318,8 +330,12 @@
       {
         "current": {
           "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "hide": 0,
         "includeAll": true,
@@ -336,8 +352,12 @@
       {
         "current": {
           "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "hide": 0,
         "includeAll": true,
@@ -355,8 +375,12 @@
         "allValue": ".*",
         "current": {
           "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "uid": "${prometheusds}"
@@ -386,8 +410,12 @@
         "allValue": ".*",
         "current": {
           "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "uid": "${prometheusds}"
@@ -417,8 +445,12 @@
         "allValue": ".*",
         "current": {
           "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "uid": "${prometheusds}"
@@ -448,8 +480,12 @@
         "allValue": ".*",
         "current": {
           "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "uid": "${prometheusds}"
@@ -476,11 +512,6 @@
         "useTags": false
       },
       {
-        "current": {
-          "selected": false,
-          "text": "juju-daed64-0.lxd",
-          "value": "juju-daed64-0.lxd"
-        },
         "datasource": {
           "type": "loki",
           "uid": "${lokids}"
@@ -514,6 +545,6 @@
   "timezone": "",
   "title": "BMC dashboard",
   "uid": "daee7467-cc8f-4484-b7a8-9414708a4df5",
-  "version": 11,
+  "version": 1,
   "weekStart": ""
 }
