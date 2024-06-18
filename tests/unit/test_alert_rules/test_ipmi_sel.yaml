@@ -19,8 +19,11 @@ tests:
       - series: ipmi_sel_state{instance="ubuntu-2"}
         values: '2x15'
 
-      - series: node_systemd_unit_state{name="ipmiseld.service", instance="ubuntu-3"}
-        values: '0x15'  
+      - series: node_systemd_unit_state{name="ipmiseld.service", instance="ubuntu-3", state="failed"}
+        values: '1x15'
+
+      - series: node_systemd_unit_state{name="ipmiseld.service", instance="ubuntu-4", state="inactive"}
+        values: '1x15'
 
     alert_rule_test:
       - eval_time: 10m
@@ -71,5 +74,16 @@ tests:
               summary: IPMISELD service is not active. (instance ubuntu-3)
               description: |
                 The ipmiseld service is not active, indicating a potential problem.
-                  VALUE = 0
+                  VALUE = 1
                   LABELS = map[__name__:node_systemd_unit_state instance:ubuntu-3 name:ipmiseld.service]
+                  
+          - exp_labels:
+              severity: warning
+              name: ipmiseld.service
+              instance: ubuntu-4
+            exp_annotations:
+              summary: IPMISELD service is not active. (instance ubuntu-4)
+              description: |
+                The ipmiseld service is not active, indicating a potential problem.
+                  VALUE = 1
+                  LABELS = map[__name__:node_systemd_unit_state instance:ubuntu-4 name:ipmiseld.service state:inactive]
