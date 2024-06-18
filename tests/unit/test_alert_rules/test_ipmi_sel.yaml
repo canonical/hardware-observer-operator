@@ -65,6 +65,7 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: warning
+              name: ipmiseld.service
               instance: ubuntu-3
             exp_annotations:
               summary: IPMISELD service is not active. (instance ubuntu-3)
