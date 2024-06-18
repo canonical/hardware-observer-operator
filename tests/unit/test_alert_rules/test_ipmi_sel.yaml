@@ -75,8 +75,8 @@ tests:
               description: |
                 The ipmiseld service is not active, indicating a potential problem.
                   VALUE = 1
-                  LABELS = map[__name__:node_systemd_unit_state instance:ubuntu-3 name:ipmiseld.service]
-                  
+                  LABELS = map[__name__:node_systemd_unit_state instance:ubuntu-3 name:ipmiseld.service state:failed]
+
           - exp_labels:
               severity: warning
               name: ipmiseld.service
