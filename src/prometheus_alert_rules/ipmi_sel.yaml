@@ -35,3 +35,15 @@ groups:
         description: |
           IPMI SEL entry in critical state.
             LABELS = {{ $labels }}
+
+    - alert: IPMISELDStateWarning
+      expr: node_systemd_unit_state{name="ipmiseld.service", state=~"failed|inactive"} == 1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: IPMISELD service is not active. (instance {{ $labels.instance }})
+        description: |
+          The ipmiseld service is not active, indicating a potential problem.
+            VALUE = {{ $value }}
+            LABELS = {{ $labels }}
