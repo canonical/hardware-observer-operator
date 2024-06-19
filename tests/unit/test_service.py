@@ -585,6 +585,10 @@ class TestSmartMetricExporter(unittest.TestCase):
 
     def setUp(self) -> None:
         """Set up harness for each test case."""
+        systemd_lib_patcher = mock.patch.object(service, "systemd")
+        self.mock_systemd = systemd_lib_patcher.start()
+        self.addCleanup(systemd_lib_patcher.stop)
+
         search_path = pathlib.Path(f"{__file__}/../../..").resolve()
         self.mock_config = {
             "smartctl-exporter-port": 10201,
@@ -607,6 +611,20 @@ class TestSmartMetricExporter(unittest.TestCase):
                 "LEVEL": self.exporter.log_level,
             }
         )
+
+    @parameterized.expand(
+        [
+            (True,),
+            (False,),
+        ]
+    )
+    def test_render_config(self, service_render_success):
+        """Test render config."""
+        self.exporter.render_service = mock.MagicMock()
+        self.exporter.render_service.return_value = service_render_success
+
+        result = self.exporter.render_config()
+        self.assertEqual(result, service_render_success)
 
     def test_hw_tools(self):
         self.assertEqual(self.exporter.hw_tools(), [HWTool.SMARTCTL])

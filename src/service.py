@@ -136,7 +136,7 @@ class BaseExporter(ABC):
         return write_to_file(self.exporter_service_path, content)
 
     def render_config(self) -> bool:
-        """Render exporter config file.."""
+        """Render exporter config file."""
         if self.exporter_config_path is not None:
             content = self._render_config_content()
             return write_to_file(self.exporter_config_path, content, mode=0o600)
@@ -285,6 +285,19 @@ class SmartCtlExporter(BaseExporter):
                 "LEVEL": self.log_level,
             }
         )
+        return service_rendered
+
+    def render_config(self) -> bool:
+        """Override base render_config to render the service file.
+
+        This is because smartctl_exporter doesn't support providing config file.
+        The config options need to be provided as flags while exectuting
+        smartctl_exporter. So, the service file must be re-rendered when a config
+        value is changed.
+        """
+        service_rendered = self.render_service()
+        if service_rendered:
+            systemd.daemon_reload()
         return service_rendered
 
     @staticmethod
