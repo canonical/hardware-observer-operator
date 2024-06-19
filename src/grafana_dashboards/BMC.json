@@ -24,7 +24,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P0E1708AB45903052"
+        "uid": "${lokids}"
       },
       "fieldConfig": {
         "defaults": {
