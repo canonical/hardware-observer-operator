@@ -1,14 +1,20 @@
-name: Promote charm to other tracks and channels
+# This file is centrally managed as a template file in https://github.com/canonical/solutions-engineering-automation
+# To update the file:
+# - Edit it in the canonical/solutions-engineering-automation repository.
+# - Open a PR with the changes.
+# - When the PR merges, the soleng-terraform bot will open a PR to the target repositories with the changes.
+name: Promote charm to default track, standard risk levels.
 
 on:
   workflow_dispatch:
     inputs:
-      destination-channel:
-        description: 'Destination Channel, e.g. latest/candidate'
+      channel-promotion:
+        description: 'Channel Promotion, e.g. latest/edge -> latest/candidate'
         required: true
-      origin-channel:
-        description: 'Origin Channel, e.g. latest/edge'
-        required: true
+        type: choice
+        options:
+          - 'latest/edge -> latest/candidate'
+          - 'latest/candidate -> latest/stable'
 
 jobs:
   promote-charm:
@@ -16,10 +22,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set channels
+        id: set-channels
+        run: |
+          channel_promotion="${{ github.event.inputs.channel-promotion }}"
+          origin=$(echo "$channel_promotion" | sed 's/\s*->.*//')
+          destination=$(echo "$channel_promotion" | sed 's/.*->\s*//')
+          echo "destination-channel=$destination" >> $GITHUB_OUTPUT
+          echo "origin-channel=$origin" >> $GITHUB_OUTPUT
       - name: Release charm to channel
         uses: canonical/charming-actions/release-charm@2.4.0
         with:
           credentials: ${{ secrets.CHARMHUB_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          destination-channel: ${{ github.event.inputs.destination-channel }}
-          origin-channel: ${{ github.event.inputs.origin-channel }}
+          destination-channel: ${{ steps.set-channels.outputs.destination-channel }}
+          origin-channel: ${{ steps.set-channels.outputs.origin-channel }}
