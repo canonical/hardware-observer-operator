@@ -117,7 +117,7 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
             assert unit.workload_status_message == AppStatus.MISSING_RELATION
 
     for unit in ops_test.model.applications[GRAFANA_AGENT_APP_NAME].units:
-        messages = ["grafana-cloud-config: off", "logging-consumer: off", "send-remote-write: off"]
+        messages = ["Missing", "grafana-cloud-config", "logging-consumer", "send-remote-write"]
         for msg in messages:
             assert msg in unit.workload_status_message
 
