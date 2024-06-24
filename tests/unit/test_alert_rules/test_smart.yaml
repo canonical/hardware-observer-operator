@@ -192,10 +192,10 @@ tests:
   - interval: 1m
     input_series:
       - series: 'smartctl_device_percentage_used{device="nvme", instance="ubuntu-3"}'
-        values: '85x10'
+        values: '85x20'
 
     alert_rule_test:
-      - eval_time: 10m
+      - eval_time: 20m
         alertname: SmartNVMeDriveLifetimeWarning
         exp_alerts:
           - exp_labels:
@@ -212,10 +212,10 @@ tests:
   - interval: 1m
     input_series:
       - series: 'smartctl_device_percentage_used{device="nvme", instance="ubuntu-4"}'
-        values: '95x10'
+        values: '95x20'
 
     alert_rule_test:
-      - eval_time: 10m
+      - eval_time: 20m
         alertname: SmartNVMeDriveLifetimeCritical
         exp_alerts:
           - exp_labels:
