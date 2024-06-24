@@ -202,6 +202,7 @@ tests:
               severity: warning
               instance: ubuntu-3
               device: nvme
+              name: smartctl_device_percentage_used
             exp_annotations:
               summary: NVMe drive is approaching its estimated lifetime (instance ubuntu-3)
               description: |
@@ -222,6 +223,7 @@ tests:
               severity: critical
               instance: ubuntu-4
               device: nvme
+              name: smartctl_device_percentage_used
             exp_annotations:
               summary: NVMe drive is close to reaching its estimated lifetime (instance ubuntu-4)
               description: |
