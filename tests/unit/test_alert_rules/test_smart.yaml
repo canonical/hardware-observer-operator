@@ -195,7 +195,7 @@ tests:
         values: '85x10'
 
     alert_rule_test:
-      - eval_time: 6m
+      - eval_time: 10m
         alertname: SmartNVMeDriveLifetimeWarning
         exp_alerts:
           - exp_labels:
@@ -215,7 +215,7 @@ tests:
         values: '95x10'
 
     alert_rule_test:
-      - eval_time: 11m
+      - eval_time: 10m
         alertname: SmartNVMeDriveLifetimeCritical
         exp_alerts:
           - exp_labels:
