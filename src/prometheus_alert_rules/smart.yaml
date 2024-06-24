@@ -101,7 +101,7 @@ groups:
           LABELS = {{ $labels }}
 
   - alert: SmartNVMeDriveLifetimeWarning
-    expr: smartctl_device_percentage_used >= 80
+    expr: smartctl_device_percentage_used{device=~"nvme.*"} >= 80
     for: 15m
     labels:
       severity: warning
@@ -113,7 +113,7 @@ groups:
         LABELS = {{ $labels }}
 
   - alert: SmartNVMeDriveLifetimeCritical
-    expr: smartctl_device_percentage_used >= 90
+    expr: smartctl_device_percentage_used{device=~"nvme.*"} >= 90
     for: 15m
     labels:
       severity: critical
