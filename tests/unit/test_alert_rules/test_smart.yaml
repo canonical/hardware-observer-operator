@@ -202,13 +202,12 @@ tests:
               severity: warning
               instance: ubuntu-3
               device: nvme
-              name: smartctl_device_percentage_used
             exp_annotations:
               summary: NVMe drive is approaching its estimated lifetime (instance ubuntu-3)
               description: |
                 The NVMe drive has reached 80% of its estimated lifetime.
                   VALUE = 85
-                  LABELS = map[device:nvme instance:ubuntu-3]
+                  LABELS = map[__name__:smartctl_device_percentage_used device:nvme instance:ubuntu-3]
 
   - interval: 1m
     input_series:
@@ -223,10 +222,9 @@ tests:
               severity: critical
               instance: ubuntu-4
               device: nvme
-              name: smartctl_device_percentage_used
             exp_annotations:
               summary: NVMe drive is close to reaching its estimated lifetime (instance ubuntu-4)
               description: |
                 The NVMe drive has reached 90% of its estimated lifetime.
                   VALUE = 95
-                  LABELS = map[device:nvme instance:ubuntu-4]
+                  LABELS = map[__name__:smartctl_device_percentage_used device:nvme instance:ubuntu-4]
