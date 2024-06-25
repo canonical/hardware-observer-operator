@@ -109,9 +109,9 @@ groups:
       summary: NVMe drive is approaching its estimated lifetime (instance {{ $labels.instance }})
       description: |
         The NVMe drive has reached 80% of its estimated lifetime.
+        Note: A value of 100 does not indicate failure. For more details, visit https://charmhub.io/hardware-observer/docs/metrics-and-alerts-smart
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
-        Note: A value of 100 does not indicate failure. For more details, visit https://charmhub.io/hardware-observer/docs/metrics-and-alerts-smart
 
   - alert: SmartNVMeDriveLifetimeCritical
     expr: smartctl_device_percentage_used{device=~"nvme.*"} >= 90
@@ -122,6 +122,6 @@ groups:
       summary: NVMe drive is close to reaching its estimated lifetime (instance {{ $labels.instance }})
       description: |
         The NVMe drive has reached 90% of its estimated lifetime.
+        Note: A value of 100 does not indicate failure. For more details, visit https://charmhub.io/hardware-observer/docs/metrics-and-alerts-smart
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
-        Note: A value of 100 does not indicate failure. For more details, visit https://charmhub.io/hardware-observer/docs/metrics-and-alerts-smart
