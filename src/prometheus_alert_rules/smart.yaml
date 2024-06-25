@@ -125,4 +125,3 @@ groups:
           VALUE = {{ $value }}
           LABELS = {{ $labels }}
         Note: A value of 100 does not indicate failure. For more details, visit https://charmhub.io/hardware-observer/docs/metrics-and-alerts-smart
-
