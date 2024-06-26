@@ -188,3 +188,46 @@ tests:
                 on device "sda" is greater than 0.
                   VALUE = 2
                   LABELS = map[__name__:smartctl_device_attribute attribute_id:5 attribute_name:Reallocated_Sectors_Count device:sda instance:ubuntu-2]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_percentage_used{device="nvme", instance="ubuntu-3"}'
+        values: '85x20'
+
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: SmartNVMeDriveLifetimeWarning
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-3
+              device: nvme
+            exp_annotations:
+              summary: NVMe drive is approaching its estimated lifetime (instance ubuntu-3)
+              description: |
+                The NVMe drive has reached 80% of its estimated lifetime.
+                Note: A value of 100 does not indicate failure. For more details, visit https://charmhub.io/hardware-observer/docs/metrics-and-alerts-smart
+                  VALUE = 85
+                  LABELS = map[__name__:smartctl_device_percentage_used device:nvme instance:ubuntu-3]
+
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_percentage_used{device="nvme", instance="ubuntu-4"}'
+        values: '95x20'
+
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: SmartNVMeDriveLifetimeCritical
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-4
+              device: nvme
+            exp_annotations:
+              summary: NVMe drive is close to reaching its estimated lifetime (instance ubuntu-4)
+              description: |
+                The NVMe drive has reached 90% of its estimated lifetime.
+                Note: A value of 100 does not indicate failure. For more details, visit https://charmhub.io/hardware-observer/docs/metrics-and-alerts-smart
+                  VALUE = 95
+                  LABELS = map[__name__:smartctl_device_percentage_used device:nvme instance:ubuntu-4]
