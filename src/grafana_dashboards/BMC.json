@@ -250,7 +250,7 @@
             "uid": "${lokids}"
           },
           "editorMode": "builder",
-          "expr": "{instance=\"$instance_var\"} |= `ipmiseld` | pattern `<raw>\"<_>\"` | regexp `(?P<log_time>\\w+\\s*\\d{1,2} \\d+:\\d+:\\d+) (?P<host>.+?) (?P<pid>\\S+): (SEL System Event: (?P<bmc_time>\\w{3}-\\d{2}-\\d{4}, \\d{2}:\\d{2}:\\d{2}), )?(?P<msg>.*)` | line_format `{{ if .bmc_time }}{{ .bmc_time | replace \"-\" \" \" }}{{ else }}{{ .log_time }}{{ end }}`",
+          "expr": "{instance=\"$instance_var\"} |~ \"ipmiseld\\\\[\\\\d+\\\\]\" | pattern `<raw>\"<_>\"` | regexp `(?P<log_time>\\w+\\s*\\d{1,2} \\d+:\\d+:\\d+) (?P<host>.+?) (?P<pid>\\S+): (SEL System Event: (?P<bmc_time>\\w{3}-\\d{2}-\\d{4}, \\d{2}:\\d{2}:\\d{2}), )?(?P<msg>.*)` | line_format `{{ if .bmc_time }}{{ .bmc_time | replace \"-\" \" \" }}{{ else }}{{ .log_time }}{{ end }}`",
           "queryType": "range",
           "refId": "A"
         }
