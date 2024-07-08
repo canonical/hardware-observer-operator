@@ -397,6 +397,13 @@ class HardwareExporter(BaseExporter):
         if not redfish_conn_params:
             return None
 
+        # Skip redfish validation if either username/password is empty.
+        if redfish_conn_params and not (
+            redfish_conn_params.get("username", "") and redfish_conn_params.get("password", "")
+        ):
+            logger.warning("Empty redfish certificate, skip validation.")
+            return False
+
         redfish_obj = None
         try:
             redfish_obj = redfish_client(
