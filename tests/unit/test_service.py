@@ -575,7 +575,7 @@ class TestHardwareExporter(unittest.TestCase):
                 },
             ),
             (
-                "missing username",
+                "missing password",
                 {
                     "host": "hosta",
                     "username": "usernameb",
