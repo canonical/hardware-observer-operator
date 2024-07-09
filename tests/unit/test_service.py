@@ -563,6 +563,39 @@ class TestHardwareExporter(unittest.TestCase):
         self.assertFalse(result)
         mock_redfish_client.return_value.login.assert_not_called()
 
+    @parameterized.expand(
+        [
+            (
+                "missing username",
+                {
+                    "host": "hosta",
+                    "username": "",
+                    "password": "passwordc",
+                    "timeout": "timeoutd",
+                },
+            ),
+            (
+                "missing password",
+                {
+                    "host": "hosta",
+                    "username": "usernameb",
+                    "password": "",
+                    "timeout": "timeoutd",
+                },
+            ),
+        ]
+    )
+    @mock.patch("service.redfish_client")
+    def test_redfish_conn_params_valid_failed_missing_credentials(
+        self,
+        _,
+        redfish_conn_params,
+        mock_redfish_client,
+    ):
+        result = self.exporter.redfish_conn_params_valid(redfish_conn_params)
+        self.assertEqual(result, False)
+        mock_redfish_client.assert_not_called()
+
     def test_hw_tools(self):
         self.assertEqual(
             self.exporter.hw_tools(),
