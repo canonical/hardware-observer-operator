@@ -16,6 +16,8 @@ jobs:
           # Finding preferred source ip address by trying to reach destination 2.2.2.2
           # This ip address will be used while enabling metallb
           echo "IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')" >> $GITHUB_ENV
+      - name: Setup tmate session
+        uses: canonical/action-tmate@main
       - name: Setup lxd controller
         uses: charmed-kubernetes/actions-operator@main
         with:
