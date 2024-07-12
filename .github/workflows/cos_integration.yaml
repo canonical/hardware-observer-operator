@@ -54,7 +54,7 @@ jobs:
           K8S_CONTROLLER: ${{ steps.k8s-controller.outputs.name }}
           LXD_CONTROLLER: ${{ steps.lxd-controller.outputs.name }}
       - name: Setup tmate session
-        if: ${{ failure() }}
+        if: failure()
         uses: canonical/action-tmate@main
       - name: Dump debug log
         if: failure()
