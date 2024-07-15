@@ -39,12 +39,11 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     model_name = ops_test.model_name
 
     # model_status = await k8s_model.get_status()
-    returncode, result, stderr = await ops_test.run("juju", "run", "traefik/0", "show-proxied-endpoints")
-    internal_address_info = json.loads(result)
-    prometheus_internal_url = internal_address_info["prometheus/0"]["url"]
-    prometheus_internal_ip = prometheus_internal_url.split('/')[2]  # Extract IP address from URL
-
-    prometheus_alerts_endpoint = f"http://{prometheus_internal_ip}/{model_name}-prometheus-0/api/v1/alerts"
+    returncode, stdout, stderr = await ops_test.run("juju", "run", "traefik/0", "show-proxied-endpoints")
+    result_json = stdout.split('proxied-endpoints: ')[1].strip().strip('\'')
+    internal_address_info = json.loads(result_json)
+    prometheus_internal_url = internal_address_info.get("traefik").get("url")
+    prometheus_alerts_endpoint = f"{prometheus_internal_url}/{model_name}-prometheus-0/api/v1/alerts"
     # traefik_ip = model_status["applications"]["traefik"].public_address
 
     # prometheus_alerts_endpoint = f"http://{traefik_ip}/{model_name}-prometheus-0/api/v1/alerts"
