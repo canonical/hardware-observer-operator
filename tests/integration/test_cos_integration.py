@@ -39,7 +39,8 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     model_name = ops_test.model_name
 
     # model_status = await k8s_model.get_status()
-    result = await ops_test.run("juju", "run", "traefik/0", "show-proxied-endpoints")
+    result, err, _ = await ops_test.run("juju", "run", "traefik/0", "show-proxied-endpoints")
+    internal_address_info = json.loads(result)
     internal_address_info = json.loads(result.stdout)
     prometheus_internal_url = internal_address_info["prometheus/0"]["url"]
     prometheus_internal_ip = prometheus_internal_url.split('/')[2]  # Extract IP address from URL
@@ -48,7 +49,7 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     # traefik_ip = model_status["applications"]["traefik"].public_address
 
     # prometheus_alerts_endpoint = f"http://{traefik_ip}/{model_name}-prometheus-0/api/v1/alerts"
-
+    logger.info(prometheus_alerts_endpoint)
     cmd = ["curl", prometheus_alerts_endpoint]
 
     # Sometimes alerts take some time to show after the metrics are exposed on the host.
