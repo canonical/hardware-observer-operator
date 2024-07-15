@@ -18,6 +18,8 @@ jobs:
           echo "IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')" >> $GITHUB_ENV
       - name: Setup tmate session
         uses: canonical/action-tmate@main
+        with:
+          detached: true
       - name: Setup lxd controller
         uses: charmed-kubernetes/actions-operator@main
         with:
