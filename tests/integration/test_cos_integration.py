@@ -39,7 +39,7 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     model_name = ops_test.model_name
 
     # model_status = await k8s_model.get_status()
-    result, err, _ = await ops_test.run("juju", "run", "traefik/0", "show-proxied-endpoints")
+    returncode, result, stderr = await ops_test.run("juju", "run", "traefik/0", "show-proxied-endpoints")
     internal_address_info = json.loads(result)
     internal_address_info = json.loads(result.stdout)
     prometheus_internal_url = internal_address_info["prometheus/0"]["url"]
