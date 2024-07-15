@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import subprocess
+import re
 from pathlib import Path
 
 import pytest
@@ -40,8 +41,11 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
 
     # model_status = await k8s_model.get_status()
     returncode, result, stderr = await ops_test.run("juju", "run", "traefik/0", "show-proxied-endpoints")
-    internal_address_info = json.loads(result)
-    internal_address_info = json.loads(result.stdout)
+    match = re.search(r'proxied-endpoints:\s*(\{.*\})', result)
+    if not match:
+        raise ValueError("Failed to find proxied-endpoints JSON in the result")
+
+    internal_address_info = json.loads(match.group(1))
     prometheus_internal_url = internal_address_info["prometheus/0"]["url"]
     prometheus_internal_ip = prometheus_internal_url.split('/')[2]  # Extract IP address from URL
 
