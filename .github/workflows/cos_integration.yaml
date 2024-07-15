@@ -16,10 +16,6 @@ jobs:
           # Finding preferred source ip address by trying to reach destination 2.2.2.2
           # This ip address will be used while enabling metallb
           echo "IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')" >> $GITHUB_ENV
-      - name: Setup tmate session
-        uses: canonical/action-tmate@main
-        with:
-          detached: true
       - name: Setup lxd controller
         uses: charmed-kubernetes/actions-operator@main
         with:
@@ -60,4 +56,7 @@ jobs:
       - name: Dump debug log
         if: failure()
         run: for ctl in $(juju controllers --format json | jq -r '.controllers | keys[]'); do for mdl in $(juju models --format json | jq -r '.models[].name' | grep -v "admin/controller"); do juju debug-log -m $ctl:$mdl --replay --ms --no-tail; done; done || true
-        shell: bash
+        shell: bash      
+      - name: Setup tmate session
+        if: failure()
+        uses: canonical/action-tmate@main
