@@ -40,8 +40,12 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
 
     # model_status = await k8s_model.get_status()
     command = ["juju", "run", "--format", "json", "traefik/0", "show-proxied-endpoints"]
-    result = subprocess.run(command, capture_output=True, text=True)
-    output = json.loads(result.stdout)
+    try:
+        result = subprocess.check_output(command)
+    except subprocess.CalledProcessError:
+        logger.error("Failed to fetch traefik endpoint")
+        raise
+    output = json.loads(result)
     proxied_endpoints = json.loads(output["traefik/0"]["results"]["proxied-endpoints"])
     prometheus_url = proxied_endpoints["prometheus/0"]["url"]
     prometheus_alerts_endpoint = f"{prometheus_url}/api/v1/alerts"
