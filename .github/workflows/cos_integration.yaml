@@ -16,6 +16,10 @@ jobs:
           # Finding preferred source ip address by trying to reach destination 2.2.2.2
           # This ip address will be used while enabling metallb
           echo "IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')" >> $GITHUB_ENV
+      - name: Setup tmate session
+        uses: canonical/action-tmate@main
+        with:
+          detached: true
       - name: Setup lxd controller
         uses: charmed-kubernetes/actions-operator@main
         with:
@@ -23,7 +27,7 @@ jobs:
           # Currently, 3.1 is used to keep the version consistent with functional tests (func31)
           # If, for example, 3.5/stable is used here in the future, the `update python-libjuju dependancy..`
           # step below should also specify `...3.5.x/g'..` so it updates requirements.txt with the correct version.
-          juju-channel: 3.4/stable
+          juju-channel: 3.1/stable
           provider: lxd
       - name: Save lxd controller name
         id: lxd-controller
@@ -32,7 +36,7 @@ jobs:
       - name: Setup k8s controller
         uses: charmed-kubernetes/actions-operator@main
         with:
-          juju-channel: 3.4/stable
+          juju-channel: 3.1/stable
           provider: microk8s
           channel: 1.28-strict/stable
           microk8s-addons: "hostpath-storage dns metallb:${{ env.IPADDR }}-${{ env.IPADDR }}"
@@ -47,7 +51,7 @@ jobs:
         # The juju CLI version and libjuju version(specified in requirements.txt) should be compatible.
         # This replaces the libjuju version in requirements.txt and
         # makes sure the same version is used, even if it has a different/incompatible version.
-        run: sed -E -i 's/^\s*juju\s*~=.+/    juju~=3.4.0/g' tests/integration/requirements.txt
+        run: sed -E -i 's/^\s*juju\s*~=.+/    juju~=3.1.0/g' tests/integration/requirements.txt
       - name: Run integration tests
         run: make integration
         env:
