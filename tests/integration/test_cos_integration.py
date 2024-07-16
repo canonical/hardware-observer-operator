@@ -44,9 +44,7 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     result_json = stdout.split("proxied-endpoints: ")[1].strip().strip("'")
     address_info = json.loads(result_json)
     traefik_url = address_info.get("traefik").get("url")
-    prometheus_alerts_endpoint = (
-        f"{traefik_url}/{model_name}-prometheus-0/api/v1/alerts"
-    )
+    prometheus_alerts_endpoint = f"{traefik_url}/{model_name}-prometheus-0/api/v1/alerts"
 
     cmd = ["curl", prometheus_alerts_endpoint]
 
