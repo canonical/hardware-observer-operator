@@ -39,8 +39,9 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     model_name = ops_test.model_name
 
     # model_status = await k8s_model.get_status()
-    json_out = await ops_test.run("juju", "run", "traefik/0", "show-proxied-endpoints","--format json")
-    address_info = json.loads(json_out)
+    returncode, stdout, stderr = await ops_test.run("juju", "run", "--format json", "traefik/0", "show-proxied-endpoints")
+    print(stdout)
+    address_info = json.loads(stdout)
     traefik_url = address_info.get("traefik").get("url")
     prometheus_alerts_endpoint = f"{traefik_url}/{model_name}-prometheus-0/api/v1/alerts"
     logger.info(prometheus_alerts_endpoint)
