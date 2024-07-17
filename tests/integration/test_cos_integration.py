@@ -36,15 +36,18 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     await _disable_hardware_exporter(ops_test, lxd_model)
     await _export_mock_metrics(lxd_model)
 
-    model_name = ops_test.model_name
-
     returncode, stdout, stderr = await ops_test.run(
-        "juju", "run", "traefik/0", "show-proxied-endpoints"
+        "juju",
+        "run",
+        "--format",
+        "json",
+        "traefik/0",
+        "show-proxied-endpoints",
     )
-    result_json = stdout.split("proxied-endpoints: ")[1].strip().strip("'")
-    address_info = json.loads(result_json)
-    traefik_url = address_info.get("traefik").get("url")
-    prometheus_alerts_endpoint = f"{traefik_url}/{model_name}-prometheus-0/api/v1/alerts"
+    json_data = json.loads(stdout)
+    proxied_endpoints = json.loads(json_data["traefik/0"]["results"]["proxied-endpoints"])
+    prometheus_url = proxied_endpoints["prometheus/0"]["url"]
+    prometheus_alerts_endpoint = f"{prometheus_url}/api/v1/alerts"
 
     cmd = ["curl", prometheus_alerts_endpoint]
 
