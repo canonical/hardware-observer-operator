@@ -44,53 +44,7 @@ $ juju relate grafana-agent hardware-observer
 
 
 ## Set up microk8s and COS
-The COS Lite bundle is a Juju-based observability stack, running on Kubernetes. The bundle consists of Prometheus, Loki, Alertmanager and Grafana.
-
-### Set up microk8s
-
-Install MicroK8s package:
-$ sudo snap install microk8s --channel 1.30-strict
-
-Add your user to the `microk8s` group for unprivileged access:
-$ sudo adduser $USER snap_microk8s
-
-Give your user permissions to read the ~/.kube directory:
-$ sudo chown -f -R $USER ~/.kube
-
-Wait for MicroK8s to finish initialising:
-$ sudo microk8s status --wait-ready
-
-Enable the 'storage' and 'dns' addons:
-(required for the Juju controller)
-$ sudo microk8s enable hostpath-storage dns
-
-Alias kubectl so it interacts with MicroK8s by default:
-$ sudo snap alias microk8s.kubectl kubectl
-
-Ensure your new group membership is apparent in the current terminal:
-(Not required once you have logged out and back in again)
-$ newgrp snap_microk8s
-
-The COS bundle comes with Traefik to provide ingress, for which the metallb addon should be enabled:
-$ IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
-$ sudo microk8s enable metallb:$IPADDR-$IPADDR
-
-Wait for all the addons to be rolled out
-$ microk8s kubectl rollout status deployments/hostpath-provisioner -n kube-system -w
-$ microk8s kubectl rollout status deployments/coredns -n kube-system -w
-$ microk8s kubectl rollout status daemonset.apps/speaker -n metallb-system -w
-
-### Deploy the COS Lite bundle with overlays
-$ juju add-model cos
-$ juju switch cos
-$ curl -L https://raw.githubusercontent.com/canonical/cos-lite-bundle/main/overlays/offers-overlay.yaml -O
-$ juju deploy cos-lite --trust --overlay ./offers-overlay.yaml
-
-### Add cross-model relations
-Go back to lxd controller and add cross-model relations
-$ juju relate grafana-agent cos.prometheus-receive-remote-write
-$ juju relate grafana-agent cos.grafana-dashboards
-$ juju relate grafana-agent cos.loki-logging
+To integrate hardware-observer with COS, you can follow this [guide](https://charmhub.io/hardware-observer/docs/integrate-with-cos)
 
 
 ## Check the dashboard
