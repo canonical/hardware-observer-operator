@@ -36,6 +36,7 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     await _disable_hardware_exporter(ops_test, lxd_model)
     await _export_mock_metrics(lxd_model)
 
+    # Run juju action to get the ip address that traefik is configured to serve on
     returncode, stdout, stderr = await ops_test.run(
         "juju",
         "run",
