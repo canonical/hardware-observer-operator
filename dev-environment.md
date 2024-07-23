@@ -12,8 +12,8 @@ A juju controller. You can find what is juju and how to deploy it [here](https:/
 First, you need to bootstrap a Juju controller on the machine. Using a default LXD controller should suffice.
 
 ### Extra requirements if using juju controller on LXD
-Due to some [historical reasons](https://bugs.launchpad.net/juju/+bug/1964513), the default bridge for LXD does not work,
-if you try to add a local machine to the LXD controller. You will need to create a new bridge:
+Due to some [historical reasons](https://bugs.launchpad.net/juju/+bug/1964513), the default bridge for LXD does not work.
+If you try to add a local machine to the LXD controller. You will need to create a new bridge:
 ```
 lxc network create br0 -t bridge
 lxc profile edit default  # Rename lxdbr0 to br0 in the profile
@@ -21,7 +21,7 @@ lxc network delete lxdbr0
 ```
 
 ### Add physical machine
-If you have a physical machine you can fully take over and expect to redeploy when you're done, you can follow these steps to add it to juju.
+If you have a physical machine that you can fully take over and expect to redeploy when you're done, you can follow these steps to add it to juju.
 
 To add physical machine to the controller, you need to pass the juju client credential to it:
 ```
