@@ -12,9 +12,9 @@ hardware resources like RAID cards and BMC management tools.
 
 A juju controller. You can find what is juju and how to deploy it [here](https://juju.is/docs/juju)
 
+
 ## Set up juju and lxd and deploy hardware-observer
 First, you need to bootstrap a Juju controller on the machine. Using a default LXD controller should suffice.
-
 
 ### Extra requirements
 Due to some [historical reasons](https://bugs.launchpad.net/juju/+bug/1964513), the machine hosting the LXD controller cannot be added to the model unless the default LXD bridge is renamed.
