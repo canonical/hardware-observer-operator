@@ -30,21 +30,21 @@ juju bootstrap localhost lxd-controller
 ```
 
 ### Add physical machine
-To add the physical machine to the model, you need to allow the juju client to log into it via SSH:
+To add the physical machine to the model, you need to allow the juju client to log into it via SSH as a user with sudo rights. On an Ubuntu machine, the `ubuntu` user typically satisfies this requirement:
 ```
 cat ~/.local/share/juju/ssh/juju_id_rsa.pub >> ~/.ssh/authorized_keys
 ```
 
-Then you can manually add physical machine, switch to the controller you just created and run:
+Now you can create a model and add your physical machine via the manual provider:
 ```
 juju add-model hw-obs
-juju add-machine ssh:<username>@ip.add.re.ss
+# use a different username if needed 
+# any IP belonging to the host should work  
+juju add-machine ssh:ubuntu@ip.add.re.ss
 ```
 
 ### Deploy Hardware-Observer
-Create a new model and deploy hardware-observer along with the necessary agents:
 ```
-juju add-model hw-obs
 juju switch hw-obs
 juju deploy ubuntu --to 0
 juju deploy hardware-observer
@@ -61,7 +61,7 @@ juju relate grafana-agent hardware-observer
 
 ## Set up microk8s and COS
 ### Set up microk8s
-Install MicroK8s package, it is recommanded to use a strictly confined version:
+Install MicroK8s package, it is required to use a strictly confined version:
 ```
 sudo snap install microk8s --channel 1.30-strict
 ```
@@ -105,18 +105,18 @@ newgrp snap_microk8s
 
 Juju recognises a local MicroK8s cloud automatically, bootstrap a microk8s controller:
 ```
-juju bootstrap microk8s dev-controller
+juju bootstrap microk8s k8s-controller
 ```
 
 ### Integrate with COS
-Before deploy COS bundle, wait for all the microk8s addons to be rolled out:
+Before deploying the COS bundle, wait for all the microk8s addons to be rolled out:
 ```
 microk8s kubectl rollout status deployments/hostpath-provisioner -n kube-system -w
 microk8s kubectl rollout status deployments/coredns -n kube-system -w
 microk8s kubectl rollout status daemonset.apps/speaker -n metallb-system -w
 ```
 
-Create model and deploy COS-lite bundle:
+Create a COS model and deploy COS-lite bundle:
 ```
 juju add-model cos
 juju switch cos
@@ -124,8 +124,9 @@ curl -L https://raw.githubusercontent.com/canonical/cos-lite-bundle/main/overlay
 juju deploy cos-lite --trust --overlay ./offers-overlay.yaml
 ```
 
-Switch to lxd-controller and add necessary relations:
+Switch back to your physical model and add the relations to COS:
 ```
+juju switch hw-obs
 juju relate grafana-agent k8s-controller:cos.prometheus-receive-remote-write
 juju relate grafana-agent k8s-controller:cos.grafana-dashboards
 juju relate grafana-agent k8s-controller:cos.loki-logging
