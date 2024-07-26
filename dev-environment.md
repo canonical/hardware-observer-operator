@@ -88,6 +88,7 @@ sudo microk8s enable hostpath-storage dns
 
 The COS bundle comes with Traefik to provide ingress, for which the metallb addon should be enabled:
 ```
+# The IP address 2.2.2.2 is arbitrary and is used to determine the preferred source IP address for routing.
 IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
 sudo microk8s enable metallb:$IPADDR-$IPADDR
 ```
