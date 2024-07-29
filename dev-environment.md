@@ -61,6 +61,8 @@ juju relate grafana-agent hardware-observer
 
 ## Set up microk8s and COS
 ### Set up microk8s
+Set up microk8. Steps can be found in this [guide](https://juju.is/docs/sdk/dev-setup?_gl=1*nsqfdk*_ga*MjEzOTcxMzA2OS4xNzEwMzYzNDU0*_ga_5LTL1CNEJM*MTcyMjI5NDE2MC4xMDMuMS4xNzIyMjk0MTY4LjUyLjAuMA..).
+
 Install MicroK8s package, it is required to use a strictly confined version:
 ```
 sudo snap install microk8s --channel 1.30-strict
