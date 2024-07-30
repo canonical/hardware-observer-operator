@@ -30,7 +30,7 @@ juju bootstrap localhost lxd-controller
 ```
 
 ### Add physical machine
-To add the physical machine to the model, you need to allow the juju client to log into it via SSH as a user with sudo rights. On an Ubuntu machine, the `ubuntu` user typically satisfies this requirement:
+To add the physical machine to the model, which is managed by a Juju controller on an LXD cloud, you need to allow the juju client to log into it via SSH as a user with sudo rights. On an Ubuntu machine, the `ubuntu` user typically satisfies this requirement:
 ```
 cat ~/.local/share/juju/ssh/juju_id_rsa.pub >> ~/.ssh/authorized_keys
 ```
