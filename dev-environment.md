@@ -14,7 +14,7 @@ A juju controller. You can find what is juju and how to deploy it [here](https:/
 
 
 ## Set up juju and lxd and deploy hardware-observer
-First, you need to bootstrap a Juju controller on the machine. Using a default LXD controller should suffice.
+First, you need to bootstrap a Juju controller on a machine. For simplicity and convenience in this guide, we will use a default LXD controller. It's important to note that you can use any machine within the same network as the one you plan to deploy the hardware-observer on to serve as a controller. However, since we are utilizing only one physical machine in this setup, we will bootstrap an LXD controller on it.
 
 ### Extra requirements
 Due to some [historical reasons](https://bugs.launchpad.net/juju/+bug/1964513), the machine hosting the LXD controller cannot be added to the model unless the default LXD bridge is renamed.
