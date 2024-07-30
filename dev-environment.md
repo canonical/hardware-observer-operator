@@ -38,9 +38,10 @@ cat ~/.local/share/juju/ssh/juju_id_rsa.pub >> ~/.ssh/authorized_keys
 Now you can create a model and add your physical machine via the manual provider:
 ```
 juju add-model hw-obs
-# use a different username if needed 
-# any IP belonging to the host should work  
-juju add-machine ssh:ubuntu@ip.add.re.ss
+# Use a different username if needed 
+# It is recommended to use the IP address of br0 for more reliable operation
+BR0_ADDR=$(ip -4 -j a sho dev br0 | jq -r .[].addr_info[0].local)
+juju add-machine ssh:ubuntu@$BR0_ADDR
 ```
 
 ### Deploy Hardware-Observer
@@ -61,9 +62,9 @@ juju relate grafana-agent hardware-observer
 
 ## Set up microk8s and COS
 ### Set up microk8s
-Set up microk8. Steps can be found in this [guide](https://juju.is/docs/sdk/dev-setup?_gl=1*nsqfdk*_ga*MjEzOTcxMzA2OS4xNzEwMzYzNDU0*_ga_5LTL1CNEJM*MTcyMjI5NDE2MC4xMDMuMS4xNzIyMjk0MTY4LjUyLjAuMA..).
+Set up microk8s. Steps can be found in this [guide](https://juju.is/docs/sdk/dev-setup?_gl=1*nsqfdk*_ga*MjEzOTcxMzA2OS4xNzEwMzYzNDU0*_ga_5LTL1CNEJM*MTcyMjI5NDE2MC4xMDMuMS4xNzIyMjk0MTY4LjUyLjAuMA..#heading--manual-set-up-your-cloud).
 
-Install MicroK8s package, it is required to use a strictly confined version:
+Install microK8s package, it is required to use a strictly confined version:
 ```
 sudo snap install microk8s --channel 1.30-strict
 ```
@@ -78,7 +79,7 @@ Give your user permissions to read the ~/.kube directory:
 sudo chown -f -R $USER ~/.kube
 ```
 
-Wait for MicroK8s to finish initialising:
+Wait for microK8s to finish initialising:
 ```
 sudo microk8s status --wait-ready
 ```
@@ -95,7 +96,7 @@ IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
 sudo microk8s enable metallb:$IPADDR-$IPADDR
 ```
 
-Alias kubectl so it interacts with MicroK8s by default:
+Alias kubectl so it interacts with microK8s by default:
 ```
 sudo snap alias microk8s.kubectl kubectl
 ```
@@ -106,7 +107,7 @@ Ensure your new group membership is apparent in the current terminal:
 newgrp snap_microk8s
 ```
 
-Juju recognises a local MicroK8s cloud automatically, bootstrap a microk8s controller:
+Juju recognises a local microK8s cloud automatically, bootstrap a microk8s controller:
 ```
 juju bootstrap microk8s k8s-controller
 ```
