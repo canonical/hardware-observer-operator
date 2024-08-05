@@ -231,22 +231,22 @@ class HardwareObserverCharm(ops.CharmBase):
                 event.handle,
             )
             event.defer()
+            return
 
-        if self.cos_agent_related:
-            success, message = self.validate_configs()
-            if not success:
+        success, message = self.validate_configs()
+        if not success:
+            self.model.unit.status = BlockedStatus(message)
+            return
+        for exporter in self.exporters:
+            success = exporter.render_config()
+            if success:
+                exporter.restart()
+            else:
+                message = (
+                    f"Failed to configure {exporter.exporter_name}, "
+                    "please check if the server is healthy."
+                )
                 self.model.unit.status = BlockedStatus(message)
-                return
-            for exporter in self.exporters:
-                success = exporter.render_config()
-                if success:
-                    exporter.restart()
-                else:
-                    message = (
-                        f"Failed to configure {exporter.exporter_name}, "
-                        "please check if the server is healthy."
-                    )
-                    self.model.unit.status = BlockedStatus(message)
 
         self._on_update_status(event)
 
