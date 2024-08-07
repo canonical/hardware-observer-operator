@@ -492,6 +492,14 @@ class TestCharm(unittest.TestCase):
                 [(True, ""), (True, "")],
             ),
             (
+                "No cos_agent_related",
+                True,
+                False,
+                (True, ""),
+                [mock.MagicMock(), mock.MagicMock()],
+                [(True, ""), (True, "")],
+            ),
+            (
                 "invalid config",
                 True,
                 True,
