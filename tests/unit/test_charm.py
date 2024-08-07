@@ -545,6 +545,10 @@ class TestCharm(unittest.TestCase):
             if not resource_installed:
                 mock_logger.info.assert_called()
             else:
+                if not cos_agent_related:
+                    self.harness.charm.validate_configs.assert_not_called()
+                    self.harness.charm._on_update_status.assert_called()
+                    return
                 if not validate_configs_return[0]:
                     self.assertEqual(self.harness.charm.unit.status, BlockedStatus("invalid msg"))
                     self.harness.charm.exporters[0].render_config.assert_not_called()
