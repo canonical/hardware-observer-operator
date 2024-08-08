@@ -552,29 +552,34 @@ class TestCharm(unittest.TestCase):
 
             if not resource_installed:
                 mock_logger.info.assert_called()
-            if not cos_agent_related:
                 self.harness.charm.validate_configs.assert_not_called()
+                self.harness.charm._on_update_status.assert_not_called()
+            else:
+                if not cos_agent_related:
+                    self.harness.charm.validate_configs.assert_not_called()
+                    self.harness.charm._on_update_status.assert_called()
+                    return
+                if not validate_configs_return[0]:
+                    self.assertEqual(self.harness.charm.unit.status, BlockedStatus("invalid msg"))
+                    self.harness.charm.exporters[0].render_config.assert_not_called()
+                    return
+                if not all(mock_exporters_render_config_returns):
+                    for mock_exporter, render_config_return in zip(
+                        mock_exporters,
+                        mock_exporters_render_config_returns,
+                    ):
+                        if render_config_return:
+                            mock_exporter.restart.assert_called()
+                        else:
+                            message = (
+                                f"Failed to configure {mock_exporter.exporter_name}, "
+                                f"please check if the server is healthy."
+                            )
+                            self.assertEqual(
+                                self.harness.charm.unit.status, BlockedStatus(message)
+                            )
+                    self.harness.charm._on_update_status.assert_called()
                 self.harness.charm._on_update_status.assert_called()
-                return
-            if not validate_configs_return[0]:
-                self.assertEqual(self.harness.charm.unit.status, BlockedStatus("invalid msg"))
-                self.harness.charm.exporters[0].render_config.assert_not_called()
-                return
-            if not all(mock_exporters_render_config_returns):
-                for mock_exporter, render_config_return in zip(
-                    mock_exporters,
-                    mock_exporters_render_config_returns,
-                ):
-                    if render_config_return:
-                        mock_exporter.restart.assert_called()
-                    else:
-                        message = (
-                            f"Failed to configure {mock_exporter.exporter_name}, "
-                            f"please check if the server is healthy."
-                        )
-                        self.assertEqual(self.harness.charm.unit.status, BlockedStatus(message))
-                self.harness.charm._on_update_status.assert_called()
-            self.harness.charm._on_update_status.assert_called()
 
     def test_config_changed_update_alert_rules(self):
         """Test config changed will update alert rule."""

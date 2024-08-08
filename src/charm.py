@@ -231,6 +231,7 @@ class HardwareObserverCharm(ops.CharmBase):
                 event.handle,
             )
             event.defer()
+            return
 
         if self.cos_agent_related:
             success, message = self.validate_configs()
