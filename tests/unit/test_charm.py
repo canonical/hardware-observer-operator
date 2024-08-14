@@ -215,7 +215,7 @@ class TestCharm(unittest.TestCase):
 
         self.harness.charm.hw_tool_helper.remove.assert_called_with(
             self.harness.charm.model.resources,
-            [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+            sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL]),
         )
         for mock_exporter in mock_exporters:
             mock_exporter.uninstall.assert_called()
