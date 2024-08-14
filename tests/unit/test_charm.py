@@ -23,15 +23,17 @@ class TestCharm(unittest.TestCase):
         self.harness = ops.testing.Harness(HardwareObserverCharm)
         self.addCleanup(self.harness.cleanup)
 
-        get_hw_tool_enable_list_patcher = mock.patch.object(charm, "get_hw_tool_enable_list")
-        self.mock_get_hw_tool_enable_list = get_hw_tool_enable_list_patcher.start()
-        self.mock_get_hw_tool_enable_list.return_value = [
-            HWTool.IPMI_SENSOR,
-            HWTool.IPMI_SEL,
-            HWTool.IPMI_DCMI,
-            HWTool.REDFISH,
-        ]
-        self.addCleanup(get_hw_tool_enable_list_patcher.stop)
+        get_detected_hw_tools_patcher = mock.patch.object(charm, "get_detected_hw_tools")
+        self.mock_get_detected_hw_tools = get_detected_hw_tools_patcher.start()
+        self.mock_get_detected_hw_tools.return_value = sorted(
+            [
+                HWTool.IPMI_SENSOR,
+                HWTool.IPMI_SEL,
+                HWTool.IPMI_DCMI,
+                HWTool.REDFISH,
+            ]
+        )
+        self.addCleanup(get_detected_hw_tools_patcher.stop)
 
         requests_patcher = mock.patch("hw_tools.requests")
         requests_patcher.start()
@@ -55,7 +57,7 @@ class TestCharm(unittest.TestCase):
         [
             (
                 "Enable two exporters",
-                [HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                sorted([HWTool.IPMI_SEL, HWTool.SMARTCTL]),
                 ["hardware-exporter", "smartctl-exporter"],
             )
         ]
@@ -64,14 +66,12 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HardwareExporter.__init__", return_value=None)
     def test_exporters(self, _, enable_tools, expect, mock_hw_exporter, mock_smart_exporter):
         self.harness.begin()
-        self.harness.charm.get_enable_hw_tools = mock.MagicMock()
-        self.harness.charm.get_enable_hw_tools.return_value = enable_tools
-        self.harness.charm._stored.enabled_hw_tool_list_values = [
-            tool.value for tool in enable_tools
-        ]
+        self.harness.charm.get_detected_hw_tools_stored = mock.MagicMock()
+        self.harness.charm.get_detected_hw_tools_stored.return_value = enable_tools
+        self.harness.charm._stored.detected_hw_tools = [tool.value for tool in enable_tools]
 
         exporters = self.harness.charm.exporters
-        self.harness.charm.get_enable_hw_tools.assert_called()
+        self.harness.charm.get_detected_hw_tools_stored.assert_called()
 
         if "hardware-exporter" in expect:
             self.assertTrue(
@@ -80,7 +80,7 @@ class TestCharm(unittest.TestCase):
             mock_hw_exporter.assert_called_with(
                 self.harness.charm.charm_dir,
                 self.harness.charm.model.config,
-                self.harness.charm._stored.enabled_hw_tool_list_values,
+                self.harness.charm._stored.detected_hw_tools,
             )
         if "smartctl-exporter" in expect:
             self.assertTrue(
@@ -96,7 +96,7 @@ class TestCharm(unittest.TestCase):
             (
                 "happy case",
                 "install",
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL]),
                 (True, ""),
                 [mock.MagicMock(), mock.MagicMock()],
                 [True, True],
@@ -104,7 +104,7 @@ class TestCharm(unittest.TestCase):
             (
                 "happy case",
                 "upgrade",
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL]),
                 (True, ""),
                 [mock.MagicMock(), mock.MagicMock()],
                 [True, True],
@@ -112,7 +112,7 @@ class TestCharm(unittest.TestCase):
             (
                 "missing resource",
                 "install",
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL]),
                 (False, "miss something"),
                 [mock.MagicMock(), mock.MagicMock()],
                 [True, True],
@@ -120,7 +120,7 @@ class TestCharm(unittest.TestCase):
             (
                 "missing resource",
                 "upgrade",
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL]),
                 (False, "miss something"),
                 [mock.MagicMock(), mock.MagicMock()],
                 [True, True],
@@ -128,7 +128,7 @@ class TestCharm(unittest.TestCase):
             (
                 "Exporter install fail",
                 "install",
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL]),
                 (True, ""),
                 [mock.MagicMock(), mock.MagicMock()],
                 [False, True],
@@ -136,7 +136,7 @@ class TestCharm(unittest.TestCase):
             (
                 "Exporter install fail",
                 "upgrade",
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL],
+                sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL]),
                 (True, ""),
                 [mock.MagicMock(), mock.MagicMock()],
                 [False, True],
@@ -161,8 +161,8 @@ class TestCharm(unittest.TestCase):
             self.harness.begin()
             self.harness.charm.hw_tool_helper = mock.MagicMock()
             self.harness.charm.hw_tool_helper.install.return_value = hw_tool_helper_install_return
-            self.harness.charm.get_enable_hw_tools = mock.MagicMock()
-            self.harness.charm.get_enable_hw_tools.return_value = hw_tools
+            self.harness.charm.get_detected_hw_tools_stored = mock.MagicMock()
+            self.harness.charm.get_detected_hw_tools_stored.return_value = hw_tools
             self.harness.charm._on_update_status = mock.MagicMock()
 
             for mock_exporter, return_val in zip(
@@ -202,12 +202,14 @@ class TestCharm(unittest.TestCase):
             self.harness.begin()
             self.harness.charm.hw_tool_helper = mock.MagicMock()
 
-            self.harness.charm.get_enable_hw_tools = mock.MagicMock()
-            self.harness.charm.get_enable_hw_tools.return_value = [
-                HWTool.IPMI_SENSOR,
-                HWTool.IPMI_SEL,
-                HWTool.SMARTCTL,
-            ]
+            self.harness.charm.get_detected_hw_tools_stored = mock.MagicMock()
+            self.harness.charm.get_detected_hw_tools_stored.return_value = sorted(
+                [
+                    HWTool.IPMI_SENSOR,
+                    HWTool.IPMI_SEL,
+                    HWTool.SMARTCTL,
+                ]
+            )
 
             self.harness.charm.on.remove.emit()
 
@@ -347,7 +349,7 @@ class TestCharm(unittest.TestCase):
             return
 
         self.harness.charm.hw_tool_helper.check_installed.assert_called_with(
-            self.harness.charm.get_enable_hw_tools()
+            self.harness.charm.get_detected_hw_tools_stored()
         )
         if not hw_tool_check_installed[0]:
             self.assertEqual(
@@ -376,8 +378,8 @@ class TestCharm(unittest.TestCase):
         [
             (
                 False,
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
+                sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH]),
+                sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH]),
                 ops.testing.ActionOutput(
                     results={
                         "hardware-change-detected": False,
@@ -389,8 +391,8 @@ class TestCharm(unittest.TestCase):
             ),
             (
                 False,
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI],
+                sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH]),
+                sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI]),
                 ops.testing.ActionOutput(
                     results={
                         "hardware-change-detected": True,
@@ -403,8 +405,8 @@ class TestCharm(unittest.TestCase):
             ),
             (
                 True,
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH],
-                [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI],
+                sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH]),
+                sorted([HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI]),
                 ops.testing.ActionOutput(
                     results={
                         "hardware-change-detected": True,
@@ -431,7 +433,7 @@ class TestCharm(unittest.TestCase):
         ]
     )
     @mock.patch(
-        "charm.get_hw_tool_enable_list",
+        "charm.get_detected_hw_tools",
     )
     def test_detect_hardware_action(
         self,
@@ -439,15 +441,13 @@ class TestCharm(unittest.TestCase):
         current_hw_tools,
         detected_hw_tools,
         expect_output,
-        mock_get_hw_tool_enable_list,
+        mock_get_detected_hw_tools,
     ) -> None:
         """Test action detect-hardware."""
-        mock_get_hw_tool_enable_list.return_value = detected_hw_tools
+        mock_get_detected_hw_tools.return_value = detected_hw_tools
         self.harness.begin()
         self.harness.charm._on_install_or_upgrade = mock.MagicMock()
-        self.harness.charm._stored.enabled_hw_tool_list_values = [
-            tool.value for tool in current_hw_tools
-        ]
+        self.harness.charm._stored.detected_hw_tools = [tool.value for tool in current_hw_tools]
 
         output = self.harness.run_action("redetect-hardware", {"apply": apply})
         self.assertEqual(output, expect_output)
@@ -456,18 +456,14 @@ class TestCharm(unittest.TestCase):
             if apply:
                 detected_hw_tools.sort()
                 self.assertEqual(
-                    self.harness.charm.get_hw_tools_from_values(
-                        self.harness.charm._stored.enabled_hw_tool_list_values
-                    ),
+                    self.harness.charm.get_detected_hw_tools_stored(),
                     detected_hw_tools,
                 )
                 self.harness.charm._on_install_or_upgrade.assert_called()
             else:
                 self.harness.charm._on_install_or_upgrade.assert_not_called()
                 self.assertEqual(
-                    self.harness.charm.get_hw_tools_from_values(
-                        self.harness.charm._stored.enabled_hw_tool_list_values
-                    ),
+                    self.harness.charm.get_detected_hw_tools_stored(),
                     [tool.value for tool in current_hw_tools],
                 )
         else:
@@ -603,12 +599,14 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.hw_tool_helper.install.return_value = (True, "")
             self.harness.charm.hw_tool_helper.check_installed.return_value = (True, "")
 
-            self.harness.charm.get_enable_hw_tools = mock.MagicMock()
-            self.harness.charm.get_enable_hw_tools.return_value = [
-                HWTool.IPMI_SENSOR,
-                HWTool.IPMI_SEL,
-                HWTool.IPMI_DCMI,
-            ]
+            self.harness.charm.get_detected_hw_tools_stored = mock.MagicMock()
+            self.harness.charm.get_detected_hw_tools_stored.return_value = sorted(
+                [
+                    HWTool.IPMI_SENSOR,
+                    HWTool.IPMI_SEL,
+                    HWTool.IPMI_DCMI,
+                ]
+            )
 
             self.harness.charm.on.install.emit()
             self.harness.add_relation_unit(rid, "grafana-agent/0")
@@ -654,8 +652,8 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.hw_tool_helper.install.return_value = (True, "")
             self.harness.charm.hw_tool_helper.check_installed.return_value = (True, "")
 
-            self.harness.charm.get_enable_hw_tools = mock.MagicMock()
-            self.harness.charm.get_enable_hw_tools.return_value = [
+            self.harness.charm.get_detected_hw_tools_stored = mock.MagicMock()
+            self.harness.charm.get_detected_hw_tools_stored.return_value = [
                 HWTool.IPMI_SENSOR,
                 HWTool.IPMI_SEL,
                 HWTool.IPMI_DCMI,

@@ -617,12 +617,9 @@ def disk_hw_verifier() -> List[HWTool]:
 # Using cache here to avoid repeat call.
 # The lru_cache should be cleaned every time the hook been triggered.
 @lru_cache
-def get_hw_tool_enable_list() -> List[HWTool]:
-    """Return HWTool enable list."""
-    raid_enable_list = raid_hw_verifier()
-    bmc_enable_list = bmc_hw_verifier()
-    disk_enable_list = disk_hw_verifier()
-    return raid_enable_list + bmc_enable_list + disk_enable_list
+def get_detected_hw_tools() -> List[HWTool]:
+    """Return HWTool detected tools."""
+    return sorted(raid_hw_verifier() + bmc_hw_verifier() + disk_hw_verifier())
 
 
 class HWToolHelper:

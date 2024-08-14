@@ -47,7 +47,7 @@ from hw_tools import (
     copy_to_snap_common_bin,
     disk_hw_verifier,
     file_is_empty,
-    get_hw_tool_enable_list,
+    get_detected_hw_tools,
     install_deb,
     make_executable,
     raid_hw_verifier,
@@ -860,13 +860,13 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
 @mock.patch("hw_tools.disk_hw_verifier", return_value=[7, 8, 9])
 @mock.patch("hw_tools.bmc_hw_verifier", return_value=[1, 2, 3])
 @mock.patch("hw_tools.raid_hw_verifier", return_value=[4, 5, 6])
-def test_get_hw_tool_enable_list(mock_raid_verifier, mock_bmc_hw_verifier, mock_disk_hw_verifier):
-    get_hw_tool_enable_list.cache_clear()
-    output = get_hw_tool_enable_list()
+def test_get_detected_hw_tools(mock_raid_verifier, mock_bmc_hw_verifier, mock_disk_hw_verifier):
+    get_detected_hw_tools.cache_clear()
+    output = get_detected_hw_tools()
     mock_raid_verifier.assert_called()
     mock_bmc_hw_verifier.assert_called()
     mock_disk_hw_verifier.assert_called()
-    assert output == [4, 5, 6, 1, 2, 3, 7, 8, 9]
+    assert output == [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 
 @mock.patch("hw_tools._raid_hw_verifier_hwinfo", return_value=set([4, 5, 6]))
