@@ -287,6 +287,7 @@ class TestCharm(unittest.TestCase):
         hw_tool_check_installed,
         mock_exporter_healths,
     ):
+        self.harness.update_config({"redfish-username": "my-user", "redfish-password": "my-pwd"})
         for mock_exporter, config_valid, health in zip(
             mock_exporters,
             mock_exporter_validate_exporter_configs_returns,
@@ -371,6 +372,25 @@ class TestCharm(unittest.TestCase):
                         f"crashed unexpectedly: {ExporterError()}"
                     )
                     self.assertEqual(self.harness.charm.unit.status, BlockedStatus(msg))
+
+    mock.patch(
+        "charm.HardwareObserverCharm.exporters",
+        new_callable=mock.PropertyMock(return_value=[mock.MagicMock()]),
+    )
+    mock.patch(
+        "charm.HardwareObserverCharm.is_redfish_disabled",
+        new_callable=mock.PropertyMock(return_value=True),
+    )
+
+    def test_update_status_redfish_detected_but_disabled(self):
+        self.harness.add_relation("cos-agent", "grafana-agent")
+        self.harness.begin()
+        self.harness.charm._stored.resource_installed = True
+        self.harness.charm.hw_tool_helper = mock.MagicMock()
+        self.harness.charm.hw_tool_helper.check_installed.return_value = True, ""
+        self.harness.charm.on.update_status.emit()
+        exp_msg = "Redfish detected. Provide credentials to enable the collector"
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus(exp_msg))
 
     @parameterized.expand(
         [
@@ -775,3 +795,46 @@ class TestCharm(unittest.TestCase):
             self.harness.begin()
             result = self.harness.charm.validate_configs()
             self.assertEqual(result, expect)
+
+    @parameterized.expand(
+        [
+            (
+                "Redfish not present",
+                [],
+                {"redfish-username": "my-user", "redfish-password": "my-pwd"},
+                False,
+            ),
+            (
+                "Redfish present and configured",
+                [HWTool.REDFISH],
+                {"redfish-username": "my-user", "redfish-password": "my-pwd"},
+                False,
+            ),
+            (
+                "Redfish present and missing user",
+                [HWTool.REDFISH],
+                {"redfish-username": "", "redfish-password": "my-pwd"},
+                True,
+            ),
+            (
+                "Redfish present and missing password",
+                [HWTool.REDFISH],
+                {"redfish-username": "my-user", "redfish-password": ""},
+                True,
+            ),
+            (
+                "Redfish present and missing user and password",
+                [HWTool.REDFISH],
+                {"redfish-username": "", "redfish-password": ""},
+                True,
+            ),
+        ]
+    )
+    @mock.patch("charm.HardwareObserverCharm.get_enable_hw_tools")
+    def test_is_redfish_disabled(
+        self, _, enable_hw_tools, config, exp_result, mock_enable_hw_tools
+    ):
+        mock_enable_hw_tools.return_value = enable_hw_tools
+        self.harness.update_config(config)
+        self.harness.begin()
+        self.assertEqual(self.harness.charm.is_redfish_disabled, exp_result)

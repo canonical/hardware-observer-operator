@@ -397,13 +397,6 @@ class HardwareExporter(BaseExporter):
         if not redfish_conn_params:
             return None
 
-        # Skip redfish validation if either username/password is empty.
-        if not (
-            redfish_conn_params.get("username", "") and redfish_conn_params.get("password", "")
-        ):
-            logger.warning("Empty redfish username/password, skip validation.")
-            return False
-
         redfish_obj = None
         try:
             redfish_obj = redfish_client(
@@ -432,9 +425,20 @@ class HardwareExporter(BaseExporter):
         return result
 
     def get_redfish_conn_params(self, config: ConfigData) -> Dict[str, Any]:
-        """Get redfish connection parameters if redfish is available."""
+        """Get redfish connection parameters if redfish is available and configured.
+
+        If no username or password are passed, redfish collector is not enabled on
+        hardware exporter.
+        """
         if HWTool.REDFISH not in self.enabled_hw_tool_list:
             logger.warning("Redfish unavailable, disregarding redfish config options...")
+            return {}
+        if (
+            not config["redfish-username"] or not config["redfish-password"]
+        ) and HWTool.REDFISH in self.enabled_hw_tool_list:
+            logger.info(
+                "Redfish credentials not passed. Pass user and password to enable the collector."
+            )
             return {}
         return {
             "host": f"https://{get_bmc_address()}",

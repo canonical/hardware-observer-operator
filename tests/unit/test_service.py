@@ -476,13 +476,33 @@ class TestHardwareExporter(unittest.TestCase):
     def test_get_redfish_conn_params_when_redfish_is_available(self):
         """Test get_redfish_conn_params when Redfish is available."""
         self.exporter.enabled_hw_tool_list = ["redfish"]
+        self.mock_config = {
+            "redfish-username": "my-user",
+            "redfish-password": "my-pwd",
+            "collect-timeout": 10,
+        }
         result = self.exporter.get_redfish_conn_params(self.mock_config)
         expected_result = {
             "host": "https://127.0.0.1",
-            "username": "",
-            "password": "",
+            "username": "my-user",
+            "password": "my-pwd",
             "timeout": 10,
         }
+        self.assertEqual(result, expected_result)
+
+    @parameterized.expand(
+        [
+            ({"redfish-username": "", "redfish-password": "my-pwd"},),
+            ({"redfish-username": "my-user", "redfish-password": ""},),
+            ({"redfish-username": "", "redfish-password": ""},),
+        ]
+    )
+    def test_get_redfish_conn_params_no_config(self, mock_config):
+        """Test get_redfish_conn_params when Redfish is available, but not configured."""
+        self.exporter.enabled_hw_tool_list = ["redfish"]
+        self.mock_config = mock_config
+        result = self.exporter.get_redfish_conn_params(self.mock_config)
+        expected_result = {}
         self.assertEqual(result, expected_result)
 
     def test_get_redfish_conn_params_when_redfish_is_unavailable(self):
@@ -515,6 +535,7 @@ class TestHardwareExporter(unittest.TestCase):
 
     @mock.patch("service.redfish_client")
     def test_redfish_conn_params_valid_miss_redfish_params(self, mock_redfish_client):
+        # Redfish miss connection parameters when it's not present or not passed user and password
         redfish_conn_params = {}
         result = self.exporter.redfish_conn_params_valid(redfish_conn_params)
         self.assertEqual(result, None)
@@ -562,39 +583,6 @@ class TestHardwareExporter(unittest.TestCase):
         )
         self.assertFalse(result)
         mock_redfish_client.return_value.login.assert_not_called()
-
-    @parameterized.expand(
-        [
-            (
-                "missing username",
-                {
-                    "host": "hosta",
-                    "username": "",
-                    "password": "passwordc",
-                    "timeout": "timeoutd",
-                },
-            ),
-            (
-                "missing password",
-                {
-                    "host": "hosta",
-                    "username": "usernameb",
-                    "password": "",
-                    "timeout": "timeoutd",
-                },
-            ),
-        ]
-    )
-    @mock.patch("service.redfish_client")
-    def test_redfish_conn_params_valid_failed_missing_credentials(
-        self,
-        _,
-        redfish_conn_params,
-        mock_redfish_client,
-    ):
-        result = self.exporter.redfish_conn_params_valid(redfish_conn_params)
-        self.assertEqual(result, False)
-        mock_redfish_client.assert_not_called()
 
     def test_hw_tools(self):
         self.assertEqual(

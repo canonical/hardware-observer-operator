@@ -86,6 +86,13 @@ class HardwareObserverCharm(ops.CharmBase):
 
         return exporters
 
+    @property
+    def is_redfish_disabled(self) -> bool:
+        """Check if redfish collector is disabled when is present but missing user or password."""
+        return HWTool.REDFISH in self.get_enable_hw_tools() and (
+            not self.model.config["redfish-username"] or not self.model.config["redfish-password"]
+        )
+
     def get_enabled_hw_tool_list_values(self) -> List[str]:
         """Get hw tool list from stored or from machine if not in stored."""
         if not self._stored.enabled_hw_tool_list_values:  # type: ignore[truthy-function]
@@ -205,8 +212,14 @@ class HardwareObserverCharm(ops.CharmBase):
         # Check health of all exporters
         exporters_health = [self._check_exporter_health(exporter) for exporter in self.exporters]
 
+        if all(exporters_health) and self.is_redfish_disabled:
+            self.model.unit.status = ActiveStatus(
+                "Redfish detected. Provide credentials to enable the collector"
+            )
+            return
         if all(exporters_health):
             self.model.unit.status = ActiveStatus("Unit is ready")
+            return
 
     def _check_exporter_health(self, exporter: BaseExporter) -> bool:
         """Check exporter health."""
