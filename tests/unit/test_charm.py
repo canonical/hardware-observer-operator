@@ -454,7 +454,6 @@ class TestCharm(unittest.TestCase):
 
         if not current_hw_tools == detected_hw_tools:
             if apply:
-                detected_hw_tools.sort()
                 self.assertEqual(
                     self.harness.charm.get_detected_hw_tools_stored(),
                     detected_hw_tools,

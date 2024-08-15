@@ -87,7 +87,7 @@ class HardwareObserverCharm(ops.CharmBase):
     def get_detected_hw_tools_stored(self) -> List[HWTool]:
         """Get hardware tool list from stored or from machine if not present.
 
-        This function store the hardware tools as sting because HWTool object is not accepted on
+        This function store the hardware tools as string because HWTool object is not accepted on
         Ops framework. However, to return the values it uses HWTool objects.
         """
         if not self._stored.detected_hw_tools:  # type: ignore[truthy-function]
