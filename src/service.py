@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from logging import getLogger
 from pathlib import Path
 from time import sleep
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Set, Tuple
 
 from charms.operator_libs_linux.v1 import systemd
 from jinja2 import Environment, FileSystemLoader
@@ -56,7 +56,7 @@ class BaseExporter(ABC):
 
     @staticmethod
     @abstractmethod
-    def hw_tools() -> set[HWTool]:
+    def hw_tools() -> Set[HWTool]:
         """Return hardware tools to watch."""
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
@@ -301,7 +301,7 @@ class SmartCtlExporter(BaseExporter):
         return service_rendered
 
     @staticmethod
-    def hw_tools() -> set[HWTool]:
+    def hw_tools() -> Set[HWTool]:
         """Return hardware tools to watch."""
         return {HWTool.SMARTCTL}
 
@@ -330,7 +330,7 @@ class HardwareExporter(BaseExporter):
     required_config: bool = True
 
     def __init__(
-        self, charm_dir: Path, config: ConfigData, available_hw_tools: set[HWTool]
+        self, charm_dir: Path, config: ConfigData, available_hw_tools: Set[HWTool]
     ) -> None:
         """Initialize the Hardware Exporter class."""
         super().__init__(charm_dir, config, HARDWARE_EXPORTER_SETTINGS)
@@ -446,7 +446,7 @@ class HardwareExporter(BaseExporter):
         }
 
     @staticmethod
-    def hw_tools() -> set[HWTool]:
+    def hw_tools() -> Set[HWTool]:
         """Return hardware tools to watch."""
         return {
             HWTool.STORCLI,

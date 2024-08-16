@@ -5,7 +5,7 @@
 """Charm the application."""
 
 import logging
-from typing import Any, List, Tuple
+from typing import Any, List, Set, Tuple
 
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -84,7 +84,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
         return exporters
 
-    def get_available_hw_tools_stored(self) -> set[HWTool]:
+    def get_available_hw_tools_stored(self) -> Set[HWTool]:
         """Get the available hardware tools from stored or from machine if not present.
 
         This function store the available hardware tools as string because HWTool object is not

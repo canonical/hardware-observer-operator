@@ -526,7 +526,7 @@ def _raid_hw_verifier_lshw() -> Set[HWTool]:
     return tools
 
 
-def raid_hw_verifier() -> set[HWTool]:
+def raid_hw_verifier() -> Set[HWTool]:
     """Verify if the HWTool support RAID card exists on machine."""
     lshw_tools = _raid_hw_verifier_lshw()
     hwinfo_tools = _raid_hw_verifier_hwinfo()
@@ -560,7 +560,7 @@ def redfish_available() -> bool:
     return result
 
 
-def bmc_hw_verifier() -> set[HWTool]:
+def bmc_hw_verifier() -> Set[HWTool]:
     """Verify if the ipmi is available on the machine.
 
     Using freeipmi-tools to verify, the package will be removed in removing stage.
@@ -596,12 +596,12 @@ def bmc_hw_verifier() -> set[HWTool]:
     return tools
 
 
-def disk_hw_verifier() -> set[HWTool]:
+def disk_hw_verifier() -> Set[HWTool]:
     """Verify if the disk exists on the machine."""
     return {HWTool.SMARTCTL} if lshw(class_filter="disk") else set()
 
 
-def get_available_hw_tools() -> set[HWTool]:
+def get_available_hw_tools() -> Set[HWTool]:
     """Return HWTool available after checking the hardware."""
     return raid_hw_verifier() | bmc_hw_verifier() | disk_hw_verifier()
 
@@ -628,7 +628,7 @@ class HWToolHelper:
     def fetch_tools(  # pylint: disable=W0102
         self,
         resources: Resources,
-        hw_available: set[HWTool] = set(),
+        hw_available: Set[HWTool] = set(),
     ) -> Dict[HWTool, Path]:
         """Fetch resource from juju if it's VENDOR_TOOLS."""
         fetch_tools: Dict[HWTool, Path] = {}
@@ -646,7 +646,7 @@ class HWToolHelper:
         return fetch_tools
 
     def check_missing_resources(
-        self, hw_available: set[HWTool], fetch_tools: Dict[HWTool, Path]
+        self, hw_available: Set[HWTool], fetch_tools: Dict[HWTool, Path]
     ) -> Tuple[bool, str]:
         """Check if required resources are not been uploaded."""
         missing_resources = []
@@ -666,7 +666,7 @@ class HWToolHelper:
             return False, f"Missing resources: {missing_resources}"
         return True, ""
 
-    def install(self, resources: Resources, hw_available: set[HWTool]) -> Tuple[bool, str]:
+    def install(self, resources: Resources, hw_available: Set[HWTool]) -> Tuple[bool, str]:
         """Install tools."""
         logger.info("hw_available: %s", hw_available)
 
@@ -706,7 +706,7 @@ class HWToolHelper:
         return True, ""
 
     # pylint: disable=W0613
-    def remove(self, resources: Resources, hw_available: set[HWTool]) -> None:
+    def remove(self, resources: Resources, hw_available: Set[HWTool]) -> None:
         """Execute all remove strategies."""
         for strategy in self.strategies:
             if strategy.name not in hw_available:
@@ -715,9 +715,9 @@ class HWToolHelper:
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
 
-    def check_installed(self, hw_available: set[HWTool]) -> Tuple[bool, str]:
+    def check_installed(self, hw_available: Set[HWTool]) -> Tuple[bool, str]:
         """Check tool status."""
-        failed_checks: set[HWTool] = set()
+        failed_checks: Set[HWTool] = set()
 
         for strategy in self.strategies:
             if strategy.name not in hw_available:
