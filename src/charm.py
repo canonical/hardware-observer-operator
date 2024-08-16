@@ -12,7 +12,7 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
-from hw_tools import HWTool, HWToolHelper, get_detected_hw_tools
+from hw_tools import HWTool, HWToolHelper, get_available_hw_tools
 from service import BaseExporter, ExporterError, HardwareExporter, SmartCtlExporter
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ class HardwareObserverCharm(ops.CharmBase):
             # resource_installed is a flag that tracks the installation state for
             # the juju resources and also the different exporters
             resource_installed=False,
-            detected_hw_tools=[],
+            available_hw_tools=set(),
         )
 
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -69,72 +69,75 @@ class HardwareObserverCharm(ops.CharmBase):
     def exporters(self) -> List[BaseExporter]:
         """Return list of exporters based on detected hardware."""
         exporters: List[BaseExporter] = []
-        detected_hw_tools = self.get_detected_hw_tools_stored()
-        if set(detected_hw_tools) & set(HardwareExporter.hw_tools()):
+        available_hw_tools = self.get_available_hw_tools_stored()
+        if available_hw_tools & HardwareExporter.hw_tools():
             exporters.append(
                 HardwareExporter(
                     self.charm_dir,
                     self.model.config,
-                    detected_hw_tools,
+                    available_hw_tools,
                 )
             )
 
-        if set(detected_hw_tools) & set(SmartCtlExporter.hw_tools()):
+        if available_hw_tools & SmartCtlExporter.hw_tools():
             exporters.append(SmartCtlExporter(self.charm_dir, self.model.config))
 
         return exporters
 
-    def get_detected_hw_tools_stored(self) -> List[HWTool]:
-        """Get hardware tool list from stored or from machine if not present.
+    def get_available_hw_tools_stored(self) -> set[HWTool]:
+        """Get the available hardware tools from stored or from machine if not present.
 
-        This function store the hardware tools as string because HWTool object is not accepted on
-        Ops framework. However, to return the values it uses HWTool objects.
+        This function store the available hardware tools as string because HWTool object is not
+        accepted on Ops framework. However, to return the values it uses HWTool objects.
         """
-        if not self._stored.detected_hw_tools:  # type: ignore[truthy-function]
-            detected_hw_tools = get_detected_hw_tools()  # type: ignore[unreachable]
-            self._stored.detected_hw_tools = [tool.value for tool in detected_hw_tools]
-        return [
-            HWTool(value) for value in self._stored.detected_hw_tools  # type: ignore[attr-defined]
-        ]
+        if not self._stored.available_hw_tools:  # type: ignore[truthy-function]
+            available_hw_tools = get_available_hw_tools()  # type: ignore[unreachable]
+            self._stored.available_hw_tools = {tool.value for tool in available_hw_tools}
+        return {
+            HWTool(value)
+            for value in self._stored.available_hw_tools  # type: ignore[attr-defined]
+        }
 
     def _on_redetect_hardware(self, event: ops.ActionEvent) -> None:
-        """Detect hardware tool list and option to rerun the install hook."""
-        stored_detected_hw_tools = self.get_detected_hw_tools_stored()
-        current_hw_tools = get_detected_hw_tools()
+        """Redetect available hardware tools and option to rerun the install hook."""
+        stored_available_hw_tools = self.get_available_hw_tools_stored()
+        available_hw_tools = get_available_hw_tools()
 
-        hw_change_detected = False
-        if stored_detected_hw_tools != current_hw_tools:
-            hw_change_detected = True
+        hw_change_detected = stored_available_hw_tools != available_hw_tools
+
+        ordered_available_hw_tools = ",".join(
+            map(lambda member: member.value, sorted(available_hw_tools))
+        )
+
+        if event.params["apply"] and hw_change_detected:
+            # Update the value in local Store
+            self._stored.available_hw_tools = available_hw_tools
+            event.log(f"Run install hook with enable tools: {ordered_available_hw_tools}")
+            self._on_install_or_upgrade(event=event)
 
         result = {
             "hardware-change-detected": hw_change_detected,
-            "current-hardware-tools": ",".join(stored_detected_hw_tools),
-            "update-hardware-tools": False,
+            "current-hardware-tools": ",".join(
+                map(lambda member: member.value, sorted(stored_available_hw_tools))
+            ),
+            "update-hardware-tools": bool(event.params["apply"] and hw_change_detected),
+            "detected-hardware-tools": ordered_available_hw_tools if hw_change_detected else "",
         }
-        # Show compare lists if hw_change_detected
-        if hw_change_detected:
-            result["detected-hardware-tools"] = ",".join(current_hw_tools)
 
-        if event.params["apply"] and hw_change_detected:
-            # Reset the value in local Store
-            self._stored.detected_hw_tools = current_hw_tools
-            event.log(f"Run install hook with enable tools: {','.join(current_hw_tools)}")
-            self._on_install_or_upgrade(event=event)
-            result["update-hardware-tools"] = True
         event.set_results(result)
 
     def _on_install_or_upgrade(self, event: EventBase) -> None:
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
 
-        detected_hw_tools = self.get_detected_hw_tools_stored()
+        available_hw_tools = self.get_available_hw_tools_stored()
 
         msg: str
         resource_installed: bool
 
         # Install hw tools
         resource_installed, msg = self.hw_tool_helper.install(
-            self.model.resources, detected_hw_tools
+            self.model.resources, available_hw_tools
         )
 
         self._stored.resource_installed = resource_installed
@@ -162,7 +165,7 @@ class HardwareObserverCharm(ops.CharmBase):
         # Remove binary tool
         self.hw_tool_helper.remove(
             self.model.resources,
-            self.get_detected_hw_tools_stored(),
+            self.get_available_hw_tools_stored(),
         )
         self._stored.resource_installed = False
 
@@ -188,7 +191,7 @@ class HardwareObserverCharm(ops.CharmBase):
                 return
 
         hw_tool_ok, error_msg = self.hw_tool_helper.check_installed(
-            self.get_detected_hw_tools_stored()
+            self.get_available_hw_tools_stored()
         )
         if not hw_tool_ok:
             self.model.unit.status = BlockedStatus(error_msg)

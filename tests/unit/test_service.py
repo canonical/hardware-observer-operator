@@ -35,7 +35,7 @@ class TestBaseExporter(unittest.TestCase):
             "redfish-username": "",
             "redfish-password": "",
         }
-        self.mock_stored_hw_tool_list_values = ["storcli", "ssacli"]
+        self.mock_stored_hw_available = {"storcli", "ssacli"}
         service.BaseExporter.__abstractmethods__ = set()
 
         self.exporter = service.BaseExporter(
@@ -414,9 +414,9 @@ class TestHardwareExporter(unittest.TestCase):
             "redfish-username": "",
             "redfish-password": "",
         }
-        self.mock_stored_hw_tool_list_values = ["storcli", "ssacli"]
+        self.mock_stored_hw_tool_available = {"storcli", "ssacli"}
         self.exporter = service.HardwareExporter(
-            search_path, self.mock_config, self.mock_stored_hw_tool_list_values
+            search_path, self.mock_config, self.mock_stored_hw_tool_available
         )
 
     def test_render_service(self):
@@ -470,12 +470,12 @@ class TestHardwareExporter(unittest.TestCase):
         self.assertEqual(content_config["level"], "INFO")
         self.assertEqual(content_config["collect_timeout"], 10)
         self.assertEqual(
-            content_config["enable_collectors"], ["collector.mega_raid", "collector.hpe_ssa"]
+            set(content_config["enable_collectors"]), {"collector.mega_raid", "collector.hpe_ssa"}
         )
 
     def test_get_redfish_conn_params_when_redfish_is_available(self):
         """Test get_redfish_conn_params when Redfish is available."""
-        self.exporter.enabled_hw_tool_list = ["redfish"]
+        self.exporter.available_hw_tool = {"redfish"}
         result = self.exporter.get_redfish_conn_params(self.mock_config)
         expected_result = {
             "host": "https://127.0.0.1",
@@ -487,7 +487,7 @@ class TestHardwareExporter(unittest.TestCase):
 
     def test_get_redfish_conn_params_when_redfish_is_unavailable(self):
         """Test get_redfish_conn_params when Redfish is not available."""
-        self.exporter.enabled_hw_tool_list = ["ssacli"]
+        self.exporter.available_hw_tool = {"ssacli"}
         result = self.exporter.get_redfish_conn_params(self.mock_config)
         expected_result = {}
         self.assertEqual(result, expected_result)
@@ -599,7 +599,7 @@ class TestHardwareExporter(unittest.TestCase):
     def test_hw_tools(self):
         self.assertEqual(
             self.exporter.hw_tools(),
-            [
+            {
                 HWTool.STORCLI,
                 HWTool.SSACLI,
                 HWTool.SAS2IRCU,
@@ -609,7 +609,7 @@ class TestHardwareExporter(unittest.TestCase):
                 HWTool.IPMI_SEL,
                 HWTool.IPMI_SENSOR,
                 HWTool.REDFISH,
-            ],
+            },
         )
 
 
@@ -660,7 +660,7 @@ class TestSmartMetricExporter(unittest.TestCase):
         self.assertEqual(result, service_render_success)
 
     def test_hw_tools(self):
-        self.assertEqual(self.exporter.hw_tools(), [HWTool.SMARTCTL])
+        self.assertEqual(self.exporter.hw_tools(), {HWTool.SMARTCTL})
 
     @mock.patch("service.systemd", return_value=mock.MagicMock())
     def test_install_resource_restart(self, mock_systemd):
