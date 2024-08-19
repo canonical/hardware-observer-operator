@@ -414,9 +414,9 @@ class TestHardwareExporter(unittest.TestCase):
             "redfish-username": "",
             "redfish-password": "",
         }
-        self.mock_stored_hw_tool_available = {"storcli", "ssacli"}
+        self.mock_tools_available = {"storcli", "ssacli"}
         self.exporter = service.HardwareExporter(
-            search_path, self.mock_config, self.mock_stored_hw_tool_available
+            search_path, self.mock_config, self.mock_tools_available
         )
 
     def test_render_service(self):
@@ -479,7 +479,7 @@ class TestHardwareExporter(unittest.TestCase):
 
     def test_render_config_content_redfish_available_and_disabled(self):
         """Test render config content redfish is available but disabled."""
-        self.exporter.available_hw_tool = {HWTool.REDFISH, HWTool.IPMI_DCMI}
+        self.exporter.available_tools = {HWTool.REDFISH, HWTool.IPMI_DCMI}
         self.exporter.config = {
             "hardware-exporter-port": 10200,
             "collect-timeout": 10,
@@ -500,7 +500,7 @@ class TestHardwareExporter(unittest.TestCase):
 
     def test_render_config_content_redfish_available_and_enabled(self):
         """Test render config content when redfish is available and enabled."""
-        self.exporter.available_hw_tool = {HWTool.REDFISH}
+        self.exporter.available_tools = {HWTool.REDFISH}
         self.exporter.config = {
             "hardware-exporter-port": 10200,
             "collect-timeout": 10,
@@ -552,15 +552,15 @@ class TestHardwareExporter(unittest.TestCase):
         self,
         _,
         redfish_available_and_enabled,
-        available_hw_tool,
+        available_tools,
         expected_result,
         mock_available_and_enabled,
     ):
         """Test that Redfish is removed from available_tools if necessary."""
         mock_available_and_enabled.return_value = redfish_available_and_enabled
-        self.exporter.available_hw_tool = available_hw_tool
+        self.exporter.available_tools = available_tools
         self.assertEqual(self.exporter.enabled_tools, expected_result)
-        self.assertEqual(self.exporter.available_hw_tool, available_hw_tool)
+        self.assertEqual(self.exporter.available_tools, available_tools)
 
     def test_get_redfish_conn_params(self):
         """Test get_redfish_conn_params."""
@@ -718,8 +718,8 @@ class TestHardwareExporter(unittest.TestCase):
             ("Not available and Enable", {}, {"redfish-enable": True}, False),
         ]
     )
-    def test_is_redfish_available_and_enabled(self, _, available_hw_tool, config, expected_result):
-        self.exporter.available_hw_tool = available_hw_tool
+    def test_is_redfish_available_and_enabled(self, _, available_tools, config, expected_result):
+        self.exporter.available_tools = available_tools
         self.exporter.config = config
         self.assertIs(self.exporter.is_redfish_available_and_enabled, expected_result)
 

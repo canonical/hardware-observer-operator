@@ -329,9 +329,7 @@ class HardwareExporter(BaseExporter):
 
     required_config: bool = True
 
-    def __init__(
-        self, charm_dir: Path, config: ConfigData, available_hw_tools: Set[HWTool]
-    ) -> None:
+    def __init__(self, charm_dir: Path, config: ConfigData, available_tools: Set[HWTool]) -> None:
         """Initialize the Hardware Exporter class."""
         super().__init__(charm_dir, config, HARDWARE_EXPORTER_SETTINGS)
 
@@ -339,7 +337,7 @@ class HardwareExporter(BaseExporter):
         self.exporter_config_path = self.settings.config_path
         self.port = int(config["hardware-exporter-port"])
         self.config = config
-        self.available_hw_tool = available_hw_tools
+        self.available_tools = available_tools
         self.collect_timeout = int(config["collect-timeout"])
         self.bmc_address = get_bmc_address()
 
@@ -369,10 +367,10 @@ class HardwareExporter(BaseExporter):
 
         Tools that are available, but disabled should not be used on prometheus hardware exporter.
         """
-        available_tools = self.available_hw_tool.copy()
+        enabled_tools = self.available_tools.copy()
         if not self.is_redfish_available_and_enabled:
-            available_tools.discard(HWTool.REDFISH)
-        return available_tools
+            enabled_tools.discard(HWTool.REDFISH)
+        return enabled_tools
 
     def render_service(self) -> bool:
         """Render required files for service."""
@@ -464,4 +462,4 @@ class HardwareExporter(BaseExporter):
     @property
     def is_redfish_available_and_enabled(self) -> bool:
         """Check if redfish is available in the hardware and if the user wants to enable it."""
-        return bool(HWTool.REDFISH in self.available_hw_tool and self.config["redfish-enable"])
+        return bool(HWTool.REDFISH in self.available_tools and self.config["redfish-enable"])
