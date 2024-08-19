@@ -341,10 +341,10 @@ class HardwareExporter(BaseExporter):
         self.config = config
         self.available_hw_tool = available_hw_tools
         self.collect_timeout = int(config["collect-timeout"])
+        self.bmc_address = get_bmc_address()
 
     def _render_config_content(self) -> str:
         """Render and install exporter config file."""
-        redfish_conn_params = self.redfish_conn_params
         collectors = set()
         for tool in self.enabled_tools:
             collector = HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(tool)
@@ -356,10 +356,10 @@ class HardwareExporter(BaseExporter):
             COLLECT_TIMEOUT=self.collect_timeout,
             COLLECTORS=collectors,
             REDFISH_ENABLE=self.is_redfish_available_and_enabled,
-            REDFISH_HOST=redfish_conn_params.get("host", ""),
-            REDFISH_USERNAME=redfish_conn_params.get("username", ""),
-            REDFISH_PASSWORD=redfish_conn_params.get("password", ""),
-            REDFISH_CLIENT_TIMEOUT=redfish_conn_params.get("timeout", ""),
+            REDFISH_HOST=self.redfish_conn_params.get("host", ""),
+            REDFISH_USERNAME=self.redfish_conn_params.get("username", ""),
+            REDFISH_PASSWORD=self.redfish_conn_params.get("password", ""),
+            REDFISH_CLIENT_TIMEOUT=self.redfish_conn_params.get("timeout", ""),
         )
         return content
 
@@ -399,15 +399,12 @@ class HardwareExporter(BaseExporter):
     def redfish_conn_params_valid(self) -> bool:
         """Check if redfish connections parameters is valid or not.
 
-        If the redfish connection params is not available this property returns
-        None. Otherwise, it verifies the connection parameters. If the redfish
-        connection parameters are valid, it returns True; if not valid, it
-        returns False.
+        Verifies the connection parameters. If the redfish connection parameters are valid, it
+        returns True; if not valid, it returns False.
         """
-        redfish_conn_params = self.redfish_conn_params
-        # Skip redfish validation if either username/password is empty.
         if not (
-            redfish_conn_params.get("username", "") and redfish_conn_params.get("password", "")
+            self.redfish_conn_params.get("username", "")
+            and self.redfish_conn_params.get("password", "")
         ):
             logger.warning("Empty redfish username/password, skip validation.")
             return False
@@ -415,10 +412,10 @@ class HardwareExporter(BaseExporter):
         redfish_obj = None
         try:
             redfish_obj = redfish_client(
-                base_url=redfish_conn_params.get("host", ""),
-                username=redfish_conn_params.get("username", ""),
-                password=redfish_conn_params.get("password", ""),
-                timeout=redfish_conn_params.get(
+                base_url=self.redfish_conn_params.get("host", ""),
+                username=self.redfish_conn_params.get("username", ""),
+                password=self.redfish_conn_params.get("password", ""),
+                timeout=self.redfish_conn_params.get(
                     "timeout", self.settings.redfish_timeout  # type: ignore
                 ),
                 max_retry=self.settings.redfish_max_retry,  # type: ignore
@@ -443,7 +440,7 @@ class HardwareExporter(BaseExporter):
     def redfish_conn_params(self) -> Dict[str, Any]:
         """Get redfish connection parameters."""
         return {
-            "host": f"https://{get_bmc_address()}",
+            "host": f"https://{self.bmc_address}",
             "username": self.config["redfish-username"],
             "password": self.config["redfish-password"],
             "timeout": self.config["collect-timeout"],
