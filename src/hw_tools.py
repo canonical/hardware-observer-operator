@@ -11,7 +11,6 @@ import stat
 import subprocess
 import tarfile
 from abc import ABCMeta, abstractmethod
-from functools import lru_cache
 from http import HTTPStatus
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
@@ -527,19 +526,13 @@ def _raid_hw_verifier_lshw() -> Set[HWTool]:
     return tools
 
 
-# Using cache here to avoid repeat call.
-# The lru_cache should be cleaned every time the hook been triggered.
-@lru_cache
-def raid_hw_verifier() -> List[HWTool]:
+def raid_hw_verifier() -> Set[HWTool]:
     """Verify if the HWTool support RAID card exists on machine."""
     lshw_tools = _raid_hw_verifier_lshw()
     hwinfo_tools = _raid_hw_verifier_hwinfo()
-    return list(lshw_tools | hwinfo_tools)
+    return lshw_tools | hwinfo_tools
 
 
-# Using cache here to avoid repeat call.
-# The lru_cache should be cleaned every time the hook been triggered.
-@lru_cache
 def redfish_available() -> bool:
     """Check if redfish service is available."""
     bmc_address = get_bmc_address()
@@ -567,62 +560,50 @@ def redfish_available() -> bool:
     return result
 
 
-# Using cache here to avoid repeat call.
-# The lru_cache should be cleaned every time the hook been triggered.
-@lru_cache
-def bmc_hw_verifier() -> List[HWTool]:
+def bmc_hw_verifier() -> Set[HWTool]:
     """Verify if the ipmi is available on the machine.
 
     Using freeipmi-tools to verify, the package will be removed in removing stage.
     """
-    tools = []
+    tools = set()
 
     # Check if ipmi services are available
     apt_helpers.add_pkg_with_candidate_version("freeipmi-tools")
 
     try:
         subprocess.check_output("ipmimonitoring --sdr-cache-recreate".split())
-        tools.append(HWTool.IPMI_SENSOR)
+        tools.add(HWTool.IPMI_SENSOR)
     except subprocess.CalledProcessError:
         logger.info("IPMI sensors monitoring is not available")
 
     try:
         subprocess.check_output("ipmi-sel --sdr-cache-recreate".split())
-        tools.append(HWTool.IPMI_SEL)
+        tools.add(HWTool.IPMI_SEL)
     except subprocess.CalledProcessError:
         logger.info("IPMI SEL monitoring is not available")
 
     try:
         subprocess.check_output("ipmi-dcmi --get-system-power-statistics".split())
-        tools.append(HWTool.IPMI_DCMI)
+        tools.add(HWTool.IPMI_DCMI)
     except subprocess.CalledProcessError:
         logger.info("IPMI DCMI monitoring is not available")
 
     # Check if RedFish is available
     if redfish_available():
-        tools.append(HWTool.REDFISH)
+        tools.add(HWTool.REDFISH)
     else:
         logger.info("Redfish is not available")
     return tools
 
 
-def disk_hw_verifier() -> List[HWTool]:
+def disk_hw_verifier() -> Set[HWTool]:
     """Verify if the disk exists on the machine."""
-    lshw_storage = lshw(class_filter="disk")
-    if lshw_storage:
-        return [HWTool.SMARTCTL]
-    return []
+    return {HWTool.SMARTCTL} if lshw(class_filter="disk") else set()
 
 
-# Using cache here to avoid repeat call.
-# The lru_cache should be cleaned every time the hook been triggered.
-@lru_cache
-def get_hw_tool_enable_list() -> List[HWTool]:
-    """Return HWTool enable list."""
-    raid_enable_list = raid_hw_verifier()
-    bmc_enable_list = bmc_hw_verifier()
-    disk_enable_list = disk_hw_verifier()
-    return raid_enable_list + bmc_enable_list + disk_enable_list
+def get_available_hw_tools() -> Set[HWTool]:
+    """Return HWTool available after checking the hardware."""
+    return raid_hw_verifier() | bmc_hw_verifier() | disk_hw_verifier()
 
 
 class HWToolHelper:
@@ -647,13 +628,13 @@ class HWToolHelper:
     def fetch_tools(  # pylint: disable=W0102
         self,
         resources: Resources,
-        hw_enable_list: List[HWTool] = [],
+        hw_available: Set[HWTool] = set(),
     ) -> Dict[HWTool, Path]:
         """Fetch resource from juju if it's VENDOR_TOOLS."""
         fetch_tools: Dict[HWTool, Path] = {}
         # Fetch all tools from juju resources
         for tool, resource in TPR_RESOURCES.items():
-            if tool not in hw_enable_list:
+            if tool not in hw_available:
                 logger.info("Skip fetch tool: %s", tool)
                 continue
             try:
@@ -665,11 +646,11 @@ class HWToolHelper:
         return fetch_tools
 
     def check_missing_resources(
-        self, hw_enable_list: List[HWTool], fetch_tools: Dict[HWTool, Path]
+        self, hw_available: Set[HWTool], fetch_tools: Dict[HWTool, Path]
     ) -> Tuple[bool, str]:
         """Check if required resources are not been uploaded."""
         missing_resources = []
-        for tool in hw_enable_list:
+        for tool in hw_available:
             if tool in TPR_RESOURCES:
                 # Resource hasn't been uploaded
                 if tool not in fetch_tools:
@@ -685,13 +666,13 @@ class HWToolHelper:
             return False, f"Missing resources: {missing_resources}"
         return True, ""
 
-    def install(self, resources: Resources, hw_enable_list: List[HWTool]) -> Tuple[bool, str]:
+    def install(self, resources: Resources, hw_available: Set[HWTool]) -> Tuple[bool, str]:
         """Install tools."""
-        logger.info("hw_enable_list: %s", hw_enable_list)
+        logger.info("hw_available: %s", hw_available)
 
-        fetch_tools: Dict[HWTool, Path] = self.fetch_tools(resources, hw_enable_list)
+        fetch_tools: Dict[HWTool, Path] = self.fetch_tools(resources, hw_available)
 
-        ok, msg = self.check_missing_resources(hw_enable_list, fetch_tools)
+        ok, msg = self.check_missing_resources(hw_available, fetch_tools)
         if not ok:
             return ok, msg
 
@@ -699,7 +680,7 @@ class HWToolHelper:
 
         # Iterate over each strategy and execute.
         for strategy in self.strategies:
-            if strategy.name not in hw_enable_list:
+            if strategy.name not in hw_available:
                 continue
             try:
                 # TPRStrategy
@@ -725,25 +706,25 @@ class HWToolHelper:
         return True, ""
 
     # pylint: disable=W0613
-    def remove(self, resources: Resources, hw_enable_list: List[HWTool]) -> None:
+    def remove(self, resources: Resources, hw_available: Set[HWTool]) -> None:
         """Execute all remove strategies."""
         for strategy in self.strategies:
-            if strategy.name not in hw_enable_list:
+            if strategy.name not in hw_available:
                 continue
             if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
 
-    def check_installed(self, hw_enable_list: List[HWTool]) -> Tuple[bool, str]:
+    def check_installed(self, hw_available: Set[HWTool]) -> Tuple[bool, str]:
         """Check tool status."""
-        failed_checks: List[HWTool] = []
+        failed_checks: Set[HWTool] = set()
 
         for strategy in self.strategies:
-            if strategy.name not in hw_enable_list:
+            if strategy.name not in hw_available:
                 continue
             ok = strategy.check()
             if not ok:
-                failed_checks.append(strategy.name)
+                failed_checks.add(strategy.name)
 
         if failed_checks:
             return False, f"Fail strategy checks: {failed_checks}"

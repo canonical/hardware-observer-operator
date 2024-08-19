@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from logging import getLogger
 from pathlib import Path
 from time import sleep
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Set, Tuple
 
 from charms.operator_libs_linux.v1 import systemd
 from jinja2 import Environment, FileSystemLoader
@@ -56,8 +56,8 @@ class BaseExporter(ABC):
 
     @staticmethod
     @abstractmethod
-    def hw_tools() -> List[HWTool]:
-        """Return list hardware tools to watch."""
+    def hw_tools() -> Set[HWTool]:
+        """Return hardware tools to watch."""
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
@@ -301,9 +301,9 @@ class SmartCtlExporter(BaseExporter):
         return service_rendered
 
     @staticmethod
-    def hw_tools() -> List[HWTool]:
-        """Return list hardware tools to watch."""
-        return [HWTool.SMARTCTL]
+    def hw_tools() -> Set[HWTool]:
+        """Return hardware tools to watch."""
+        return {HWTool.SMARTCTL}
 
     def install_resources(self) -> bool:
         restart = False
@@ -329,7 +329,9 @@ class HardwareExporter(BaseExporter):
 
     required_config: bool = True
 
-    def __init__(self, charm_dir: Path, config: ConfigData, enable_hw_tools: List[HWTool]) -> None:
+    def __init__(
+        self, charm_dir: Path, config: ConfigData, available_hw_tools: Set[HWTool]
+    ) -> None:
         """Initialize the Hardware Exporter class."""
         super().__init__(charm_dir, config, HARDWARE_EXPORTER_SETTINGS)
 
@@ -337,18 +339,18 @@ class HardwareExporter(BaseExporter):
         self.exporter_config_path = self.settings.config_path
         self.port = int(config["hardware-exporter-port"])
 
-        self.enabled_hw_tool_list = enable_hw_tools
+        self.available_hw_tool = available_hw_tools
 
         self.redfish_conn_params = self.get_redfish_conn_params(config)
         self.collect_timeout = int(config["collect-timeout"])
 
     def _render_config_content(self) -> str:
         """Render and install exporter config file."""
-        collectors = []
-        for tool in self.enabled_hw_tool_list:
+        collectors = set()
+        for tool in self.available_hw_tool:
             collector = HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(tool)
             if collector is not None:
-                collectors += collector
+                collectors.add(collector)
         content = self.config_template.render(
             PORT=self.port,
             LEVEL=self.log_level,
@@ -433,7 +435,7 @@ class HardwareExporter(BaseExporter):
 
     def get_redfish_conn_params(self, config: ConfigData) -> Dict[str, Any]:
         """Get redfish connection parameters if redfish is available."""
-        if HWTool.REDFISH not in self.enabled_hw_tool_list:
+        if HWTool.REDFISH not in self.available_hw_tool:
             logger.warning("Redfish unavailable, disregarding redfish config options...")
             return {}
         return {
@@ -444,9 +446,9 @@ class HardwareExporter(BaseExporter):
         }
 
     @staticmethod
-    def hw_tools() -> List[HWTool]:
-        """Return list hardware tools to watch."""
-        return [
+    def hw_tools() -> Set[HWTool]:
+        """Return hardware tools to watch."""
+        return {
             HWTool.STORCLI,
             HWTool.SSACLI,
             HWTool.SAS2IRCU,
@@ -456,4 +458,4 @@ class HardwareExporter(BaseExporter):
             HWTool.IPMI_SEL,
             HWTool.IPMI_SENSOR,
             HWTool.REDFISH,
-        ]
+        }

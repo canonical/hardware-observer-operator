@@ -93,7 +93,7 @@ class TestHwinfo:
 class TestLshw(unittest.TestCase):
     @mock.patch("hardware.apt")
     @mock.patch("hardware.subprocess.check_output")
-    def test_lshw_list_output(self, mock_subprocess, mock_apt):
+    def test_lshw_output(self, mock_subprocess, mock_apt):
         mock_subprocess.return_value = """[{"expected_output": 1}]"""
         for class_filter in [None, "storage"]:
             output = lshw(class_filter)

@@ -89,15 +89,15 @@ TPR_RESOURCES: t.Dict[HWTool, str] = {
 }
 
 HARDWARE_EXPORTER_COLLECTOR_MAPPING = {
-    HWTool.STORCLI: ["collector.mega_raid"],
-    HWTool.PERCCLI: ["collector.poweredge_raid"],
-    HWTool.SAS2IRCU: ["collector.lsi_sas_2"],
-    HWTool.SAS3IRCU: ["collector.lsi_sas_3"],
-    HWTool.SSACLI: ["collector.hpe_ssa"],
-    HWTool.IPMI_DCMI: ["collector.ipmi_dcmi"],
-    HWTool.IPMI_SEL: ["collector.ipmi_sel"],
-    HWTool.IPMI_SENSOR: ["collector.ipmi_sensor"],
-    HWTool.REDFISH: ["collector.redfish"],
+    HWTool.STORCLI: "collector.mega_raid",
+    HWTool.PERCCLI: "collector.poweredge_raid",
+    HWTool.SAS2IRCU: "collector.lsi_sas_2",
+    HWTool.SAS3IRCU: "collector.lsi_sas_3",
+    HWTool.SSACLI: "collector.hpe_ssa",
+    HWTool.IPMI_DCMI: "collector.ipmi_dcmi",
+    HWTool.IPMI_SEL: "collector.ipmi_sel",
+    HWTool.IPMI_SENSOR: "collector.ipmi_sensor",
+    HWTool.REDFISH: "collector.redfish",
 }
 
 TOOLS_DIR = Path("/usr/sbin")
