@@ -45,9 +45,9 @@ from hw_tools import (
     bmc_hw_verifier,
     check_deb_pkg_installed,
     copy_to_snap_common_bin,
+    detect_available_tools,
     disk_hw_verifier,
     file_is_empty,
-    get_available_hw_tools,
     install_deb,
     make_executable,
     raid_hw_verifier,
@@ -860,8 +860,8 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
 @mock.patch("hw_tools.disk_hw_verifier", return_value={7, 8, 9})
 @mock.patch("hw_tools.bmc_hw_verifier", return_value={1, 2, 3})
 @mock.patch("hw_tools.raid_hw_verifier", return_value={4, 5, 6})
-def test_get_available_hw_tools(mock_raid_verifier, mock_bmc_hw_verifier, mock_disk_hw_verifier):
-    output = get_available_hw_tools()
+def test_detect_available_tools(mock_raid_verifier, mock_bmc_hw_verifier, mock_disk_hw_verifier):
+    output = detect_available_tools()
     mock_raid_verifier.assert_called()
     mock_bmc_hw_verifier.assert_called()
     mock_disk_hw_verifier.assert_called()

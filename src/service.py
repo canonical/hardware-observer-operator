@@ -338,16 +338,15 @@ class HardwareExporter(BaseExporter):
         self.config_template = self.environment.get_template(self.settings.config_template)
         self.exporter_config_path = self.settings.config_path
         self.port = int(config["hardware-exporter-port"])
-
+        self.config = config
         self.available_hw_tool = available_hw_tools
-
-        self.redfish_conn_params = self.get_redfish_conn_params(config)
         self.collect_timeout = int(config["collect-timeout"])
 
     def _render_config_content(self) -> str:
         """Render and install exporter config file."""
+        redfish_conn_params = self.redfish_conn_params
         collectors = set()
-        for tool in self.available_hw_tool:
+        for tool in self.enabled_tools:
             collector = HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(tool)
             if collector is not None:
                 collectors.add(collector)
@@ -356,13 +355,24 @@ class HardwareExporter(BaseExporter):
             LEVEL=self.log_level,
             COLLECT_TIMEOUT=self.collect_timeout,
             COLLECTORS=collectors,
-            REDFISH_ENABLE=self.redfish_conn_params,
-            REDFISH_HOST=self.redfish_conn_params.get("host", ""),
-            REDFISH_USERNAME=self.redfish_conn_params.get("username", ""),
-            REDFISH_PASSWORD=self.redfish_conn_params.get("password", ""),
-            REDFISH_CLIENT_TIMEOUT=self.redfish_conn_params.get("timeout", ""),
+            REDFISH_ENABLE=self.is_redfish_available_and_enabled,
+            REDFISH_HOST=redfish_conn_params.get("host", ""),
+            REDFISH_USERNAME=redfish_conn_params.get("username", ""),
+            REDFISH_PASSWORD=redfish_conn_params.get("password", ""),
+            REDFISH_CLIENT_TIMEOUT=redfish_conn_params.get("timeout", ""),
         )
         return content
+
+    @property
+    def enabled_tools(self) -> Set[HWTool]:
+        """Get the enabled hardware tools.
+
+        Tools that are available, but disabled should not be used on prometheus hardware exporter.
+        """
+        available_tools = self.available_hw_tool.copy()
+        if not self.is_redfish_available_and_enabled:
+            available_tools.discard(HWTool.REDFISH)
+        return available_tools
 
     def render_service(self) -> bool:
         """Render required files for service."""
@@ -380,15 +390,13 @@ class HardwareExporter(BaseExporter):
         if not valid:
             return valid, msg
 
-        # Note we need to use `is False` because `None` means redfish is not
-        # available.
-        if self.redfish_conn_params_valid(self.redfish_conn_params) is False:
+        if self.redfish_conn_params_valid() is False:
             logger.error("Invalid redfish credentials.")
             return False, "Invalid config: 'redfish-username' or 'redfish-password'"
 
         return True, "Exporter config is valid."
 
-    def redfish_conn_params_valid(self, redfish_conn_params: Dict[str, str]) -> Optional[bool]:
+    def redfish_conn_params_valid(self) -> bool:
         """Check if redfish connections parameters is valid or not.
 
         If the redfish connection params is not available this property returns
@@ -396,9 +404,7 @@ class HardwareExporter(BaseExporter):
         connection parameters are valid, it returns True; if not valid, it
         returns False.
         """
-        if not redfish_conn_params:
-            return None
-
+        redfish_conn_params = self.redfish_conn_params
         # Skip redfish validation if either username/password is empty.
         if not (
             redfish_conn_params.get("username", "") and redfish_conn_params.get("password", "")
@@ -433,16 +439,14 @@ class HardwareExporter(BaseExporter):
 
         return result
 
-    def get_redfish_conn_params(self, config: ConfigData) -> Dict[str, Any]:
-        """Get redfish connection parameters if redfish is available."""
-        if HWTool.REDFISH not in self.available_hw_tool:
-            logger.warning("Redfish unavailable, disregarding redfish config options...")
-            return {}
+    @property
+    def redfish_conn_params(self) -> Dict[str, Any]:
+        """Get redfish connection parameters."""
         return {
             "host": f"https://{get_bmc_address()}",
-            "username": config["redfish-username"],
-            "password": config["redfish-password"],
-            "timeout": config["collect-timeout"],
+            "username": self.config["redfish-username"],
+            "password": self.config["redfish-password"],
+            "timeout": self.config["collect-timeout"],
         }
 
     @staticmethod
@@ -459,3 +463,8 @@ class HardwareExporter(BaseExporter):
             HWTool.IPMI_SENSOR,
             HWTool.REDFISH,
         }
+
+    @property
+    def is_redfish_available_and_enabled(self) -> bool:
+        """Check if redfish is available in the hardware and if the user wants to enable it."""
+        return bool(HWTool.REDFISH in self.available_hw_tool and self.config["redfish-enable"])
