@@ -384,7 +384,6 @@ class HardwareExporter(BaseExporter):
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
-
         valid, msg = super().validate_exporter_configs()
         if not valid:
             return valid, msg

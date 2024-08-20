@@ -93,9 +93,7 @@ class HardwareObserverCharm(ops.CharmBase):
         if not self._stored.stored_tools:  # type: ignore[truthy-function]
             available_tools = detect_available_tools()  # type: ignore[unreachable]
             self._stored.stored_tools = {tool.value for tool in available_tools}
-        return {
-            HWTool(value) for value in self._stored.stored_tools  # type: ignore[attr-defined]
-        }
+        return {HWTool(value) for value in self._stored.stored_tools}  # type: ignore[attr-defined]
 
     def _on_redetect_hardware(self, event: ops.ActionEvent) -> None:
         """Redetect available hardware tools and option to rerun the install hook."""
