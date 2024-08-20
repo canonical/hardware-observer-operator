@@ -353,7 +353,7 @@ class HardwareExporter(BaseExporter):
             LEVEL=self.log_level,
             COLLECT_TIMEOUT=self.collect_timeout,
             COLLECTORS=collectors,
-            REDFISH_ENABLE=self.is_redfish_available_and_enabled,
+            REDFISH_ENABLE=HWTool.REDFISH in self.enabled_tools,
             REDFISH_HOST=self.redfish_conn_params.get("host", ""),
             REDFISH_USERNAME=self.redfish_conn_params.get("username", ""),
             REDFISH_PASSWORD=self.redfish_conn_params.get("password", ""),
@@ -368,7 +368,7 @@ class HardwareExporter(BaseExporter):
         Tools that are available, but disabled should not be used on prometheus hardware exporter.
         """
         enabled_tools = self.available_tools.copy()
-        if not self.is_redfish_available_and_enabled:
+        if self.config["redfish-disable"]:
             enabled_tools.discard(HWTool.REDFISH)
         return enabled_tools
 
@@ -384,6 +384,7 @@ class HardwareExporter(BaseExporter):
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
         """Validate the static and runtime config options for the exporter."""
+
         valid, msg = super().validate_exporter_configs()
         if not valid:
             return valid, msg
@@ -397,9 +398,12 @@ class HardwareExporter(BaseExporter):
     def redfish_conn_params_valid(self) -> bool:
         """Check if redfish connections parameters is valid or not.
 
-        Verifies the connection parameters. If the redfish connection parameters are valid, it
-        returns True; if not valid, it returns False.
+        Verifies the connection parameters if redfish is enabled. If the redfish connection
+        parameters are valid, it returns True; if not valid, it returns False.
         """
+        if HWTool.REDFISH not in self.enabled_tools:
+            return True
+
         if not (
             self.redfish_conn_params.get("username", "")
             and self.redfish_conn_params.get("password", "")
@@ -458,8 +462,3 @@ class HardwareExporter(BaseExporter):
             HWTool.IPMI_SENSOR,
             HWTool.REDFISH,
         }
-
-    @property
-    def is_redfish_available_and_enabled(self) -> bool:
-        """Check if redfish is available in the hardware and if the user wants to enable it."""
-        return bool(HWTool.REDFISH in self.available_tools and self.config["redfish-enable"])

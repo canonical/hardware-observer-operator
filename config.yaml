@@ -44,8 +44,8 @@ options:
     default: ""
     description: |
       BMC password to be used by the redfish collector.
-  redfish-enable:
+  redfish-disable:
     type: boolean
-    default: true
+    default: false
     description: |
-      Boolean flag to enable or disable the Redfish collector. By default the Redfish is enabled.
+      Boolean flag to disable the Redfish collector. Defaults to enabled (if redfish is available).

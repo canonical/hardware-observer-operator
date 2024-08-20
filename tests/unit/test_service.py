@@ -413,6 +413,7 @@ class TestHardwareExporter(unittest.TestCase):
             "exporter-log-level": "INFO",
             "redfish-username": "",
             "redfish-password": "",
+            "redfish-disable": False,
         }
         self.mock_tools_available = {"storcli", "ssacli"}
         self.exporter = service.HardwareExporter(
@@ -453,7 +454,9 @@ class TestHardwareExporter(unittest.TestCase):
         mock_super.return_value.validate_exporter_configs.accept_called()
         self.exporter.redfish_conn_params_valid.assert_not_called()
 
-    def test_validate_exporter_config_redfish_conn_params_failed(self):
+    @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
+    def test_validate_exporter_config_redfish_conn_params_failed(self, mock_enable_tools):
+        mock_enable_tools.return_value = {HWTool.REDFISH}
         self.exporter.redfish_conn_params_valid = mock.MagicMock()
         self.exporter.redfish_conn_params_valid.return_value = False
 
@@ -486,7 +489,7 @@ class TestHardwareExporter(unittest.TestCase):
             "exporter-log-level": "INFO",
             "redfish-username": "my-user",
             "redfish-password": "my-pwd",
-            "redfish-enable": False,
+            "redfish-disable": True,
         }
         content = self.exporter._render_config_content()
         content_config = yaml.safe_load(content)
@@ -507,7 +510,7 @@ class TestHardwareExporter(unittest.TestCase):
             "exporter-log-level": "INFO",
             "redfish-username": "my-user",
             "redfish-password": "my-pwd",
-            "redfish-enable": True,
+            "redfish-disable": False,
         }
         content = self.exporter._render_config_content()
         content_config = yaml.safe_load(content)
@@ -524,40 +527,35 @@ class TestHardwareExporter(unittest.TestCase):
         [
             (
                 "Redfish Available and Enabled",
-                True,
+                False,
                 # keep redfish
                 {HWTool.REDFISH, HWTool.IPMI_SENSOR},
                 {HWTool.REDFISH, HWTool.IPMI_SENSOR},
             ),
             (
-                "Redfish not Available",
+                "Redfish not Available and Enabled",
                 False,
                 {HWTool.IPMI_SENSOR},
                 {HWTool.IPMI_SENSOR},
             ),
             (
                 "Redfish Available and disabled",
-                False,
+                True,
                 {HWTool.REDFISH, HWTool.IPMI_SENSOR},
                 # removed redfish
                 {HWTool.IPMI_SENSOR},
             ),
         ]
     )
-    @mock.patch(
-        "service.HardwareExporter.is_redfish_available_and_enabled",
-        new_callable=mock.PropertyMock,
-    )
     def test_enabled_tools(
         self,
         _,
-        redfish_available_and_enabled,
+        redfish_disable,
         available_tools,
         expected_result,
-        mock_available_and_enabled,
     ):
         """Test that Redfish is removed from available_tools if necessary."""
-        mock_available_and_enabled.return_value = redfish_available_and_enabled
+        self.exporter.config = {"redfish-disable": redfish_disable}
         self.exporter.available_tools = available_tools
         self.assertEqual(self.exporter.enabled_tools, expected_result)
         self.assertEqual(self.exporter.available_tools, available_tools)
@@ -583,8 +581,10 @@ class TestHardwareExporter(unittest.TestCase):
             "timeout": "timeoutd",
         },
     )
+    @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
     @mock.patch("service.redfish_client")
-    def test_redfish_conn_params_valid_success(self, mock_redfish_client, _):
+    def test_redfish_conn_params_valid_success(self, mock_redfish_client, mock_enable, _):
+        mock_enable.return_value = {HWTool.REDFISH}
         result = self.exporter.redfish_conn_params_valid()
         self.assertTrue(result)
 
@@ -598,6 +598,15 @@ class TestHardwareExporter(unittest.TestCase):
         mock_redfish_client.return_value.login.assert_called_with(auth="session")
         mock_redfish_client.return_value.logout.assert_called()
 
+    @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
+    @mock.patch("service.redfish_client")
+    def test_redfish_conn_params_not_enable(self, mock_redfish_client, mock_enable):
+        mock_enable.return_value = {}
+        result = self.exporter.redfish_conn_params_valid()
+
+        self.assertTrue(result)
+        mock_redfish_client.assert_not_called()
+
     @mock.patch(
         "service.HardwareExporter.redfish_conn_params",
         new_callable=mock.PropertyMock,
@@ -608,10 +617,12 @@ class TestHardwareExporter(unittest.TestCase):
             "timeout": "timeoutd",
         },
     )
+    @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
     @mock.patch("service.redfish_client")
     def test_redfish_conn_params_valid_failed_invalid_credentials_error(
-        self, mock_redfish_client, _
+        self, mock_redfish_client, mock_enable, _
     ):
+        mock_enable.return_value = {HWTool.REDFISH}
         mock_redfish_client.side_effect = InvalidCredentialsError
         result = self.exporter.redfish_conn_params_valid()
 
@@ -635,8 +646,10 @@ class TestHardwareExporter(unittest.TestCase):
             "timeout": "timeoutd",
         },
     )
+    @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
     @mock.patch("service.redfish_client")
-    def test_redfish_conn_params_valid_failed_exception(self, mock_redfish_client, _):
+    def test_redfish_conn_params_valid_failed_exception(self, mock_redfish_client, mock_enable, _):
+        mock_enable.return_value = {HWTool.REDFISH}
         mock_redfish_client.side_effect = Exception
         result = self.exporter.redfish_conn_params_valid()
 
@@ -685,10 +698,17 @@ class TestHardwareExporter(unittest.TestCase):
         "service.HardwareExporter.redfish_conn_params",
         new_callable=mock.PropertyMock,
     )
+    @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
     @mock.patch("service.redfish_client")
     def test_redfish_conn_params_valid_failed_missing_credentials(
-        self, _, redfish_conn_params, mock_redfish_client, mock_redfish_conn_params
+        self,
+        _,
+        redfish_conn_params,
+        mock_redfish_client,
+        mock_enable,
+        mock_redfish_conn_params,
     ):
+        mock_enable.return_value = {HWTool.REDFISH}
         mock_redfish_conn_params.return_value = redfish_conn_params
         result = self.exporter.redfish_conn_params_valid()
         self.assertEqual(result, False)
@@ -709,19 +729,6 @@ class TestHardwareExporter(unittest.TestCase):
                 HWTool.REDFISH,
             },
         )
-
-    @parameterized.expand(
-        [
-            ("Available and Enable", {HWTool.REDFISH}, {"redfish-enable": True}, True),
-            ("Available and Disable", {HWTool.REDFISH}, {"redfish-enable": False}, False),
-            ("Not available and Disable", {}, {"redfish-enable": False}, False),
-            ("Not available and Enable", {}, {"redfish-enable": True}, False),
-        ]
-    )
-    def test_is_redfish_available_and_enabled(self, _, available_tools, config, expected_result):
-        self.exporter.available_tools = available_tools
-        self.exporter.config = config
-        self.assertIs(self.exporter.is_redfish_available_and_enabled, expected_result)
 
 
 class TestSmartMetricExporter(unittest.TestCase):
