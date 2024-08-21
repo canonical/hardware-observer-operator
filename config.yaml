@@ -48,4 +48,5 @@ options:
     type: boolean
     default: false
     description: |
-      Boolean flag to disable the Redfish collector. Defaults to enabled (if redfish is available).
+      Boolean flag to force disabling the Redfish collector. The collector will normally be run if
+      Redfish support is detected on the unit.

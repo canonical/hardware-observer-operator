@@ -88,7 +88,7 @@ class HardwareObserverCharm(ops.CharmBase):
         """Get the current hardware tools from stored or from machine if not present.
 
         This function stores the current hardware tools as strings because StoredState cannot store
-        arbitrary objects. HWTool object can however be re-instantiated from tool names.
+        arbitrary objects. HWTool objects can however be re-instantiated from tool names.
         """
         if not self._stored.stored_tools:  # type: ignore[truthy-function]
             available_tools = detect_available_tools()  # type: ignore[unreachable]

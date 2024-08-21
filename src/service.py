@@ -388,7 +388,7 @@ class HardwareExporter(BaseExporter):
         if not valid:
             return valid, msg
 
-        if self.redfish_conn_params_valid() is False:
+        if HWTool.REDFISH in self.enabled_tools and self.redfish_conn_params_valid() is False:
             logger.error("Invalid redfish credentials.")
             return False, "Invalid config: 'redfish-username' or 'redfish-password'"
 
@@ -400,9 +400,6 @@ class HardwareExporter(BaseExporter):
         Verifies the connection parameters if redfish is enabled. If the redfish connection
         parameters are valid, it returns True; if not valid, it returns False.
         """
-        if HWTool.REDFISH not in self.enabled_tools:
-            return True
-
         if not (
             self.redfish_conn_params.get("username", "")
             and self.redfish_conn_params.get("password", "")

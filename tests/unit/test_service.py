@@ -581,10 +581,8 @@ class TestHardwareExporter(unittest.TestCase):
             "timeout": "timeoutd",
         },
     )
-    @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
     @mock.patch("service.redfish_client")
-    def test_redfish_conn_params_valid_success(self, mock_redfish_client, mock_enable, _):
-        mock_enable.return_value = {HWTool.REDFISH}
+    def test_redfish_conn_params_valid_success(self, mock_redfish_client, _):
         result = self.exporter.redfish_conn_params_valid()
         self.assertTrue(result)
 
@@ -598,15 +596,6 @@ class TestHardwareExporter(unittest.TestCase):
         mock_redfish_client.return_value.login.assert_called_with(auth="session")
         mock_redfish_client.return_value.logout.assert_called()
 
-    @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
-    @mock.patch("service.redfish_client")
-    def test_redfish_conn_params_not_enable(self, mock_redfish_client, mock_enable):
-        mock_enable.return_value = {}
-        result = self.exporter.redfish_conn_params_valid()
-
-        self.assertTrue(result)
-        mock_redfish_client.assert_not_called()
-
     @mock.patch(
         "service.HardwareExporter.redfish_conn_params",
         new_callable=mock.PropertyMock,
@@ -617,12 +606,10 @@ class TestHardwareExporter(unittest.TestCase):
             "timeout": "timeoutd",
         },
     )
-    @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
     @mock.patch("service.redfish_client")
     def test_redfish_conn_params_valid_failed_invalid_credentials_error(
-        self, mock_redfish_client, mock_enable, _
+        self, mock_redfish_client, _
     ):
-        mock_enable.return_value = {HWTool.REDFISH}
         mock_redfish_client.side_effect = InvalidCredentialsError
         result = self.exporter.redfish_conn_params_valid()
 
@@ -646,10 +633,8 @@ class TestHardwareExporter(unittest.TestCase):
             "timeout": "timeoutd",
         },
     )
-    @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
     @mock.patch("service.redfish_client")
-    def test_redfish_conn_params_valid_failed_exception(self, mock_redfish_client, mock_enable, _):
-        mock_enable.return_value = {HWTool.REDFISH}
+    def test_redfish_conn_params_valid_failed_exception(self, mock_redfish_client, _):
         mock_redfish_client.side_effect = Exception
         result = self.exporter.redfish_conn_params_valid()
 
@@ -698,17 +683,14 @@ class TestHardwareExporter(unittest.TestCase):
         "service.HardwareExporter.redfish_conn_params",
         new_callable=mock.PropertyMock,
     )
-    @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
     @mock.patch("service.redfish_client")
     def test_redfish_conn_params_valid_failed_missing_credentials(
         self,
         _,
         redfish_conn_params,
         mock_redfish_client,
-        mock_enable,
         mock_redfish_conn_params,
     ):
-        mock_enable.return_value = {HWTool.REDFISH}
         mock_redfish_conn_params.return_value = redfish_conn_params
         result = self.exporter.redfish_conn_params_valid()
         self.assertEqual(result, False)

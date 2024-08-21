@@ -453,6 +453,33 @@ class TestCharmWithHW:
             results = await run_command_on_unit(ops_test, unit.name, check_resource_cmd)
             assert results.get("return-code") == 0, f"{symlink_bin} resource doesn't exist"
 
+    async def test_redfish_config(self, app, unit, ops_test):
+        """Test Redfish options."""
+        # initially Redfish is available and enabled
+        cmd = "cat /etc/hardware-exporter-config.yaml"
+        results_before = await run_command_on_unit(ops_test, unit.name, cmd)
+        assert results_before.get("return-code") == 0
+        config = yaml.safe_load(results_before.get("stdout").strip())
+        assert config.get("redfish_host") is not None
+        assert config.get("redfish_username") is not None
+        assert config.get("redfish_client_timeout") is not None
+
+        # Disable Redfish and see if the config is not present
+        await asyncio.gather(
+            app.set_config({"redfish-disable": "true"}),
+            ops_test.model.wait_for_idle(apps=[APP_NAME]),
+        )
+
+        cmd = "cat /etc/hardware-exporter-config.yaml"
+        results_after = await run_command_on_unit(ops_test, unit.name, cmd)
+        assert results_before.get("return-code") == 0
+        config = yaml.safe_load(results_after.get("stdout").strip())
+        assert config.get("redfish_host") is None
+        assert config.get("redfish_username") is None
+        assert config.get("redfish_client_timeout") is None
+
+        await app.reset_config(["redfish-disable"])
+
     async def test_wrong_resource_attached(self, ops_test, unit, required_resources, tmp_path):
         """Test charm when wrong resource file for collector has been attached."""
         for resource in required_resources:
@@ -568,6 +595,16 @@ class TestCharm:
         assert config["port"] == int(new_port)
 
         await app.reset_config(["hardware-exporter-port"])
+
+    async def test_no_redfish_config(self, unit, ops_test):
+        """Test that there is no Redfish options because it's not available on lxd machines."""
+        cmd = "cat /etc/hardware-exporter-config.yaml"
+        results = await run_command_on_unit(ops_test, unit.name, cmd)
+        assert results.get("return-code") == 0
+        config = yaml.safe_load(results.get("stdout").strip())
+        assert config.get("redfish_host") is None
+        assert config.get("redfish_username") is None
+        assert config.get("redfish_client_timeout") is None
 
     async def test_config_changed_log_level(self, app, unit, ops_test):
         """Test changing the config option: exporter-log-level."""
