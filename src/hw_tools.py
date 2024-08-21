@@ -601,8 +601,8 @@ def disk_hw_verifier() -> Set[HWTool]:
     return {HWTool.SMARTCTL} if lshw(class_filter="disk") else set()
 
 
-def get_available_hw_tools() -> Set[HWTool]:
-    """Return HWTool available after checking the hardware."""
+def detect_available_tools() -> Set[HWTool]:
+    """Return HWTool detected after checking the hardware."""
     return raid_hw_verifier() | bmc_hw_verifier() | disk_hw_verifier()
 
 

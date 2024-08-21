@@ -23,16 +23,16 @@ class TestCharm(unittest.TestCase):
         self.harness = ops.testing.Harness(HardwareObserverCharm)
         self.addCleanup(self.harness.cleanup)
 
-        get_available_hw_tools_patcher = mock.patch.object(charm, "get_available_hw_tools")
-        self.mock_get_available_hw_tools = get_available_hw_tools_patcher.start()
-        self.mock_get_available_hw_tools.return_value = {
+        detect_available_tools_patcher = mock.patch.object(charm, "detect_available_tools")
+        self.mock_detect_available_tools = detect_available_tools_patcher.start()
+        self.mock_detect_available_tools.return_value = {
             HWTool.IPMI_SENSOR,
             HWTool.IPMI_SEL,
             HWTool.IPMI_DCMI,
             HWTool.REDFISH,
         }
 
-        self.addCleanup(get_available_hw_tools_patcher.stop)
+        self.addCleanup(detect_available_tools_patcher.stop)
 
         requests_patcher = mock.patch("hw_tools.requests")
         requests_patcher.start()
@@ -63,14 +63,14 @@ class TestCharm(unittest.TestCase):
     )
     @mock.patch("charm.SmartCtlExporter.__init__", return_value=None)
     @mock.patch("charm.HardwareExporter.__init__", return_value=None)
-    def test_exporters(self, _, enable_tools, expect, mock_hw_exporter, mock_smart_exporter):
+    def test_exporters(self, _, stored_tools, expect, mock_hw_exporter, mock_smart_exporter):
         self.harness.begin()
-        self.harness.charm.get_available_hw_tools_stored = mock.MagicMock()
-        self.harness.charm.get_available_hw_tools_stored.return_value = enable_tools
-        self.harness.charm._stored.available_hw_tools = {tool.value for tool in enable_tools}
+        self.harness.charm.get_stored_tools = mock.MagicMock()
+        self.harness.charm.get_stored_tools.return_value = stored_tools
+        self.harness.charm._stored.stored_tools = {tool.value for tool in stored_tools}
 
         exporters = self.harness.charm.exporters
-        self.harness.charm.get_available_hw_tools_stored.assert_called()
+        self.harness.charm.get_stored_tools.assert_called()
 
         if "hardware-exporter" in expect:
             self.assertTrue(
@@ -79,7 +79,7 @@ class TestCharm(unittest.TestCase):
             mock_hw_exporter.assert_called_with(
                 self.harness.charm.charm_dir,
                 self.harness.charm.model.config,
-                self.harness.charm._stored.available_hw_tools,
+                self.harness.charm._stored.stored_tools,
             )
         if "smartctl-exporter" in expect:
             self.assertTrue(
@@ -146,7 +146,7 @@ class TestCharm(unittest.TestCase):
         self,
         _,
         event,
-        hw_tools,
+        stored_tools,
         hw_tool_helper_install_return,
         mock_exporters,
         mock_exporter_install_returns,
@@ -160,8 +160,8 @@ class TestCharm(unittest.TestCase):
             self.harness.begin()
             self.harness.charm.hw_tool_helper = mock.MagicMock()
             self.harness.charm.hw_tool_helper.install.return_value = hw_tool_helper_install_return
-            self.harness.charm.get_available_hw_tools_stored = mock.MagicMock()
-            self.harness.charm.get_available_hw_tools_stored.return_value = hw_tools
+            self.harness.charm.get_stored_tools = mock.MagicMock()
+            self.harness.charm.get_stored_tools.return_value = stored_tools
             self.harness.charm._on_update_status = mock.MagicMock()
 
             for mock_exporter, return_val in zip(
@@ -176,7 +176,7 @@ class TestCharm(unittest.TestCase):
 
         self.harness.charm.hw_tool_helper.install.assert_called_with(
             self.harness.charm.model.resources,
-            hw_tools,
+            stored_tools,
         )
 
         store_resource = False
@@ -201,8 +201,8 @@ class TestCharm(unittest.TestCase):
             self.harness.begin()
             self.harness.charm.hw_tool_helper = mock.MagicMock()
 
-            self.harness.charm.get_available_hw_tools_stored = mock.MagicMock()
-            self.harness.charm.get_available_hw_tools_stored.return_value = {
+            self.harness.charm.get_stored_tools = mock.MagicMock()
+            self.harness.charm.get_stored_tools.return_value = {
                 HWTool.IPMI_SENSOR,
                 HWTool.IPMI_SEL,
                 HWTool.SMARTCTL,
@@ -346,7 +346,7 @@ class TestCharm(unittest.TestCase):
             return
 
         self.harness.charm.hw_tool_helper.check_installed.assert_called_with(
-            self.harness.charm.get_available_hw_tools_stored()
+            self.harness.charm.get_stored_tools()
         )
         if not hw_tool_check_installed[0]:
             self.assertEqual(
@@ -432,40 +432,38 @@ class TestCharm(unittest.TestCase):
         ]
     )
     @mock.patch(
-        "charm.get_available_hw_tools",
+        "charm.detect_available_tools",
     )
     def test_detect_hardware_action(
         self,
         apply,
-        stored_available_hw_tools,
-        available_hw_tools,
+        stored_tools,
+        detected_available_tools,
         expect_output,
-        mock_get_available_hw_tools,
+        mock_detect_available_tools,
     ) -> None:
         """Test action detect-hardware."""
-        mock_get_available_hw_tools.return_value = available_hw_tools
+        mock_detect_available_tools.return_value = detected_available_tools
         self.harness.begin()
         self.harness.charm._on_install_or_upgrade = mock.MagicMock()
-        self.harness.charm._stored.available_hw_tools = [
-            tool.value for tool in stored_available_hw_tools
-        ]
+        self.harness.charm._stored.stored_tools = [tool.value for tool in stored_tools]
 
         output = self.harness.run_action("redetect-hardware", {"apply": apply})
 
         self.assertEqual(output, expect_output)
 
-        if not stored_available_hw_tools == available_hw_tools:
+        if not stored_tools == detected_available_tools:
             if apply:
                 self.assertEqual(
-                    self.harness.charm.get_available_hw_tools_stored(),
-                    available_hw_tools,
+                    self.harness.charm.get_stored_tools(),
+                    detected_available_tools,
                 )
                 self.harness.charm._on_install_or_upgrade.assert_called()
             else:
                 self.harness.charm._on_install_or_upgrade.assert_not_called()
                 self.assertEqual(
-                    self.harness.charm.get_available_hw_tools_stored(),
-                    {tool.value for tool in stored_available_hw_tools},
+                    self.harness.charm.get_stored_tools(),
+                    {tool.value for tool in stored_tools},
                 )
         else:
             self.harness.charm._on_install_or_upgrade.assert_not_called()
@@ -600,8 +598,8 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.hw_tool_helper.install.return_value = (True, "")
             self.harness.charm.hw_tool_helper.check_installed.return_value = (True, "")
 
-            self.harness.charm.get_available_hw_tools_stored = mock.MagicMock()
-            self.harness.charm.get_available_hw_tools_stored.return_value = {
+            self.harness.charm.get_stored_tools = mock.MagicMock()
+            self.harness.charm.get_stored_tools.return_value = {
                 HWTool.IPMI_SENSOR,
                 HWTool.IPMI_SEL,
                 HWTool.IPMI_DCMI,
@@ -651,8 +649,8 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.hw_tool_helper.install.return_value = (True, "")
             self.harness.charm.hw_tool_helper.check_installed.return_value = (True, "")
 
-            self.harness.charm.get_available_hw_tools_stored = mock.MagicMock()
-            self.harness.charm.get_available_hw_tools_stored.return_value = [
+            self.harness.charm.get_stored_tools = mock.MagicMock()
+            self.harness.charm.get_stored_tools.return_value = [
                 HWTool.IPMI_SENSOR,
                 HWTool.IPMI_SEL,
                 HWTool.IPMI_DCMI,
