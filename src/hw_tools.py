@@ -6,6 +6,7 @@ Define strategy for install, remove and verifier for different hardware.
 import io
 import logging
 import os
+import platform
 import shutil
 import stat
 import subprocess
@@ -411,16 +412,34 @@ class SmartCtlStrategy(APTStrategyABC):
         return check_deb_pkg_installed(self.pkg)
 
 
+def get_release_url(base_url: str, releases: Dict[str, str]) -> str:
+    """Determine the appropriate release URL based on the system architecture."""
+    arch = platform.machine()
+    if arch not in releases:
+        raise ValueError(f"Unsupported architecture: {arch}")
+    return base_url + releases[arch]
+
+
 class SmartCtlExporterStrategy(StrategyABC):  # pylint: disable=R0903
     """Install smartctl exporter binary."""
 
     _name = HWTool.SMARTCTL_EXPORTER
 
     _resource_dir = Path("/opt/SmartCtlExporter/")
-    _release = (
-        "https://github.com/prometheus-community/"
-        "smartctl_exporter/releases/download/v0.12.0/smartctl_exporter-0.12.0.linux-amd64.tar.gz"
+
+    _base_url = (
+        "https://github.com/prometheus-community/smartctl_exporter/releases/download/v0.12.0/"
     )
+
+    _releases = {
+        "x86_64": "smartctl_exporter-0.12.0.linux-amd64.tar.gz",
+        "arm64": "smartctl_exporter-0.12.0.linux-arm64.tar.gz",
+        "ppc64le": "smartctl_exporter-0.12.0.linux-ppc64le.tar.gz",
+        "riscv64": "smartctl_exporter-0.12.0.linux-riscv64.tar.gz",
+        "s390x": "smartctl_exporter-0.12.0.linux-s390x.tar.gz",
+    }
+
+    _release = get_release_url(_base_url, _releases)
     _exporter_name = "smartctl_exporter"
     _exporter_path = Path(_resource_dir / "smartctl_exporter")
 

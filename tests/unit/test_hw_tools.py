@@ -48,6 +48,7 @@ from hw_tools import (
     detect_available_tools,
     disk_hw_verifier,
     file_is_empty,
+    get_release_url,
     install_deb,
     make_executable,
     raid_hw_verifier,
@@ -762,6 +763,24 @@ class TestSmartCtlStrategy(unittest.TestCase):
         strategy.check()
 
         mock_check_deb_method.assert_called_with("smartmontools")
+
+
+@mock.patch("platform.machine")
+def test_get_release_url(mock_machine):
+    base_url = "https://example.com/releases/"
+    releases = {
+        "x86_64": "example-0.1.0.linux-amd64.tar.gz",
+        "arm64": "example-0.1.0.linux-arm64.tar.gz",
+    }
+
+    # Test for unsupported architecture
+    mock_machine.return_value = "unsupported_arch"
+    try:
+        get_release_url(base_url, releases)
+    except ValueError as e:
+        assert str(e) == "Unsupported architecture: unsupported_arch"
+    else:
+        assert False, "ValueError not raised"
 
 
 class TestSmartCtlExporterStrategy(unittest.TestCase):
