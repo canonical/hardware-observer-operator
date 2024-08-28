@@ -29,7 +29,9 @@ resources:
       Download v7.26 from: https://docs.broadcom.com/docs/1232743291.
       The download will start automatically upon accepting the license agreement.
       Unzip the downloaded file and attach the relevant deb package.
-      Eg: ./Unified_storcli_all_os/Ubuntu/storcli_007.2612.0000.0000_all.deb
+      Eg:
+      For x86 users, use ./Unified_storcli_all_os/Ubuntu/storcli_007.2612.0000.0000_all.deb
+      For arm users, use ./Unified_storcli_all_os/ARM/Linux/storcli_007.2612.0000.0000_arm64.deb
     filename: storcli.deb
 
   perccli-deb:
@@ -40,6 +42,7 @@ resources:
       Scroll down to "Available Formats" and download the PERCCLI_XXX_Linux.tar.gz file.
       Extract the downloaded file and attach the relevant deb package.
       Eg: ./PERCCLI_7.2313.0_A14_Linux/perccli_007.2313.0000.0000_all.deb
+      Note: This resource is only applicable to AMD64 servers.
     filename: perccli.deb
 
   sas2ircu-bin:
@@ -50,6 +53,7 @@ resources:
       The download will start automatically upon accepting the license agreement.
       Unzip the downloaded file and attach the relevant binary.
       Eg: ./SAS2IRCU_P20/sas2ircu_linux_x86_rel/sas2ircu
+      Note: This resource is only applicable to AMD64 servers.
     filename: sas2ircu
 
   sas3ircu-bin:
@@ -59,7 +63,9 @@ resources:
       Download vP16 from https://docs.broadcom.com/docs/SAS3IRCU_P16.zip.
       The download will start automatically upon accepting the license agreement.
       Unzip the downloaded file and attach the relevant binary.
-      Eg: ./SAS3IRCU_P16/sas3ircu_rel/sas3ircu_linux_x86_rel/sas3ircu
+      Eg:
+      For x86 users, use ./SAS3IRCU_P16/sas3ircu_linux_x86_rel/sas3ircu.
+      For ARM users, use ./SAS3IRCU_P16/sas3ircu_linux_arm_rel/sas3ircu.
     filename: sas3ircu
 
 provides:
