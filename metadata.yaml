@@ -26,32 +26,46 @@ resources:
     type: file
     description: |
       (Optional) StorCLI deb file published by Broadcom for their RAID devices.
-      For a list of supported and verified StorCLI deb package, please refer to 
-      https://github.com/canonical/hardware-observer-operator/blob/main/src/checksum.py.
+      Download v7.27 from: https://docs.broadcom.com/docs/1232743397.
+      The download will start automatically upon accepting the license agreement.
+      Unzip the downloaded file and attach the relevant deb package.
+      E.g.:
+      On AMD64 hosts, use ./Unified_storcli_all_os/Ubuntu/storcli_007.2705.0000.0000_all.deb
+      On ARM64 hosts, use ./Unified_storcli_all_os/ARM/Linux/storcli64_007.2705.0000.0000_arm64.deb
     filename: storcli.deb
 
   perccli-deb:
     type: file
     description: |
       (Optional) PERCCLI deb file published by Dell for their RAID devices.
-      For a list of supported and verified PERCCLI deb package, please refer to 
-      https://github.com/canonical/hardware-observer-operator/blob/main/src/checksum.py.
+      Download v7.23 from https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=tdghn.
+      Scroll down to "Available Formats" and download the PERCCLI_XXX_Linux.tar.gz file.
+      Extract the downloaded file and attach the relevant deb package.
+      E.g.: ./PERCCLI_7.2313.0_A14_Linux/perccli_007.2313.0000.0000_all.deb
+      Note: perccli is only available for the AMD64 architecture.
     filename: perccli.deb
 
   sas2ircu-bin:
     type: file
     description: |
       (Optional) SAS2IRCU binary file published by Broadcom.
-      For a list of supported and verified SAS2IRCU deb package, please refer to 
-      https://github.com/canonical/hardware-observer-operator/blob/main/src/checksum.py.
+      Download vP20 from https://docs.broadcom.com/docs/12351735.
+      The download will start automatically upon accepting the license agreement.
+      Unzip the downloaded file and attach the relevant binary.
+      E.g.: ./SAS2IRCU_P20/sas2ircu_linux_x86_rel/sas2ircu
+      Note: sas2ircu is only available for the AMD64 architecture.
     filename: sas2ircu
 
   sas3ircu-bin:
     type: file
     description: |
       (Optional) SAS3IRCU binary file published by Broadcom.
-      For a list of supported and verified SAS3IRCU deb package, please refer to 
-      https://github.com/canonical/hardware-observer-operator/blob/main/src/checksum.py.
+      Download vP16 from https://docs.broadcom.com/docs/SAS3IRCU_P16.zip.
+      The download will start automatically upon accepting the license agreement.
+      Unzip the downloaded file and attach the relevant binary.
+      E.g.:
+      On AMD64 hosts, use ./SAS3IRCU_P16/sas3ircu_linux_x86_rel/sas3ircu.
+      On ARM64 hosts, use ./SAS3IRCU_P16/sas3ircu_linux_arm_rel/sas3ircu.
     filename: sas3ircu
 
 provides:
