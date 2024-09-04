@@ -601,9 +601,15 @@ def disk_hw_verifier() -> Set[HWTool]:
     return {HWTool.SMARTCTL} if lshw(class_filter="disk") else set()
 
 
+def nvidia_gpu_verifier() -> Set[HWTool]:
+    """Verify if the hardware has NVIDIA gpu."""
+    gpus = lshw(class_filter="display")
+    return {HWTool.DCGM for gpu in gpus if "nvidia" in gpu.get("vendor", "").lower()}
+
+
 def detect_available_tools() -> Set[HWTool]:
     """Return HWTool detected after checking the hardware."""
-    return raid_hw_verifier() | bmc_hw_verifier() | disk_hw_verifier()
+    return raid_hw_verifier() | bmc_hw_verifier() | disk_hw_verifier() | nvidia_gpu_verifier()
 
 
 class HWToolHelper:

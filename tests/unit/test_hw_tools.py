@@ -50,6 +50,7 @@ from hw_tools import (
     file_is_empty,
     install_deb,
     make_executable,
+    nvidia_gpu_verifier,
     raid_hw_verifier,
     redfish_available,
     remove_deb,
@@ -860,12 +861,16 @@ class TestSmartCtlExporterStrategy(unittest.TestCase):
 @mock.patch("hw_tools.disk_hw_verifier", return_value={7, 8, 9})
 @mock.patch("hw_tools.bmc_hw_verifier", return_value={1, 2, 3})
 @mock.patch("hw_tools.raid_hw_verifier", return_value={4, 5, 6})
-def test_detect_available_tools(mock_raid_verifier, mock_bmc_hw_verifier, mock_disk_hw_verifier):
+@mock.patch("hw_tools.nvidia_gpu_verifier", return_value={10, 11, 12})
+def test_detect_available_tools(
+    mock_raid_verifier, mock_bmc_hw_verifier, mock_disk_hw_verifier, mock_nvidia_gpu_verifier
+):
     output = detect_available_tools()
     mock_raid_verifier.assert_called()
     mock_bmc_hw_verifier.assert_called()
     mock_disk_hw_verifier.assert_called()
-    assert output == {1, 2, 3, 4, 5, 6, 7, 8, 9}
+    mock_nvidia_gpu_verifier.assert_called()
+    assert output == {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
 
 
 @mock.patch("hw_tools._raid_hw_verifier_hwinfo", return_value={4, 5, 6})
@@ -992,6 +997,73 @@ class TestDiskHWVerifier(unittest.TestCase):
     def test_disk_not_available(self, mock_lshw):
         tools = disk_hw_verifier()
         self.assertEqual(tools, set())
+
+
+@pytest.mark.parametrize(
+    "lshw_output, expect",
+    [
+        ([], set()),
+        (
+            [
+                {
+                    "id": "display",
+                    "class": "display",
+                    "handle": "PCI:0000:00:02.0",
+                    "description": "VGA compatible controller",
+                    "product": "TigerLake-H GT1 [UHD Graphics]",
+                    "vendor": "Intel Corporation",
+                },
+            ],
+            set(),
+        ),
+        (
+            [
+                {
+                    "id": "display",
+                    "class": "display",
+                    "handle": "PCI:0000:01:00.0",
+                    "description": "VGA compatible controller",
+                    "product": "GA107M [GeForce RTX 3050 Mobile]",
+                    "vendor": "NVIDIA Corporation",
+                },
+                {
+                    "id": "display",
+                    "class": "display",
+                    "handle": "PCI:0000:00:02.0",
+                    "description": "VGA compatible controller",
+                    "product": "TigerLake-H GT1 [UHD Graphics]",
+                    "vendor": "Intel Corporation",
+                },
+            ],
+            {HWTool.DCGM},
+        ),
+        (
+            [
+                {
+                    "id": "display",
+                    "class": "display",
+                    "handle": "PCI:0000:01:00.0",
+                    "description": "VGA compatible controller",
+                    "product": "GA107M [GeForce RTX 3050 Mobile]",
+                    "vendor": "NVIDIA Corporation",
+                },
+                {
+                    "id": "display",
+                    "class": "display",
+                    "handle": "PCI:0000:00:02.0",
+                    "description": "3D controller",
+                    "product": "H100 [H100 SXM5 80GB]",
+                    "vendor": "NVIDIA Corporation",
+                },
+            ],
+            {HWTool.DCGM},
+        ),
+    ],
+)
+@mock.patch("hw_tools.lshw")
+def test_nvidia_gpu_verifier(mock_lshw, lshw_output, expect):
+    mock_lshw.return_value = lshw_output
+    assert nvidia_gpu_verifier() == expect
 
 
 class TestIPMIHWVerifier(unittest.TestCase):
