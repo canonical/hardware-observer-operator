@@ -79,6 +79,7 @@ class HWTool(str, Enum):
     REDFISH = "redfish"
     SMARTCTL = "smartctl"
     SMARTCTL_EXPORTER = "smartctl_exporter"
+    DCGM = "dcgm"
 
 
 TPR_RESOURCES: t.Dict[HWTool, str] = {
