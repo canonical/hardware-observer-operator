@@ -18,6 +18,7 @@ from typing import Dict, List, Set, Tuple
 import requests
 import urllib3
 from charms.operator_libs_linux.v0 import apt
+from charms.operator_libs_linux.v2 import snap
 from ops.model import ModelError, Resources
 
 import apt_helpers
@@ -173,6 +174,28 @@ class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
         # Note: The repo and keys should be remove when removing
         # hook is triggered. But currently the apt lib don't have
         # the remove option.
+
+
+class SnapStrategy(StrategyABC):
+    """Snap strategy class."""
+
+    def __init__(self, tool: HWTool):
+        """Snap strategy constructor."""
+        self._name = tool
+        self.snap_name = tool.value
+
+    def install(self, channel: str = "latest/stable") -> None:
+        """Install the snap from a channel."""
+        snap.add(self.snap_name, channel=channel)
+
+    def remove(self) -> None:
+        """Remove the snap."""
+        snap.remove([self.snap_name])
+
+    def check(self) -> bool:
+        """Check if all services are active."""
+        snap_client = snap.SnapCache()[self.snap_name]
+        return all(service.get("active", False) for service in snap_client.services.values())
 
 
 class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):

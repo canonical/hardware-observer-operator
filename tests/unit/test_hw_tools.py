@@ -36,6 +36,7 @@ from hw_tools import (
     SAS3IRCUStrategy,
     SmartCtlExporterStrategy,
     SmartCtlStrategy,
+    SnapStrategy,
     SSACLIStrategy,
     StorCLIStrategy,
     StrategyABC,
@@ -1147,3 +1148,108 @@ class TestIPMIHWVerifier(unittest.TestCase):
             output = bmc_hw_verifier()
             mock_apt_helpers.add_pkg_with_candidate_version.assert_called_with("freeipmi-tools")
             self.assertCountEqual(output, [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL])
+
+
+def test_snap_strategy_name():
+    hwtool = mock.MagicMock()
+    hwtool.value = "my-snap"
+
+    snap = SnapStrategy(hwtool)
+    assert snap.name == hwtool
+
+
+@pytest.mark.parametrize("channel", ["latest/stable", "latest/edge"])
+@mock.patch("hw_tools.snap")
+def test_snap_strategy_install(mock_snap, channel):
+    hwtool = mock.MagicMock()
+    hwtool.value = "my-snap"
+    snap = SnapStrategy(hwtool)
+    snap.install(channel)
+    mock_snap.add.assert_called_with(snap.snap_name, channel=channel)
+
+
+@mock.patch("hw_tools.snap")
+def test_snap_strategy_remove(mock_snap):
+    hwtool = mock.MagicMock()
+    hwtool.value = "my-snap"
+    snap = SnapStrategy(hwtool)
+    snap.remove()
+    mock_snap.remove.assert_called_with([snap.snap_name])
+
+
+@pytest.mark.parametrize(
+    "services, expected",
+    [
+        # all services active
+        (
+            {
+                "nv-hostengine": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": True,
+                    "activators": [],
+                },
+                "dcgm-exporter": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": True,
+                    "activators": [],
+                },
+            },
+            True,
+        ),
+        # at least one services down
+        (
+            {
+                "nv-hostengine": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": False,
+                    "activators": [],
+                },
+                "dcgm-exporter": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": True,
+                    "activators": [],
+                },
+            },
+            False,
+        ),
+        # all services down
+        (
+            {
+                "nv-hostengine": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": False,
+                    "activators": [],
+                },
+                "dcgm-exporter": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": False,
+                    "activators": [],
+                },
+            },
+            False,
+        ),
+        # snap without service
+        ({}, True),
+    ],
+)
+@mock.patch("hw_tools.snap.SnapCache")
+def test_snap_strategy_check(mock_snap_cache, services, expected):
+    mock_snap_info = mock.MagicMock()
+    mock_snap_info.services = services
+    mock_snap_cache.return_value.__getitem__.return_value = mock_snap_info
+    hwtool = mock.MagicMock()
+    hwtool.value = "my-snap"
+    snap = SnapStrategy(hwtool)
+    assert snap.check() is expected
