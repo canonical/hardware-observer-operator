@@ -48,7 +48,7 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
         support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/1232743397",
-        desc="MR 7.27 all",
+        desc="MR 7.27",
         sha256_checksum="45ff0d3c7fc8b77f64de7de7b3698307971546a6be00982934a19ee44f5d91bb",
     ),
     ToolVersionInfo(
@@ -64,7 +64,7 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
         support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/1232743291",
-        desc="MR 7.26 all",
+        desc="MR 7.26",
         sha256_checksum="5ab2c1b608934626817828ced85e4aeaee7dc97fbd6e3f4fed00b13a95a06e14",
     ),
     ToolVersionInfo(
@@ -80,7 +80,7 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
         support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/1232743203",
-        desc="MR 7.25 all",
+        desc="MR 7.25",
         sha256_checksum="17c3f5292de6491f1388c9305ba65836730614b6defe17039b427fced2f75e0b",
     ),
     ToolVersionInfo(
@@ -96,7 +96,7 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
         support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/1232743081",
-        desc="MR 7.24 all",
+        desc="MR 7.24",
         sha256_checksum="8ecf2d46e253e243c5d169adcd84f2701e52e3815913694f074e80af5a98cbab",
     ),
     ToolVersionInfo(
@@ -112,7 +112,7 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
         support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/Unified_storcli_all_os_7.2309.0000.0000.zip",
-        desc="MR 7.23 all",
+        desc="MR 7.23",
         sha256_checksum="94cbef2ec2ca58700a49e646a7bded3a49ddab4646a9d5d178bc4ccb2996cb73",
     ),
     ToolVersionInfo(
