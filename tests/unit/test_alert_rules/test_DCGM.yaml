@@ -21,4 +21,4 @@ tests:
                 GPU clock throttling has been detected on GPU 0.
                 Throttle reasons (bitmask): 32
                 Refer to the DCGM documentation for more information: https://docs.nvidia.com/datacenter/dcgm/2.1/dcgm-api/group__dcgmFieldConstants.html
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS instance:ubuntu-0]
+                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:0 instance:ubuntu-0]
