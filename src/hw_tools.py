@@ -183,19 +183,36 @@ class SnapStrategy(StrategyABC):
         """Snap strategy constructor."""
         self._name = tool
         self.snap_name = tool.value
+        self.snap_client = snap.SnapCache()[tool.value]
 
-    def install(self, channel: str = "latest/stable") -> None:
-        """Install the snap from a channel."""
-        snap.add(self.snap_name, channel=channel)
+    def install(self) -> None:
+        """Install the snap."""
+        possible_channels = ["latest/stable", "latest/candidate", "latest/edge"]
+        for channel in possible_channels:
+            try:
+                snap.add(self.snap_name, channel=channel)
+            except snap.SnapError as err:
+                logger.warning(
+                    "Failed to install %s on channel: %s: %s", self.snap_name, channel, err
+                )
+            else:
+                logger.info("Installed %s on channel: %s", self.snap_name, channel)
+                # some services might be disabled by default. E.g: dcgm-exporter
+                self.enable_services()
+                break
 
     def remove(self) -> None:
         """Remove the snap."""
         snap.remove([self.snap_name])
 
+    def enable_services(self) -> None:
+        """Enable the snap services."""
+        # breakpoint()
+        self.snap_client.start(list(self.snap_client.services.keys()), enable=True)
+
     def check(self) -> bool:
         """Check if all services are active."""
-        snap_client = snap.SnapCache()[self.snap_name]
-        return all(service.get("active", False) for service in snap_client.services.values())
+        return all(service.get("active", False) for service in self.snap_client.services.values())
 
 
 class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
@@ -652,6 +669,7 @@ class HWToolHelper:
             IPMISENSORStrategy(),
             RedFishStrategy(),
             SmartCtlStrategy(),
+            SnapStrategy(HWTool.DCGM),
         ]
 
     def fetch_tools(  # pylint: disable=W0102
@@ -718,7 +736,7 @@ class HWToolHelper:
                     if path:
                         strategy.install(path)
                 # APTStrategy
-                elif isinstance(strategy, APTStrategyABC):
+                elif isinstance(strategy, (APTStrategyABC, SnapStrategy)):
                     strategy.install()  # pylint: disable=E1120
                 logger.info("Strategy %s install success", strategy)
             except (
@@ -726,6 +744,7 @@ class HWToolHelper:
                 OSError,
                 apt.PackageError,
                 ResourceChecksumError,
+                snap.SnapError,
             ) as e:
                 logger.warning("Strategy %s install fail: %s", strategy, e)
                 fail_strategies.append(strategy.name)
@@ -740,7 +759,7 @@ class HWToolHelper:
         for strategy in self.strategies:
             if strategy.name not in hw_available:
                 continue
-            if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
+            if isinstance(strategy, (TPRStrategyABC, APTStrategyABC, SnapStrategy)):
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
 

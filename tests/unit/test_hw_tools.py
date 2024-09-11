@@ -1150,31 +1150,33 @@ class TestIPMIHWVerifier(unittest.TestCase):
             self.assertCountEqual(output, [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL])
 
 
-def test_snap_strategy_name():
-    hwtool = mock.MagicMock()
-    hwtool.value = "my-snap"
-
-    snap = SnapStrategy(hwtool)
-    assert snap.name == hwtool
-
-
-@pytest.mark.parametrize("channel", ["latest/stable", "latest/edge"])
 @mock.patch("hw_tools.snap")
-def test_snap_strategy_install(mock_snap, channel):
+def test_snap_strategy_name(_):
     hwtool = mock.MagicMock()
     hwtool.value = "my-snap"
-    snap = SnapStrategy(hwtool)
-    snap.install(channel)
-    mock_snap.add.assert_called_with(snap.snap_name, channel=channel)
+
+    strategy = SnapStrategy(hwtool)
+    assert strategy.name == hwtool
+
+
+@mock.patch("hw_tools.SnapStrategy.enable_services")
+@mock.patch("hw_tools.snap")
+def test_snap_strategy_install(mock_snap, mock_enable):
+    hwtool = mock.MagicMock()
+    hwtool.value = "my-snap"
+    strategy = SnapStrategy(hwtool)
+    strategy.install()
+    mock_snap.add.assert_called_with(strategy.snap_name, channel="latest/stable")
+    mock_enable.assert_called_once()
 
 
 @mock.patch("hw_tools.snap")
 def test_snap_strategy_remove(mock_snap):
     hwtool = mock.MagicMock()
     hwtool.value = "my-snap"
-    snap = SnapStrategy(hwtool)
-    snap.remove()
-    mock_snap.remove.assert_called_with([snap.snap_name])
+    strategy = SnapStrategy(hwtool)
+    strategy.remove()
+    mock_snap.remove.assert_called_with([strategy.snap_name])
 
 
 @pytest.mark.parametrize(
@@ -1183,14 +1185,14 @@ def test_snap_strategy_remove(mock_snap):
         # all services active
         (
             {
-                "nv-hostengine": {
+                "service_1": {
                     "daemon": "simple",
                     "daemon_scope": "system",
                     "enabled": True,
                     "active": True,
                     "activators": [],
                 },
-                "dcgm-exporter": {
+                "service_2": {
                     "daemon": "simple",
                     "daemon_scope": "system",
                     "enabled": True,
@@ -1203,14 +1205,14 @@ def test_snap_strategy_remove(mock_snap):
         # at least one services down
         (
             {
-                "nv-hostengine": {
+                "service_1": {
                     "daemon": "simple",
                     "daemon_scope": "system",
                     "enabled": True,
                     "active": False,
                     "activators": [],
                 },
-                "dcgm-exporter": {
+                "service_2": {
                     "daemon": "simple",
                     "daemon_scope": "system",
                     "enabled": True,
@@ -1223,14 +1225,14 @@ def test_snap_strategy_remove(mock_snap):
         # all services down
         (
             {
-                "nv-hostengine": {
+                "service_1": {
                     "daemon": "simple",
                     "daemon_scope": "system",
                     "enabled": True,
                     "active": False,
                     "activators": [],
                 },
-                "dcgm-exporter": {
+                "service_2": {
                     "daemon": "simple",
                     "daemon_scope": "system",
                     "enabled": True,
@@ -1251,5 +1253,19 @@ def test_snap_strategy_check(mock_snap_cache, services, expected):
     mock_snap_cache.return_value.__getitem__.return_value = mock_snap_info
     hwtool = mock.MagicMock()
     hwtool.value = "my-snap"
-    snap = SnapStrategy(hwtool)
-    assert snap.check() is expected
+    strategy = SnapStrategy(hwtool)
+    assert strategy.check() is expected
+
+
+@mock.patch("hw_tools.snap.SnapCache")
+def test_snap_enable_services(mock_snap_cache):
+    hwtool = mock.MagicMock(spec=HWTool)
+    hwtool.value = "my-snap"
+    mock_snap_client = mock.MagicMock()
+    mock_snap_client.services = {"service1": {}, "service2": {}}
+    mock_snap_cache.return_value = {"my-snap": mock_snap_client}
+
+    strategy = SnapStrategy(hwtool)
+    strategy.enable_services()
+
+    mock_snap_client.start.assert_called_once_with(["service1", "service2"], enable=True)
