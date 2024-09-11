@@ -339,7 +339,7 @@ class DCGMExporter(BaseExporter):
         super().__init__(charm_dir, config, DCGM_EXPORTER_SETTINGS)
 
         self.port = int(config["dcgm-exporter-port"])
-        self.strategy = SnapStrategy(HWTool.DCGM)
+        self.strategy = SnapStrategy(HWTool.DCGM, config["dcgm-snap-channel"])
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
