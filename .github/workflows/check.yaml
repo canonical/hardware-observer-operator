@@ -20,17 +20,62 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-unit:
-    uses: canonical/bootstack-actions/.github/workflows/lint-unit.yaml@v2
+  lint:
+    name: Lint
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.8", "3.10"]
-    with:
-      python-version: ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # pin tox to the current major version to avoid
+        # workflows breaking all at once when a new major version is released.
+        python -m pip install 'tox<5'
+
+    - name: Run linters
+      run: tox -e lint
+
+  unit:
+    name: Unit
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.10"]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install 'tox<5'
+
+    - name: Run unit tests
+      run: tox -e unit
 
   func:
-    needs: lint-unit
+    needs:
+      - lint
+      - unit
     name: functional tests
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 120
