@@ -14,20 +14,23 @@ bases:
   - build-on:
     - name: ubuntu
       channel: "22.04"
-      architectures: ["amd64"]
+      architectures: ["amd64", "arm64"]
     run-on:
       - name: ubuntu
         channel: "24.04"
         architectures:
           - amd64
+          - arm64
       - name: ubuntu
         channel: "22.04"
         architectures:
           - amd64
+          - arm64
       - name: ubuntu
         channel: "20.04"
         architectures:
           - amd64
+          - arm64
 
 actions:
   redetect-hardware:

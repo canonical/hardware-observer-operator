@@ -82,8 +82,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [[ubuntu-22.04]]
-        test-command: ['tox -e func -- --series focal', 'tox -e func -- --series jammy']
+        runs-on: [[ubuntu-22.04], [Ubuntu_ARM64_4C_16G_01]]
+        test-command: ['tox -e func -- --series focal --keep-models', 'tox -e func -- --series jammy --keep-models']
         juju-channel: ["3.4/stable"]
     steps:
 
