@@ -52,12 +52,28 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
         sha256_checksum="45ff0d3c7fc8b77f64de7de7b3698307971546a6be00982934a19ee44f5d91bb",
     ),
     ToolVersionInfo(
+        version="007.2705.0000.0000",
+        support_all_series=True,
+        supported_architectures=[Architecture.AARCH64],
+        link="https://docs.broadcom.com/docs/1232743397",
+        desc="MR 7.27 arm64",
+        sha256_checksum="9c36caacb6b7f956a9f5bcdb3f37d24e4aa8263ce01243b251092a39e5e32e35",
+    ),
+    ToolVersionInfo(
         version="007.2612.0000.0000",
         support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/1232743291",
         desc="MR 7.26",
         sha256_checksum="5ab2c1b608934626817828ced85e4aeaee7dc97fbd6e3f4fed00b13a95a06e14",
+    ),
+    ToolVersionInfo(
+        version="007.2612.0000.0000",
+        support_all_series=True,
+        supported_architectures=[Architecture.AARCH64],
+        link="https://docs.broadcom.com/docs/1232743291",
+        desc="MR 7.26 arm64",
+        sha256_checksum="d74b4598219fda94f6e045e6b5ea89757bda8d2ff82453afafcc1caad98195aa",
     ),
     ToolVersionInfo(
         version="007.2508.0000.0000",
@@ -68,6 +84,14 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
         sha256_checksum="17c3f5292de6491f1388c9305ba65836730614b6defe17039b427fced2f75e0b",
     ),
     ToolVersionInfo(
+        version="007.2508.0000.0000",
+        support_all_series=True,
+        supported_architectures=[Architecture.AARCH64],
+        link="https://docs.broadcom.com/docs/1232743203",
+        desc="MR 7.25 arm64",
+        sha256_checksum="69122ff45dbb3fa27acecc8da79d22053d35ee780fc43b07b7c6a2e1f70241db",
+    ),
+    ToolVersionInfo(
         version="007.2408.0000.0000",
         support_all_series=True,
         supported_architectures=[Architecture.X86_64],
@@ -76,12 +100,28 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
         sha256_checksum="8ecf2d46e253e243c5d169adcd84f2701e52e3815913694f074e80af5a98cbab",
     ),
     ToolVersionInfo(
+        version="007.2408.0000.0000",
+        support_all_series=True,
+        supported_architectures=[Architecture.AARCH64],
+        link="https://docs.broadcom.com/docs/1232743081",
+        desc="MR 7.24 arm64",
+        sha256_checksum="d278cd60d7775b877c0b4fc830a2b0659c016e0458130b3a9474903b6fead7cf",
+    ),
+    ToolVersionInfo(
         version="007.2310.0000.0000",
         support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/Unified_storcli_all_os_7.2309.0000.0000.zip",
         desc="MR 7.23",
         sha256_checksum="94cbef2ec2ca58700a49e646a7bded3a49ddab4646a9d5d178bc4ccb2996cb73",
+    ),
+    ToolVersionInfo(
+        version="007.2310.0000.0000",
+        support_all_series=True,
+        supported_architectures=[Architecture.AARCH64],
+        link="https://docs.broadcom.com/docs/Unified_storcli_all_os_7.2309.0000.0000.zip",
+        desc="MR 7.23 arm64",
+        sha256_checksum="7c97d55c29d127571e5c68f5b47834294286bcdc31b46b74b0fa4fd9a7acc8a8",
     ),
 ]
 
@@ -104,11 +144,7 @@ PERCCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ),
     ToolVersionInfo(
         version="007.1420.0000.0000",
-        supported_series=[
-            UbuntuSeries.FOCAL,
-            UbuntuSeries.BIONIC,
-            UbuntuSeries.XENIAL,
-        ],
+        supported_series=[UbuntuSeries.FOCAL, UbuntuSeries.BIONIC, UbuntuSeries.XENIAL],
         supported_architectures=[Architecture.X86_64],
         link="https://www.dell.com/support/home/zh-tw/drivers/driversdetails?driverid=n65f1",
         desc="A10",
@@ -177,6 +213,14 @@ SAS3IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
         sha256_checksum="7fa299a36254c582cf579d197463d6e59ffa9270b7241d98d0e477f05235be26",
     ),
     ToolVersionInfo(
+        version="17.00.00.00",
+        support_all_series=True,
+        supported_architectures=[Architecture.AARCH64],
+        link="https://docs.broadcom.com/docs/SAS3IRCU_P16.zip",
+        desc="P16, linux_arm",
+        sha256_checksum="0e668f7066b74626671a2e8657ab40e29d7ebd1f4b96afe2e0c5f1732f4e4cec",
+    ),
+    ToolVersionInfo(
         version="16.00.00.00",
         support_all_series=True,
         supported_architectures=[Architecture.X86_64],
@@ -185,12 +229,28 @@ SAS3IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
         sha256_checksum="f150eb37bb332668949a3eccf9636e0e03f874aecd17a39d586082c6be1386bd",
     ),
     ToolVersionInfo(
+        version="16.00.00.00",
+        support_all_series=True,
+        supported_architectures=[Architecture.AARCH64],
+        link="https://docs.broadcom.com/docs/SAS3IRCU_P15.zip",
+        desc="P15, linux_arm",
+        sha256_checksum="654096f29d57cbab021800d1dc96ee0a8f82ee34dae3c60e940dd96fb6a623b5",
+    ),
+    ToolVersionInfo(
         version="15.00.00.00",
         support_all_series=True,
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/SAS3IRCU_P14.zip",
         desc="P14, linux_x86",
         sha256_checksum="5825b90964d1950551e5ed5100ddf1141360b0acf8dd3c6ddb4fe5874d6bbabb",
+    ),
+    ToolVersionInfo(
+        version="15.00.00.00",
+        support_all_series=True,
+        supported_architectures=[Architecture.AARCH64],
+        link="https://docs.broadcom.com/docs/SAS3IRCU_P14.zip",
+        desc="P14, linux_arm",
+        sha256_checksum="cbd8006de6ea7214e7b8c8a5d68c92e7b482ec404ba222c46fac1e988849502d",
     ),
     ToolVersionInfo(
         version="14.00.00.00",
@@ -229,7 +289,7 @@ def validate_checksum(support_version_infos: t.List[ToolVersionInfo], path: Path
 
     supported_checksums = []
     for info in support_version_infos:
-        if os_platform.machine in info.supported_architectures and (
+        if os_platform.architecture in info.supported_architectures and (
             info.support_all_series or os_platform.series in info.supported_series
         ):
             supported_checksums.append(info.sha256_checksum)

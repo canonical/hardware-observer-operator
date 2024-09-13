@@ -36,6 +36,7 @@ class Architecture(str, Enum):
     """Host architecture."""
 
     X86_64 = "x86_64"
+    AARCH64 = "aarch64"
 
 
 @dataclasses.dataclass
@@ -51,6 +52,14 @@ class OSPlatform:
         for series in UbuntuSeries:
             if series == self.release:
                 return series
+        return None
+
+    @property
+    def architecture(self) -> t.Optional[Architecture]:
+        """Return architecture base on machine type."""
+        for arch in Architecture:
+            if arch == self.machine:
+                return arch
         return None
 
 
