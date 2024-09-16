@@ -19,7 +19,7 @@ import requests
 import urllib3
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v2 import snap
-from ops.model import ConfigData, ModelError, Resources
+from ops.model import ModelError, Resources
 
 import apt_helpers
 from checksum import (
@@ -179,25 +179,27 @@ class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
 class SnapStrategy(StrategyABC):
     """Snap strategy class."""
 
-    def __init__(self, tool: HWTool, channel: str):
+    def __init__(self, tool: HWTool):
         """Snap strategy constructor."""
         self._name = tool
         self.snap_name = tool.value
-        self.channel = channel
         self.snap_client = snap.SnapCache()[tool.value]
 
     def install(self) -> None:
         """Install the snap."""
-        try:
-            snap.add(self.snap_name, channel=self.channel)
-        except snap.SnapError as err:
-            logger.error(
-                "Failed to install %s on channel: %s: %s", self.snap_name, self.channel, err
-            )
-        else:
-            logger.info("Installed %s on channel: %s", self.snap_name, self.channel)
-            # some services might be disabled by default. E.g: dcgm-exporter
-            self.enable_services()
+        possible_channels = ["latest/stable", "latest/candidate", "latest/edge"]
+        for channel in possible_channels:
+            try:
+                snap.add(self.snap_name, channel=channel)
+            except snap.SnapError as err:
+                logger.warning(
+                    "Failed to install %s on channel: %s: %s", self.snap_name, channel, err
+                )
+            else:
+                logger.info("Installed %s on channel: %s", self.snap_name, channel)
+                # some services might be disabled by default. E.g: dcgm-exporter
+                self.enable_services()
+                break
 
     def remove(self) -> None:
         """Remove the snap."""
@@ -653,10 +655,6 @@ def detect_available_tools() -> Set[HWTool]:
 class HWToolHelper:
     """Helper to install vendor's or hardware related tools."""
 
-    def __init__(self, config: ConfigData) -> None:
-        """Init."""
-        self.config = config
-
     @property
     def strategies(self) -> List[StrategyABC]:
         """Define strategies for every tools."""
@@ -671,7 +669,7 @@ class HWToolHelper:
             IPMISENSORStrategy(),
             RedFishStrategy(),
             SmartCtlStrategy(),
-            SnapStrategy(HWTool.DCGM, self.config["dcgm-snap-channel"]),
+            SnapStrategy(HWTool.DCGM),
         ]
 
     def fetch_tools(  # pylint: disable=W0102

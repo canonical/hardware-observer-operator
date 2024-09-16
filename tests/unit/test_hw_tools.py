@@ -1155,7 +1155,7 @@ def test_snap_strategy_name(_):
     hwtool = mock.MagicMock()
     hwtool.value = "my-snap"
 
-    strategy = SnapStrategy(hwtool, "my-channel")
+    strategy = SnapStrategy(hwtool)
     assert strategy.name == hwtool
 
 
@@ -1164,10 +1164,9 @@ def test_snap_strategy_name(_):
 def test_snap_strategy_install(mock_snap, mock_enable):
     hwtool = mock.MagicMock()
     hwtool.value = "my-snap"
-    channel = "my-channel"
-    strategy = SnapStrategy(hwtool, channel)
+    strategy = SnapStrategy(hwtool)
     strategy.install()
-    mock_snap.add.assert_called_with(strategy.snap_name, channel=channel)
+    mock_snap.add.assert_called_with(strategy.snap_name, channel="latest/stable")
     mock_enable.assert_called_once()
 
 
@@ -1175,7 +1174,7 @@ def test_snap_strategy_install(mock_snap, mock_enable):
 def test_snap_strategy_remove(mock_snap):
     hwtool = mock.MagicMock()
     hwtool.value = "my-snap"
-    strategy = SnapStrategy(hwtool, "my-channel")
+    strategy = SnapStrategy(hwtool)
     strategy.remove()
     mock_snap.remove.assert_called_with([strategy.snap_name])
 
@@ -1254,7 +1253,7 @@ def test_snap_strategy_check(mock_snap_cache, services, expected):
     mock_snap_cache.return_value.__getitem__.return_value = mock_snap_info
     hwtool = mock.MagicMock()
     hwtool.value = "my-snap"
-    strategy = SnapStrategy(hwtool, "my-channel")
+    strategy = SnapStrategy(hwtool)
     assert strategy.check() is expected
 
 
@@ -1266,7 +1265,7 @@ def test_snap_enable_services(mock_snap_cache):
     mock_snap_client.services = {"service1": {}, "service2": {}}
     mock_snap_cache.return_value = {"my-snap": mock_snap_client}
 
-    strategy = SnapStrategy(hwtool, "my-channel")
+    strategy = SnapStrategy(hwtool)
     strategy.enable_services()
 
     mock_snap_client.start.assert_called_once_with(["service1", "service2"], enable=True)
