@@ -15,12 +15,6 @@ options:
     description: |
       Start the prometheus smartctl exporter at "smartctl-exporter-port". By default,
       it will start at port 10201.
-  dcgm-exporter-port:
-    type: int
-    default: 9400
-    description: |
-      Start the prometheus dcgm exporter at "dcgm-exporter-port". By default,
-      it will start at port 9400.
   exporter-log-level:
     type: string
     default: "INFO"

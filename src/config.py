@@ -12,21 +12,11 @@ class ExporterSettings(BaseModel):  # pylint: disable = too-few-public-methods
 
     health_retry_count: int = 3
     health_retry_timeout: int = 3
-    service_template: t.Optional[str] = None
+    service_template: str
     service_path: Path
     name: str
-    config_template: t.Optional[str] = None
-    config_path: t.Optional[Path] = None
-
-
-class DCGMExporterSettings(ExporterSettings):  # pylint: disable = too-few-public-methods
-    """Constant settings for DCGM Exporter."""
-
-    name: str = "snap.dcgm.dcgm-exporter"
-    service_path: Path = Path(f"/etc/systemd/system/{name}.service")
-
-
-DCGM_EXPORTER_SETTINGS = DCGMExporterSettings()
+    config_template: str
+    config_path: Path
 
 
 class HardwareExporterSettings(ExporterSettings):  # pylint: disable = too-few-public-methods

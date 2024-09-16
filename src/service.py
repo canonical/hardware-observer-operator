@@ -14,7 +14,6 @@ from redfish import redfish_client
 from redfish.rest.v1 import InvalidCredentialsError
 
 from config import (
-    DCGM_EXPORTER_SETTINGS,
     HARDWARE_EXPORTER_COLLECTOR_MAPPING,
     HARDWARE_EXPORTER_SETTINGS,
     SMARTCTL_EXPORTER_SETTINGS,
@@ -22,7 +21,7 @@ from config import (
     HWTool,
 )
 from hardware import get_bmc_address
-from hw_tools import SmartCtlExporterStrategy, SnapStrategy
+from hw_tools import SmartCtlExporterStrategy
 
 logger = getLogger(__name__)
 
@@ -49,11 +48,7 @@ class BaseExporter(ABC):
 
         self.settings = settings
         self.environment = Environment(loader=FileSystemLoader(charm_dir / "templates"))
-        self.service_template = (
-            self.environment.get_template(self.settings.service_template)
-            if self.settings.service_template
-            else None
-        )
+        self.service_template = self.environment.get_template(self.settings.service_template)
         self.exporter_service_path = self.settings.service_path
         self.exporter_name = self.settings.name
 
@@ -137,8 +132,6 @@ class BaseExporter(ABC):
 
     def _render_service(self, params: Dict[str, str]) -> bool:
         """Render and install exporter service file."""
-        if self.service_template is None:
-            return True
         content = self.service_template.render(**params)
         return write_to_file(self.exporter_service_path, content)
 
@@ -331,22 +324,6 @@ class SmartCtlExporter(BaseExporter):
         return True
 
 
-class DCGMExporter(BaseExporter):
-    """A class representing the DCGM exporter and the metric endpoints."""
-
-    def __init__(self, charm_dir: Path, config: ConfigData) -> None:
-        """Initialize the Hardware Exporter class."""
-        super().__init__(charm_dir, config, DCGM_EXPORTER_SETTINGS)
-
-        self.port = int(config["dcgm-exporter-port"])
-        self.strategy = SnapStrategy(HWTool.DCGM)
-
-    @staticmethod
-    def hw_tools() -> Set[HWTool]:
-        """Return hardware tools to watch."""
-        return {HWTool.DCGM}
-
-
 class HardwareExporter(BaseExporter):
     """A class representing the hardware exporter and the metric endpoints."""
 
@@ -356,11 +333,7 @@ class HardwareExporter(BaseExporter):
         """Initialize the Hardware Exporter class."""
         super().__init__(charm_dir, config, HARDWARE_EXPORTER_SETTINGS)
 
-        self.config_template = (
-            self.environment.get_template(self.settings.config_template)
-            if self.settings.config_template
-            else None
-        )
+        self.config_template = self.environment.get_template(self.settings.config_template)
         self.exporter_config_path = self.settings.config_path
         self.port = int(config["hardware-exporter-port"])
         self.config = config
@@ -375,20 +348,16 @@ class HardwareExporter(BaseExporter):
             collector = HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(tool)
             if collector is not None:
                 collectors.add(collector)
-        content = (
-            self.config_template.render(
-                PORT=self.port,
-                LEVEL=self.log_level,
-                COLLECT_TIMEOUT=self.collect_timeout,
-                COLLECTORS=collectors,
-                REDFISH_ENABLE=HWTool.REDFISH in self.enabled_tools,
-                REDFISH_HOST=self.redfish_conn_params.get("host", ""),
-                REDFISH_USERNAME=self.redfish_conn_params.get("username", ""),
-                REDFISH_PASSWORD=self.redfish_conn_params.get("password", ""),
-                REDFISH_CLIENT_TIMEOUT=self.redfish_conn_params.get("timeout", ""),
-            )
-            if self.config_template
-            else ""
+        content = self.config_template.render(
+            PORT=self.port,
+            LEVEL=self.log_level,
+            COLLECT_TIMEOUT=self.collect_timeout,
+            COLLECTORS=collectors,
+            REDFISH_ENABLE=HWTool.REDFISH in self.enabled_tools,
+            REDFISH_HOST=self.redfish_conn_params.get("host", ""),
+            REDFISH_USERNAME=self.redfish_conn_params.get("username", ""),
+            REDFISH_PASSWORD=self.redfish_conn_params.get("password", ""),
+            REDFISH_CLIENT_TIMEOUT=self.redfish_conn_params.get("timeout", ""),
         )
         return content
 

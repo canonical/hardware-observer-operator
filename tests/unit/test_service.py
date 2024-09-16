@@ -879,18 +879,5 @@ class TestWriteToFile(unittest.TestCase):
         self.assertFalse(result)
 
 
-@mock.patch("service.SnapStrategy")
-def test_dcgm_exporter(mock_strategy):
-    strategy = mock.MagicMock()
-    mock_strategy.return_value = strategy
-    path_lib = pathlib.Path()
-    mock_config = {"dcgm-exporter-port": 9400, "exporter-log-level": "INFO"}
-    dcgm_exporter = service.DCGMExporter(path_lib, mock_config)
-
-    assert dcgm_exporter.port == 9400
-    assert dcgm_exporter.hw_tools() == {HWTool.DCGM}
-    assert dcgm_exporter.strategy == strategy
-
-
 if __name__ == "__main__":
     unittest.main()

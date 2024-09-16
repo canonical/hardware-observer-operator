@@ -13,7 +13,7 @@ from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
 from hw_tools import HWTool, HWToolHelper, detect_available_tools
-from service import BaseExporter, DCGMExporter, ExporterError, HardwareExporter, SmartCtlExporter
+from service import BaseExporter, ExporterError, HardwareExporter, SmartCtlExporter
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,6 @@ class HardwareObserverCharm(ops.CharmBase):
             metrics_endpoints=[
                 {"path": "/metrics", "port": int(self.model.config["hardware-exporter-port"])},
                 {"path": "/metrics", "port": int(self.model.config["smartctl-exporter-port"])},
-                {"path": "/metrics", "port": int(self.model.config["dcgm-exporter-port"])},
             ],
             # Setting scrape_timeout as collect_timeout in the `duration` format specified in
             # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration
@@ -82,9 +81,6 @@ class HardwareObserverCharm(ops.CharmBase):
 
         if stored_tools & SmartCtlExporter.hw_tools():
             exporters.append(SmartCtlExporter(self.charm_dir, self.model.config))
-
-        if DCGMExporter.hw_tools() in stored_tools:
-            exporters.append(DCGMExporter(self.charm_dir, self.model.config))
 
         return exporters
 

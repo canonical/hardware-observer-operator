@@ -15,7 +15,7 @@ from parameterized import parameterized
 import charm
 from charm import ExporterError, HardwareObserverCharm
 from config import HWTool
-from service import DCGMExporter, HardwareExporter
+from service import HardwareExporter
 
 
 class TestCharm(unittest.TestCase):
@@ -55,18 +55,15 @@ class TestCharm(unittest.TestCase):
     @parameterized.expand(
         [
             (
-                "Enable three exporters",
-                {HWTool.IPMI_SEL, HWTool.SMARTCTL, HWTool.DCGM},
-                {"hardware-exporter", "smartctl-exporter", "dcgm"},
+                "Enable two exporters",
+                {HWTool.IPMI_SEL, HWTool.SMARTCTL},
+                {"hardware-exporter", "smartctl-exporter"},
             )
         ]
     )
     @mock.patch("charm.SmartCtlExporter.__init__", return_value=None)
     @mock.patch("charm.HardwareExporter.__init__", return_value=None)
-    @mock.patch("charm.DCGMExporter.__init__", return_value=None)
-    def test_exporters(
-        self, _, stored_tools, expect, mock_dcgm_exporter, mock_hw_exporter, mock_smart_exporter
-    ):
+    def test_exporters(self, _, stored_tools, expect, mock_hw_exporter, mock_smart_exporter):
         self.harness.begin()
         self.harness.charm.get_stored_tools = mock.MagicMock()
         self.harness.charm.get_stored_tools.return_value = stored_tools
@@ -89,13 +86,6 @@ class TestCharm(unittest.TestCase):
                 any([isinstance(exporter, HardwareExporter) for exporter in exporters])
             )
             mock_smart_exporter.assert_called_with(
-                self.harness.charm.charm_dir,
-                self.harness.charm.model.config,
-            )
-
-        if "dcgm-exporter" in expect:
-            self.assertTrue(any([isinstance(exporter, DCGMExporter) for exporter in exporters]))
-            mock_dcgm_exporter.assert_called_with(
                 self.harness.charm.charm_dir,
                 self.harness.charm.model.config,
             )
