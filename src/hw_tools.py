@@ -179,23 +179,39 @@ class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
 class SnapStrategy(StrategyABC):
     """Snap strategy class."""
 
-    def __init__(self, tool: HWTool):
+    def __init__(self, tool: HWTool, channel: str):
         """Snap strategy constructor."""
         self._name = tool
         self.snap_name = tool.value
+        self.channel = channel
+        self.snap_client = snap.SnapCache()[tool.value]
 
     def install(self, channel: str = "latest/stable") -> None:
         """Install the snap from a channel."""
-        snap.add(self.snap_name, channel=channel)
+        try:
+            snap.add(self.snap_name, channel=channel)
+        # using the snap.SnapError will result into:
+        # TypeError: catching classes that do not inherit from BaseException is not allowed
+        except Exception as err:  # pylint: disable=broad-except
+            logger.error(
+                "Failed to install %s from channel: %s: %s", self.snap_name, self.channel, err
+            )
+        else:
+            logger.info("Installed %s from channel: %s", self.snap_name, self.channel)
+            # some services might be disabled by default
+            self.enable_services()
 
     def remove(self) -> None:
         """Remove the snap."""
         snap.remove([self.snap_name])
 
+    def enable_services(self) -> None:
+        """Enable the snap services."""
+        self.snap_client.start(list(self.snap_client.services.keys()), enable=True)
+
     def check(self) -> bool:
         """Check if all services are active."""
-        snap_client = snap.SnapCache()[self.snap_name]
-        return all(service.get("active", False) for service in snap_client.services.values())
+        return all(service.get("active", False) for service in self.snap_client.services.values())
 
 
 class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
@@ -712,13 +728,12 @@ class HWToolHelper:
             if strategy.name not in hw_available:
                 continue
             try:
-                # TPRStrategy
                 if isinstance(strategy, TPRStrategyABC):
                     path = fetch_tools.get(strategy.name)  # pylint: disable=W0212
                     if path:
                         strategy.install(path)
-                # APTStrategy
-                elif isinstance(strategy, APTStrategyABC):
+
+                elif isinstance(strategy, (APTStrategyABC, SnapStrategy)):
                     strategy.install()  # pylint: disable=E1120
                 logger.info("Strategy %s install success", strategy)
             except (
@@ -726,6 +741,7 @@ class HWToolHelper:
                 OSError,
                 apt.PackageError,
                 ResourceChecksumError,
+                snap.SnapError,
             ) as e:
                 logger.warning("Strategy %s install fail: %s", strategy, e)
                 fail_strategies.append(strategy.name)
@@ -740,7 +756,7 @@ class HWToolHelper:
         for strategy in self.strategies:
             if strategy.name not in hw_available:
                 continue
-            if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
+            if isinstance(strategy, (TPRStrategyABC, APTStrategyABC, SnapStrategy)):
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
 
