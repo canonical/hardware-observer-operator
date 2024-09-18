@@ -18,8 +18,7 @@ from typing import Dict, List, Set, Tuple
 import requests
 import urllib3
 from charms.operator_libs_linux.v0 import apt
-from charms.operator_libs_linux.v2 import snap
-from ops.model import ConfigData, ModelError, Resources
+from ops.model import ModelError, Resources
 
 import apt_helpers
 from checksum import (
@@ -616,10 +615,6 @@ def detect_available_tools() -> Set[HWTool]:
 class HWToolHelper:
     """Helper to install vendor's or hardware related tools."""
 
-    def __init__(self, config: ConfigData) -> None:
-        """Init."""
-        self.config = config
-
     @property
     def strategies(self) -> List[StrategyABC]:
         """Define strategies for every tools."""
@@ -707,7 +702,6 @@ class HWToolHelper:
                 OSError,
                 apt.PackageError,
                 ResourceChecksumError,
-                snap.SnapError,
             ) as e:
                 logger.warning("Strategy %s install fail: %s", strategy, e)
                 fail_strategies.append(strategy.name)

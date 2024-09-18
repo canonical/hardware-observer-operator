@@ -50,15 +50,6 @@ class SmartCtlExporterSettings(ExporterSettings):  # pylint: disable = too-few-p
 SMARTCTL_EXPORTER_SETTINGS = SmartCtlExporterSettings()
 
 
-class DCGMExporterSettings:  # pylint: disable = too-few-public-methods
-    """Constant settings for DCGM Exporter."""
-
-    name: str = "snap.dcgm.dcgm-exporter"
-
-
-DCGM_EXPORTER_SETTINGS = DCGMExporterSettings()
-
-
 class SystemVendor(str, Enum):
     """Different hardware system vendor."""
 
