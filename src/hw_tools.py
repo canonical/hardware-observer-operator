@@ -186,28 +186,25 @@ class SnapStrategy(StrategyABC):
         self.channel = channel
         self.snap_client = snap.SnapCache()[tool.value]
 
-    def install(self, channel: str = "latest/stable") -> None:
+    def install(self) -> None:
         """Install the snap from a channel."""
         try:
-            snap.add(self.snap_name, channel=channel)
+            snap.add(self.snap_name, channel=self.channel)
         # using the snap.SnapError will result into:
         # TypeError: catching classes that do not inherit from BaseException is not allowed
         except Exception as err:  # pylint: disable=broad-except
             logger.error(
                 "Failed to install %s from channel: %s: %s", self.snap_name, self.channel, err
             )
+            raise err
         else:
             logger.info("Installed %s from channel: %s", self.snap_name, self.channel)
-            # some services might be disabled by default
-            self.enable_services()
+            # enable services because some might be disabled by default
+            self.snap_client.start(list(self.snap_client.services.keys()), enable=True)
 
     def remove(self) -> None:
         """Remove the snap."""
         snap.remove([self.snap_name])
-
-    def enable_services(self) -> None:
-        """Enable the snap services."""
-        self.snap_client.start(list(self.snap_client.services.keys()), enable=True)
 
     def check(self) -> bool:
         """Check if all services are active."""

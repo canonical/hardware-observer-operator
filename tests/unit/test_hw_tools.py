@@ -1160,28 +1160,38 @@ def test_snap_strategy_name(_):
     assert strategy.name == hwtool
 
 
-@mock.patch("hw_tools.SnapStrategy.enable_services")
+@mock.patch("hw_tools.snap.SnapCache")
 @mock.patch("hw_tools.snap")
-def test_snap_strategy_install(mock_snap, mock_enable):
+def test_snap_strategy_install(mock_snap, mock_snap_cache):
     hwtool = mock.MagicMock()
     hwtool.value = "my-snap"
     channel = "my-channel"
+
+    mock_snap_client = mock.MagicMock()
+    mock_snap_client.services = {"service1": {}, "service2": {}}
+    mock_snap_cache.return_value = {"my-snap": mock_snap_client}
+
     strategy = SnapStrategy(hwtool, channel)
-    strategy.install(channel)
+    strategy.install()
     mock_snap.add.assert_called_with(strategy.snap_name, channel=channel)
-    mock_enable.assert_called_once()
+    mock_snap_client.start.assert_called_once_with(["service1", "service2"], enable=True)
 
 
-@mock.patch("hw_tools.SnapStrategy.enable_services")
+@mock.patch("hw_tools.snap.SnapCache")
 @mock.patch("hw_tools.snap")
-def test_snap_strategy_install_fail(mock_snap, mock_enable):
+def test_snap_strategy_install_fail(mock_snap, mock_snap_cache):
     hwtool = mock.MagicMock()
     hwtool.value = "my-snap"
     channel = "my-channel"
+
+    mock_snap_client = mock.MagicMock()
+    mock_snap_cache.return_value = {"my-snap": mock_snap_client}
+
     strategy = SnapStrategy(hwtool, channel)
     mock_snap.add.side_effect = snap.SnapError
-    strategy.install(channel)
-    mock_enable.assert_not_called()
+    with pytest.raises(snap.SnapError):
+        strategy.install()
+    mock_snap_client.start.assert_not_called()
 
 
 @mock.patch("hw_tools.snap")
@@ -1269,17 +1279,3 @@ def test_snap_strategy_check(mock_snap_cache, services, expected):
     hwtool.value = "my-snap"
     strategy = SnapStrategy(hwtool, "my-channel")
     assert strategy.check() is expected
-
-
-@mock.patch("hw_tools.snap.SnapCache")
-def test_snap_enable_services(mock_snap_cache):
-    hwtool = mock.MagicMock(spec=HWTool)
-    hwtool.value = "my-snap"
-    mock_snap_client = mock.MagicMock()
-    mock_snap_client.services = {"service1": {}, "service2": {}}
-    mock_snap_cache.return_value = {"my-snap": mock_snap_client}
-
-    strategy = SnapStrategy(hwtool, "my-channel")
-    strategy.enable_services()
-
-    mock_snap_client.start.assert_called_once_with(["service1", "service2"], enable=True)
