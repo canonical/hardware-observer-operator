@@ -19,7 +19,7 @@ import requests
 import urllib3
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v2 import snap
-from ops.model import ModelError, Resources
+from ops.model import ConfigData, ModelError, Resources
 
 import apt_helpers
 from checksum import (
@@ -174,41 +174,6 @@ class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
         # Note: The repo and keys should be remove when removing
         # hook is triggered. But currently the apt lib don't have
         # the remove option.
-
-
-class SnapStrategy(StrategyABC):
-    """Snap strategy class."""
-
-    def __init__(self, tool: HWTool, channel: str):
-        """Snap strategy constructor."""
-        self._name = tool
-        self.snap_name = tool.value
-        self.channel = channel
-        self.snap_client = snap.SnapCache()[tool.value]
-
-    def install(self) -> None:
-        """Install the snap from a channel."""
-        try:
-            snap.add(self.snap_name, channel=self.channel)
-        # using the snap.SnapError will result into:
-        # TypeError: catching classes that do not inherit from BaseException is not allowed
-        except Exception as err:  # pylint: disable=broad-except
-            logger.error(
-                "Failed to install %s from channel: %s: %s", self.snap_name, self.channel, err
-            )
-            raise err
-
-        logger.info("Installed %s from channel: %s", self.snap_name, self.channel)
-        # enable services because some might be disabled by default
-        self.snap_client.start(list(self.snap_client.services.keys()), enable=True)
-
-    def remove(self) -> None:
-        """Remove the snap."""
-        snap.remove([self.snap_name])
-
-    def check(self) -> bool:
-        """Check if all services are active."""
-        return all(service.get("active", False) for service in self.snap_client.services.values())
 
 
 class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
@@ -651,6 +616,10 @@ def detect_available_tools() -> Set[HWTool]:
 class HWToolHelper:
     """Helper to install vendor's or hardware related tools."""
 
+    def __init__(self, config: ConfigData) -> None:
+        """Init."""
+        self.config = config
+
     @property
     def strategies(self) -> List[StrategyABC]:
         """Define strategies for every tools."""
@@ -730,7 +699,7 @@ class HWToolHelper:
                     if path:
                         strategy.install(path)
 
-                elif isinstance(strategy, (APTStrategyABC, SnapStrategy)):
+                elif isinstance(strategy, APTStrategyABC):
                     strategy.install()  # pylint: disable=E1120
                 logger.info("Strategy %s install success", strategy)
             except (
@@ -753,7 +722,7 @@ class HWToolHelper:
         for strategy in self.strategies:
             if strategy.name not in hw_available:
                 continue
-            if isinstance(strategy, (TPRStrategyABC, APTStrategyABC, SnapStrategy)):
+            if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
 

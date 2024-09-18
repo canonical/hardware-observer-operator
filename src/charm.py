@@ -13,7 +13,7 @@ from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
 from hw_tools import HWTool, HWToolHelper, detect_available_tools
-from service import BaseExporter, ExporterError, HardwareExporter, SmartCtlExporter
+from service import BaseExporter, DCGMExporter, ExporterError, HardwareExporter, SmartCtlExporter
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class HardwareObserverCharm(ops.CharmBase):
     def __init__(self, *args: Any) -> None:
         """Init."""
         super().__init__(*args)
-        self.hw_tool_helper = HWToolHelper()
+        self.hw_tool_helper = HWToolHelper(self.model.config)
 
         # Add refresh_events to COSAgentProvider to update relation data when
         # config changed (default behavior) and upgrade charm. This is useful
@@ -37,6 +37,7 @@ class HardwareObserverCharm(ops.CharmBase):
             metrics_endpoints=[
                 {"path": "/metrics", "port": int(self.model.config["hardware-exporter-port"])},
                 {"path": "/metrics", "port": int(self.model.config["smartctl-exporter-port"])},
+                {"path": "/metrics", "port": int(self.model.config["dcgm-exporter-port"])},
             ],
             # Setting scrape_timeout as collect_timeout in the `duration` format specified in
             # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration
@@ -81,6 +82,14 @@ class HardwareObserverCharm(ops.CharmBase):
 
         if stored_tools & SmartCtlExporter.hw_tools():
             exporters.append(SmartCtlExporter(self.charm_dir, self.model.config))
+
+        if DCGMExporter.hw_tools() & stored_tools:
+            exporters.append(
+                DCGMExporter(
+                    channel=str(self.model.config["dcgm-snap-channel"]),
+                    port=int(self.model.config["dcgm-exporter-port"]),
+                )
+            )
 
         return exporters
 
@@ -226,7 +235,7 @@ class HardwareObserverCharm(ops.CharmBase):
                 self.model.unit.status = BlockedStatus(message)
                 return
             for exporter in self.exporters:
-                success = exporter.render_config()
+                success = exporter.set_config()
                 if success:
                     exporter.restart()
                 else:

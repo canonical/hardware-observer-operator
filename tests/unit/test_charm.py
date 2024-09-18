@@ -503,7 +503,7 @@ class TestCharm(unittest.TestCase):
                 [(True, ""), (True, "")],
             ),
             (
-                "Exporter render_config failed",
+                "Exporter set_config failed",
                 True,
                 True,
                 (True, ""),
@@ -520,14 +520,14 @@ class TestCharm(unittest.TestCase):
         cos_agent_related,
         validate_configs_return,
         mock_exporters,
-        mock_exporters_render_config_returns,
+        mock_exporters_set_config_returns,
         mock_logger,
     ):
-        for mock_exporter, render_config_return in zip(
+        for mock_exporter, set_config_return in zip(
             mock_exporters,
-            mock_exporters_render_config_returns,
+            mock_exporters_set_config_returns,
         ):
-            mock_exporter.render_config.return_value = render_config_return
+            mock_exporter.set_config.return_value = set_config_return
 
         with mock.patch(
             "charm.HardwareObserverCharm.exporters",
@@ -556,14 +556,14 @@ class TestCharm(unittest.TestCase):
                     return
                 if not validate_configs_return[0]:
                     self.assertEqual(self.harness.charm.unit.status, BlockedStatus("invalid msg"))
-                    self.harness.charm.exporters[0].render_config.assert_not_called()
+                    self.harness.charm.exporters[0].set_config.assert_not_called()
                     return
-                if not all(mock_exporters_render_config_returns):
-                    for mock_exporter, render_config_return in zip(
+                if not all(mock_exporters_set_config_returns):
+                    for mock_exporter, set_config_return in zip(
                         mock_exporters,
-                        mock_exporters_render_config_returns,
+                        mock_exporters_set_config_returns,
                     ):
-                        if render_config_return:
+                        if set_config_return:
                             mock_exporter.restart.assert_called()
                         else:
                             message = (

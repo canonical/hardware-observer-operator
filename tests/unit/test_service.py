@@ -14,7 +14,7 @@ import service
 from config import HARDWARE_EXPORTER_SETTINGS, HWTool
 
 
-class TestBaseExporter(unittest.TestCase):
+class TestRendarableExporter(unittest.TestCase):
     """Test Hardware Exporter methods."""
 
     def setUp(self) -> None:
@@ -36,9 +36,9 @@ class TestBaseExporter(unittest.TestCase):
             "redfish-password": "",
         }
         self.mock_stored_hw_available = {"storcli", "ssacli"}
-        service.BaseExporter.__abstractmethods__ = set()
+        service.RendarableExporter.__abstractmethods__ = set()
 
-        self.exporter = service.BaseExporter(
+        self.exporter = service.RendarableExporter(
             search_path, self.mock_config, HARDWARE_EXPORTER_SETTINGS
         )
 
@@ -48,13 +48,13 @@ class TestBaseExporter(unittest.TestCase):
                 {
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "render_config": True,
+                    "set_config": True,
                     "render_service": True,
                 },
                 {
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "render_config": True,
+                    "set_config": True,
                     "render_service": True,
                 },
                 True,
@@ -64,13 +64,13 @@ class TestBaseExporter(unittest.TestCase):
                 {
                     "verify_render_files_exist": True,
                     "install_resources": False,
-                    "render_config": True,
+                    "set_config": True,
                     "render_service": True,
                 },
                 {
                     "verify_render_files_exist": False,
                     "install_resources": True,
-                    "render_config": False,
+                    "set_config": False,
                     "render_service": False,
                 },
                 False,
@@ -80,13 +80,13 @@ class TestBaseExporter(unittest.TestCase):
                 {
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "render_config": False,
+                    "set_config": False,
                     "render_service": True,
                 },
                 {
                     "verify_render_files_exist": False,
                     "install_resources": True,
-                    "render_config": True,
+                    "set_config": True,
                     "render_service": False,
                 },
                 False,
@@ -96,13 +96,13 @@ class TestBaseExporter(unittest.TestCase):
                 {
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "render_config": True,
+                    "set_config": True,
                     "render_service": False,
                 },
                 {
                     "verify_render_files_exist": False,
                     "install_resources": True,
-                    "render_config": True,
+                    "set_config": True,
                     "render_service": True,
                 },
                 False,
@@ -113,14 +113,14 @@ class TestBaseExporter(unittest.TestCase):
                     "verify_render_files_exist": False,
                     "install_resources": True,
                     "resources_exist": True,
-                    "render_config": True,
+                    "set_config": True,
                     "render_service": True,
                 },
                 {
                     "verify_render_files_exist": True,
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "render_config": True,
+                    "set_config": True,
                     "render_service": True,
                 },
                 False,
@@ -156,8 +156,8 @@ class TestBaseExporter(unittest.TestCase):
         self.exporter.install_resources.return_value = True
         self.exporter.resources_exist = mock.MagicMock()
         self.exporter.resources_exist.return_value = False
-        self.exporter.render_config = mock.MagicMock()
-        self.exporter.render_config.return_value = True
+        self.exporter.set_config = mock.MagicMock()
+        self.exporter.set_config.return_value = True
         self.exporter.render_service = mock.MagicMock()
         self.exporter.render_service.return_value = True
 
@@ -166,7 +166,7 @@ class TestBaseExporter(unittest.TestCase):
 
         self.exporter.install_resources.assert_called()
         self.exporter.resources_exist.assert_called()
-        self.exporter.render_config.assert_not_called()
+        self.exporter.set_config.assert_not_called()
         self.exporter.render_service.assert_not_called()
 
         self.mock_systemd.daemon_reload.assert_not_called()
@@ -321,29 +321,29 @@ class TestBaseExporter(unittest.TestCase):
         mock_write_to_file.assert_called_with("some-config-path", "some-content")
 
     @mock.patch("service.write_to_file")
-    def test_render_config_okay(self, mock_write_to_file):
+    def test_set_config_okay(self, mock_write_to_file):
         self.exporter.exporter_config_path = "some-path"
-        self.exporter._render_config_content = mock.MagicMock()
-        self.exporter._render_config_content.return_value = "some-config-content"
+        self.exporter._set_config_content = mock.MagicMock()
+        self.exporter._set_config_content.return_value = "some-config-content"
         mock_write_to_file.return_value = "some-result"
 
-        result = self.exporter.render_config()
+        result = self.exporter.set_config()
 
         mock_write_to_file.assert_called_with("some-path", "some-config-content", mode=0o600)
         self.assertEqual("some-result", result)
 
     @mock.patch("service.write_to_file")
-    def test_render_config_skip(self, mock_write_to_file):
+    def test_set_config_skip(self, mock_write_to_file):
         self.exporter.exporter_config_path = None
         mock_write_to_file.return_value = "some-result"
 
-        result = self.exporter.render_config()
+        result = self.exporter.set_config()
 
         mock_write_to_file.assert_not_called()
         self.assertEqual(True, result)
 
-    def test__render_config_content(self):
-        result = self.exporter._render_config_content()
+    def test__set_config_content(self):
+        result = self.exporter._set_config_content()
         self.assertEqual(result, "")
 
     @parameterized.expand(
@@ -465,9 +465,9 @@ class TestHardwareExporter(unittest.TestCase):
             self.exporter.validate_exporter_configs(),
         )
 
-    def test_render_config_content_redfish_not_available(self):
+    def test_set_config_content_redfish_not_available(self):
         """Test render config content redfish not available."""
-        content = self.exporter._render_config_content()
+        content = self.exporter._set_config_content()
         content_config = yaml.safe_load(content)
         self.assertEqual(content_config["port"], 10200)
         self.assertEqual(content_config["level"], "INFO")
@@ -480,7 +480,7 @@ class TestHardwareExporter(unittest.TestCase):
         self.assertNotIn("redfish_password", content_config)
         self.assertNotIn("redfish_client_timeout", content_config)
 
-    def test_render_config_content_redfish_available_and_disabled(self):
+    def test_set_config_content_redfish_available_and_disabled(self):
         """Test render config content redfish is available but disabled."""
         self.exporter.available_tools = {HWTool.REDFISH, HWTool.IPMI_DCMI}
         self.exporter.config = {
@@ -491,7 +491,7 @@ class TestHardwareExporter(unittest.TestCase):
             "redfish-password": "my-pwd",
             "redfish-disable": True,
         }
-        content = self.exporter._render_config_content()
+        content = self.exporter._set_config_content()
         content_config = yaml.safe_load(content)
         self.assertEqual(content_config["port"], 10200)
         self.assertEqual(content_config["level"], "INFO")
@@ -501,7 +501,7 @@ class TestHardwareExporter(unittest.TestCase):
         self.assertNotIn("redfish_password", content_config)
         self.assertNotIn("redfish_client_timeout", content_config)
 
-    def test_render_config_content_redfish_available_and_enabled(self):
+    def test_set_config_content_redfish_available_and_enabled(self):
         """Test render config content when redfish is available and enabled."""
         self.exporter.available_tools = {HWTool.REDFISH}
         self.exporter.config = {
@@ -512,7 +512,7 @@ class TestHardwareExporter(unittest.TestCase):
             "redfish-password": "my-pwd",
             "redfish-disable": False,
         }
-        content = self.exporter._render_config_content()
+        content = self.exporter._set_config_content()
         content_config = yaml.safe_load(content)
         self.assertEqual(content_config["port"], 10200)
         self.assertEqual(content_config["level"], "INFO")
@@ -751,12 +751,12 @@ class TestSmartMetricExporter(unittest.TestCase):
             (False,),
         ]
     )
-    def test_render_config(self, service_render_success):
+    def test_set_config(self, service_render_success):
         """Test render config."""
         self.exporter.render_service = mock.MagicMock()
         self.exporter.render_service.return_value = service_render_success
 
-        result = self.exporter.render_config()
+        result = self.exporter.set_config()
         self.assertEqual(result, service_render_success)
 
     def test_hw_tools(self):
