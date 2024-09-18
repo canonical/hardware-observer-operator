@@ -1,5 +1,4 @@
 -r requirements.txt
 coverage
-flake8 < 5
-pre-commit
+flake8
 parameterized
