@@ -197,10 +197,10 @@ class SnapStrategy(StrategyABC):
                 "Failed to install %s from channel: %s: %s", self.snap_name, self.channel, err
             )
             raise err
-        else:
-            logger.info("Installed %s from channel: %s", self.snap_name, self.channel)
-            # enable services because some might be disabled by default
-            self.snap_client.start(list(self.snap_client.services.keys()), enable=True)
+
+        logger.info("Installed %s from channel: %s", self.snap_name, self.channel)
+        # enable services because some might be disabled by default
+        self.snap_client.start(list(self.snap_client.services.keys()), enable=True)
 
     def remove(self) -> None:
         """Remove the snap."""
