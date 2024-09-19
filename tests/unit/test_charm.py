@@ -15,7 +15,13 @@ from parameterized import parameterized
 import charm
 from charm import ExporterError, HardwareObserverCharm
 from config import HWTool
-from service import HardwareExporter
+from service import (
+    HARDWARE_EXPORTER_SETTINGS,
+    SMARTCTL_EXPORTER_SETTINGS,
+    DCGMExporter,
+    HardwareExporter,
+    SmartCtlExporter,
+)
 
 
 class TestCharm(unittest.TestCase):
@@ -55,40 +61,56 @@ class TestCharm(unittest.TestCase):
     @parameterized.expand(
         [
             (
+                "No exporters enabled",
+                set(),
+                set(),
+            ),
+            (
+                "Enable one exporter",
+                {HWTool.IPMI_SEL},
+                {"hardware-exporter"},
+            ),
+            (
                 "Enable two exporters",
                 {HWTool.IPMI_SEL, HWTool.SMARTCTL},
                 {"hardware-exporter", "smartctl-exporter"},
-            )
+            ),
+            (
+                "Enable all exporters",
+                {HWTool.IPMI_SEL, HWTool.SMARTCTL, HWTool.DCGM},
+                {"hardware-exporter", "smartctl-exporter", "dcgm"},
+            ),
         ]
     )
-    @mock.patch("charm.SmartCtlExporter.__init__", return_value=None)
-    @mock.patch("charm.HardwareExporter.__init__", return_value=None)
-    def test_exporters(self, _, stored_tools, expect, mock_hw_exporter, mock_smart_exporter):
+    @mock.patch("charm.DCGMExporter")
+    @mock.patch("charm.SmartCtlExporter")
+    @mock.patch("charm.HardwareExporter")
+    def test_exporters(
+        self, _, stored_tools, expect, mock_hw_exporter, mock_smart_exporter, mock_dcgm_exporter
+    ):
         self.harness.begin()
         self.harness.charm.get_stored_tools = mock.MagicMock()
         self.harness.charm.get_stored_tools.return_value = stored_tools
-        self.harness.charm._stored.stored_tools = {tool.value for tool in stored_tools}
+
+        hw_exporter = mock.MagicMock()
+        hw_exporter.exporter_name = HARDWARE_EXPORTER_SETTINGS.name
+        mock_hw_exporter.hw_tools.return_value = HardwareExporter.hw_tools()
+        mock_hw_exporter.return_value = hw_exporter
+
+        smart_exporter = mock.MagicMock()
+        smart_exporter.exporter_name = SMARTCTL_EXPORTER_SETTINGS.name
+        mock_smart_exporter.hw_tools.return_value = SmartCtlExporter.hw_tools()
+        mock_smart_exporter.return_value = smart_exporter
+
+        dcgm_exporter = mock.MagicMock()
+        dcgm_exporter.exporter_name = DCGMExporter.exporter_name
+        mock_dcgm_exporter.hw_tools.return_value = DCGMExporter.hw_tools()
+        mock_dcgm_exporter.return_value = dcgm_exporter
 
         exporters = self.harness.charm.exporters
         self.harness.charm.get_stored_tools.assert_called()
 
-        if "hardware-exporter" in expect:
-            self.assertTrue(
-                any([isinstance(exporter, HardwareExporter) for exporter in exporters])
-            )
-            mock_hw_exporter.assert_called_with(
-                self.harness.charm.charm_dir,
-                self.harness.charm.model.config,
-                self.harness.charm._stored.stored_tools,
-            )
-        if "smartctl-exporter" in expect:
-            self.assertTrue(
-                any([isinstance(exporter, HardwareExporter) for exporter in exporters])
-            )
-            mock_smart_exporter.assert_called_with(
-                self.harness.charm.charm_dir,
-                self.harness.charm.model.config,
-            )
+        self.assertEqual({exporter.exporter_name for exporter in exporters}, expect)
 
     @parameterized.expand(
         [
@@ -503,7 +525,7 @@ class TestCharm(unittest.TestCase):
                 [(True, ""), (True, "")],
             ),
             (
-                "Exporter set_config failed",
+                "Exporter configure failed",
                 True,
                 True,
                 (True, ""),
@@ -520,14 +542,14 @@ class TestCharm(unittest.TestCase):
         cos_agent_related,
         validate_configs_return,
         mock_exporters,
-        mock_exporters_set_config_returns,
+        mock_exporters_configure_returns,
         mock_logger,
     ):
-        for mock_exporter, set_config_return in zip(
+        for mock_exporter, configure_return in zip(
             mock_exporters,
-            mock_exporters_set_config_returns,
+            mock_exporters_configure_returns,
         ):
-            mock_exporter.set_config.return_value = set_config_return
+            mock_exporter.configure.return_value = configure_return
 
         with mock.patch(
             "charm.HardwareObserverCharm.exporters",
@@ -556,14 +578,14 @@ class TestCharm(unittest.TestCase):
                     return
                 if not validate_configs_return[0]:
                     self.assertEqual(self.harness.charm.unit.status, BlockedStatus("invalid msg"))
-                    self.harness.charm.exporters[0].set_config.assert_not_called()
+                    self.harness.charm.exporters[0].configure.assert_not_called()
                     return
-                if not all(mock_exporters_set_config_returns):
-                    for mock_exporter, set_config_return in zip(
+                if not all(mock_exporters_configure_returns):
+                    for mock_exporter, configure_return in zip(
                         mock_exporters,
-                        mock_exporters_set_config_returns,
+                        mock_exporters_configure_returns,
                     ):
-                        if set_config_return:
+                        if configure_return:
                             mock_exporter.restart.assert_called()
                         else:
                             message = (

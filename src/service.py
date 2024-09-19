@@ -72,7 +72,7 @@ class BaseExporter(ABC):
         """Disable and stop the exporter services."""
 
     @abstractmethod
-    def set_config(self) -> bool:
+    def configure(self) -> bool:
         """Set exporter config."""
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
@@ -81,13 +81,6 @@ class BaseExporter(ABC):
             logger.error("Invalid exporter port: port must be in [1, 65535].")
             return False, "Invalid config: exporter's port"
 
-        allowed_log_level_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-        if self.log_level.upper() not in allowed_log_level_choices:
-            logger.error(
-                "Invalid exporter-log-level: log-level must be in %s (case-insensitive).",
-                allowed_log_level_choices,
-            )
-            return False, "Invalid config: 'exporter-log-level'"
         return True, "Exporter config is valid."
 
 
@@ -173,7 +166,7 @@ class RendarableExporter(BaseExporter):
         content = self.service_template.render(**params)
         return write_to_file(self.exporter_service_path, content)
 
-    def set_config(self) -> bool:
+    def configure(self) -> bool:
         """Set exporter config file by rendering templates."""
         if self.exporter_config_path is not None:
             content = self._set_config_content()
@@ -211,8 +204,8 @@ class RendarableExporter(BaseExporter):
             return False
 
         # Render config
-        set_config_success = self.set_config()
-        if not set_config_success:
+        configure_success = self.configure()
+        if not configure_success:
             logger.error("Failed to render config files for %s.", self.exporter_name)
             return False
 
@@ -261,6 +254,21 @@ class RendarableExporter(BaseExporter):
         except Exception as err:  # pylint: disable=W0718
             logger.error("Exporter %s crashed unexpectedly: %s", self.exporter_name, err)
             raise ExporterError() from err
+
+    def validate_exporter_configs(self) -> Tuple[bool, str]:
+        """Validate the static and runtime config options for the exporter."""
+        valid, msg = super().validate_exporter_configs()
+        if not valid:
+            return valid, msg
+
+        allowed_log_level_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        if self.log_level.upper() not in allowed_log_level_choices:
+            logger.error(
+                "Invalid exporter-log-level: log-level must be in %s (case-insensitive).",
+                allowed_log_level_choices,
+            )
+            return False, "Invalid config: 'exporter-log-level'"
+        return True, "Exporter config is valid."
 
 
 def write_to_file(path: Path, content: str, mode: Optional[int] = None) -> bool:
@@ -325,8 +333,8 @@ class SmartCtlExporter(RendarableExporter):
         )
         return service_rendered
 
-    def set_config(self) -> bool:
-        """Override base set_config to render the service file.
+    def configure(self) -> bool:
+        """Override base configure to render the service file.
 
         This is because smartctl_exporter doesn't support providing config file.
         The config options need to be provided as flags while exectuting
@@ -366,18 +374,32 @@ class SnapExporter(BaseExporter):
     """A class representing a snap exporter."""
 
     exporter_name: str
+    channel: str
 
-    def __init__(self, channel: str, port: int):
+    def __init__(self, config: ConfigData):
         """Init."""
-        self.channel = channel
-        self.port = port
+        self.config = config
         self.snap_client = snap.SnapCache()[self.exporter_name]
+
+    @staticmethod
+    def hw_tools() -> Set[HWTool]:
+        """Return hardware tools to watch."""
+        return set()
 
     def install(self) -> bool:
         """Install the snap from a channel."""
+        if not self._install() or not self.configure():
+            return False
+
+        self.enable_and_start()
+        return True
+
+    def _install(self) -> bool:
         try:
             snap.add(self.exporter_name, channel=self.channel)
-            self.set_config()
+            logger.info("Installed %s from channel: %s", self.exporter_name, self.channel)
+            return True
+
         # using the snap.SnapError will result into:
         # TypeError: catching classes that do not inherit from BaseException is not allowed
         except Exception as err:  # pylint: disable=broad-except
@@ -386,14 +408,17 @@ class SnapExporter(BaseExporter):
             )
             return False
 
-        logger.info("Installed %s from channel: %s", self.exporter_name, self.channel)
-        # enable services because some might be disabled by default
-        self.enable_and_start()
-        return True
-
     def uninstall(self) -> bool:
         """Uninstall the snap."""
-        snap.remove([self.exporter_name])
+        try:
+            snap.remove([self.exporter_name])
+
+        # using the snap.SnapError will result into:
+        # TypeError: catching classes that do not inherit from BaseException is not allowed
+        except Exception as err:  # pylint: disable=broad-except
+            logger.error("Failed to remove %s: %s", self.exporter_name, err)
+            return False
+
         return self.snap_client.present is False
 
     def enable_and_start(self) -> None:
@@ -412,7 +437,7 @@ class SnapExporter(BaseExporter):
         """Check if all services are active."""
         return all(service.get("active", False) for service in self.snap_client.services.values())
 
-    def set_config(self) -> bool:
+    def configure(self) -> bool:
         """Set the necessary exporter configurations."""
         return True
 
@@ -422,15 +447,24 @@ class DCGMExporter(SnapExporter):
 
     exporter_name: str = "dcgm"
 
+    def __init__(self, config: ConfigData):
+        """Init."""
+        super().__init__(config)
+        # breakpoint()
+        self.channel = str(self.config["dcgm-snap-channel"])
+        self.port = int(self.config["dcgm-exporter-port"])
+
     @staticmethod
     def hw_tools() -> Set[HWTool]:
         """Return hardware tools to watch."""
         return {HWTool.DCGM}
 
-    def set_config(self) -> bool:
+    def configure(self) -> bool:
         """Set the necessary exporter configurations."""
         # refresh the channel if necessary
-        snap.add(self.exporter_name, channel=self.channel)
+        if not self._install():
+            return False
+
         self.snap_client.set(config={"dcgm-exporter-address": f":{self.port}"})
         self.snap_client.restart(list(self.snap_client.services.keys()))
         return True

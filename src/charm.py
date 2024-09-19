@@ -26,7 +26,7 @@ class HardwareObserverCharm(ops.CharmBase):
     def __init__(self, *args: Any) -> None:
         """Init."""
         super().__init__(*args)
-        self.hw_tool_helper = HWToolHelper(self.model.config)
+        self.hw_tool_helper = HWToolHelper()
 
         # Add refresh_events to COSAgentProvider to update relation data when
         # config changed (default behavior) and upgrade charm. This is useful
@@ -71,6 +71,7 @@ class HardwareObserverCharm(ops.CharmBase):
         """Return list of exporters based on detected hardware."""
         exporters: List[BaseExporter] = []
         stored_tools = self.get_stored_tools()
+        # breakpoint()
         if stored_tools & HardwareExporter.hw_tools():
             exporters.append(
                 HardwareExporter(
@@ -84,12 +85,7 @@ class HardwareObserverCharm(ops.CharmBase):
             exporters.append(SmartCtlExporter(self.charm_dir, self.model.config))
 
         if DCGMExporter.hw_tools() & stored_tools:
-            exporters.append(
-                DCGMExporter(
-                    channel=str(self.model.config["dcgm-snap-channel"]),
-                    port=int(self.model.config["dcgm-exporter-port"]),
-                )
-            )
+            exporters.append(DCGMExporter(self.model.config))
 
         return exporters
 
@@ -235,7 +231,7 @@ class HardwareObserverCharm(ops.CharmBase):
                 self.model.unit.status = BlockedStatus(message)
                 return
             for exporter in self.exporters:
-                success = exporter.set_config()
+                success = exporter.configure()
                 if success:
                     exporter.restart()
                 else:

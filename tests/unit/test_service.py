@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+import pytest
 import yaml
 from parameterized import parameterized
 from redfish.rest.v1 import InvalidCredentialsError
@@ -48,13 +49,13 @@ class TestRendarableExporter(unittest.TestCase):
                 {
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "set_config": True,
+                    "configure": True,
                     "render_service": True,
                 },
                 {
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "set_config": True,
+                    "configure": True,
                     "render_service": True,
                 },
                 True,
@@ -64,13 +65,13 @@ class TestRendarableExporter(unittest.TestCase):
                 {
                     "verify_render_files_exist": True,
                     "install_resources": False,
-                    "set_config": True,
+                    "configure": True,
                     "render_service": True,
                 },
                 {
                     "verify_render_files_exist": False,
                     "install_resources": True,
-                    "set_config": False,
+                    "configure": False,
                     "render_service": False,
                 },
                 False,
@@ -80,13 +81,13 @@ class TestRendarableExporter(unittest.TestCase):
                 {
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "set_config": False,
+                    "configure": False,
                     "render_service": True,
                 },
                 {
                     "verify_render_files_exist": False,
                     "install_resources": True,
-                    "set_config": True,
+                    "configure": True,
                     "render_service": False,
                 },
                 False,
@@ -96,13 +97,13 @@ class TestRendarableExporter(unittest.TestCase):
                 {
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "set_config": True,
+                    "configure": True,
                     "render_service": False,
                 },
                 {
                     "verify_render_files_exist": False,
                     "install_resources": True,
-                    "set_config": True,
+                    "configure": True,
                     "render_service": True,
                 },
                 False,
@@ -113,14 +114,14 @@ class TestRendarableExporter(unittest.TestCase):
                     "verify_render_files_exist": False,
                     "install_resources": True,
                     "resources_exist": True,
-                    "set_config": True,
+                    "configure": True,
                     "render_service": True,
                 },
                 {
                     "verify_render_files_exist": True,
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "set_config": True,
+                    "configure": True,
                     "render_service": True,
                 },
                 False,
@@ -156,8 +157,8 @@ class TestRendarableExporter(unittest.TestCase):
         self.exporter.install_resources.return_value = True
         self.exporter.resources_exist = mock.MagicMock()
         self.exporter.resources_exist.return_value = False
-        self.exporter.set_config = mock.MagicMock()
-        self.exporter.set_config.return_value = True
+        self.exporter.configure = mock.MagicMock()
+        self.exporter.configure.return_value = True
         self.exporter.render_service = mock.MagicMock()
         self.exporter.render_service.return_value = True
 
@@ -166,7 +167,7 @@ class TestRendarableExporter(unittest.TestCase):
 
         self.exporter.install_resources.assert_called()
         self.exporter.resources_exist.assert_called()
-        self.exporter.set_config.assert_not_called()
+        self.exporter.configure.assert_not_called()
         self.exporter.render_service.assert_not_called()
 
         self.mock_systemd.daemon_reload.assert_not_called()
@@ -327,7 +328,7 @@ class TestRendarableExporter(unittest.TestCase):
         self.exporter._set_config_content.return_value = "some-config-content"
         mock_write_to_file.return_value = "some-result"
 
-        result = self.exporter.set_config()
+        result = self.exporter.configure()
 
         mock_write_to_file.assert_called_with("some-path", "some-config-content", mode=0o600)
         self.assertEqual("some-result", result)
@@ -337,7 +338,7 @@ class TestRendarableExporter(unittest.TestCase):
         self.exporter.exporter_config_path = None
         mock_write_to_file.return_value = "some-result"
 
-        result = self.exporter.set_config()
+        result = self.exporter.configure()
 
         mock_write_to_file.assert_not_called()
         self.assertEqual(True, result)
@@ -756,7 +757,7 @@ class TestSmartMetricExporter(unittest.TestCase):
         self.exporter.render_service = mock.MagicMock()
         self.exporter.render_service.return_value = service_render_success
 
-        result = self.exporter.set_config()
+        result = self.exporter.configure()
         self.assertEqual(result, service_render_success)
 
     def test_hw_tools(self):
@@ -877,6 +878,273 @@ class TestWriteToFile(unittest.TestCase):
 
         # Assert calls and result
         self.assertFalse(result)
+
+
+# create a class from SnapExporter to be tested
+class MySnapExporter(service.SnapExporter):
+    exporter_name = "my-exporter"
+    channel = "my-channel"
+
+
+@mock.patch("service.snap.SnapCache")
+@mock.patch("service.snap")
+def test_snap_exporter_hw_tools(mock_snap, _):
+    exporter = MySnapExporter(mock.MagicMock())
+
+    assert exporter.hw_tools() == set()
+
+
+@mock.patch("service.snap.SnapCache")
+@mock.patch("service.SnapExporter.configure")
+@mock.patch("service.SnapExporter.enable_and_start")
+@mock.patch("service.snap")
+def test_snap_exporter_install(mock_snap, mock_enable_and_start, mock_configure, _):
+    exporter = MySnapExporter(mock.MagicMock())
+
+    assert exporter.install() is True
+    mock_snap.add.assert_called_with("my-exporter", channel="my-channel")
+    mock_configure.assert_called_once()
+    mock_enable_and_start.assert_called_once()
+
+
+@mock.patch("service.snap.SnapCache")
+@mock.patch("service.SnapExporter.configure")
+@mock.patch("service.SnapExporter.enable_and_start")
+@mock.patch("service.snap")
+def test_snap_exporter_install_fail(mock_snap, mock_enable_and_start, mock_configure, _):
+    exporter = MySnapExporter(mock.MagicMock())
+    mock_snap.add.side_effect = ValueError
+
+    assert exporter.install() is False
+    mock_snap.add.assert_called_with("my-exporter", channel="my-channel")
+    mock_configure.assert_not_called()
+    mock_enable_and_start.assert_not_called()
+
+
+@mock.patch("service.snap.SnapCache")
+@mock.patch("service.SnapExporter.configure")
+@mock.patch("service.SnapExporter.enable_and_start")
+@mock.patch("service.snap")
+def test_snap_exporter_install_configure_fail(mock_snap, mock_enable_and_start, mock_configure, _):
+    exporter = MySnapExporter(mock.MagicMock())
+    mock_configure.return_value = False
+
+    assert exporter.install() is False
+    mock_snap.add.assert_called_with("my-exporter", channel="my-channel")
+    mock_enable_and_start.assert_not_called()
+
+
+@mock.patch("service.snap.SnapCache")
+@mock.patch("service.snap")
+def test_snap_exporter_uninstall(mock_snap, mock_snap_cache):
+    mock_snap_client = mock.MagicMock()
+    mock_snap_client.present = False
+    mock_snap_cache.return_value = {"my-exporter": mock_snap_client}
+
+    exporter = MySnapExporter(mock.MagicMock())
+
+    assert exporter.uninstall() is True
+    mock_snap.remove.assert_called_with([exporter.exporter_name])
+
+
+@mock.patch("service.snap.SnapCache")
+@mock.patch("service.snap")
+def test_snap_exporter_uninstall_fail(mock_snap, mock_snap_cache):
+    mock_snap_client = mock.MagicMock()
+    mock_snap_cache.return_value = {"my-exporter": mock_snap_client}
+    mock_snap.remove.side_effect = ValueError
+
+    exporter = MySnapExporter(mock.MagicMock())
+
+    assert exporter.uninstall() is False
+    mock_snap.remove.assert_called_with([exporter.exporter_name])
+
+
+@mock.patch("service.snap.SnapCache")
+@mock.patch("service.snap")
+def test_snap_exporter_uninstall_present(mock_snap, mock_snap_cache):
+    mock_snap_client = mock.MagicMock()
+    # for some reason the snao is still present even after the removal
+    mock_snap_client.present = True
+    mock_snap_cache.return_value = {"my-exporter": mock_snap_client}
+
+    exporter = MySnapExporter(mock.MagicMock())
+
+    assert exporter.uninstall() is False
+    mock_snap.remove.assert_called_with([exporter.exporter_name])
+
+
+@mock.patch("service.snap.SnapCache")
+def test_snap_exporter_enable_and_start(mock_snap_cache):
+    mock_snap_client = mock.MagicMock()
+    mock_snap_client.services = {"service1": {}, "service2": {}}
+    mock_snap_cache.return_value = {"my-exporter": mock_snap_client}
+
+    exporter = MySnapExporter(mock.MagicMock())
+
+    exporter.enable_and_start()
+    mock_snap_client.start.assert_called_once_with(["service1", "service2"], enable=True)
+
+
+@mock.patch("service.snap.SnapCache")
+def test_snap_exporter_disable_and_stop(mock_snap_cache):
+    mock_snap_client = mock.MagicMock()
+    mock_snap_client.services = {"service1": {}, "service2": {}}
+    mock_snap_cache.return_value = {"my-exporter": mock_snap_client}
+
+    exporter = MySnapExporter(mock.MagicMock())
+
+    exporter.disable_and_stop()
+    mock_snap_client.stop.assert_called_once_with(["service1", "service2"], disable=True)
+
+
+@mock.patch("service.snap.SnapCache")
+def test_snap_exporter_restart(mock_snap_cache):
+    mock_snap_client = mock.MagicMock()
+    mock_snap_client.services = {"service1": {}, "service2": {}}
+    mock_snap_cache.return_value = {"my-exporter": mock_snap_client}
+
+    exporter = MySnapExporter(mock.MagicMock())
+
+    exporter.restart()
+    mock_snap_client.restart.assert_called_once_with(["service1", "service2"])
+
+
+@pytest.mark.parametrize(
+    "services, expected",
+    [
+        # all services active
+        (
+            {
+                "service_1": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": True,
+                    "activators": [],
+                },
+                "service_2": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": True,
+                    "activators": [],
+                },
+            },
+            True,
+        ),
+        # at least one services down
+        (
+            {
+                "service_1": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": False,
+                    "activators": [],
+                },
+                "service_2": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": True,
+                    "activators": [],
+                },
+            },
+            False,
+        ),
+        # all services down
+        (
+            {
+                "service_1": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": False,
+                    "activators": [],
+                },
+                "service_2": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": False,
+                    "activators": [],
+                },
+            },
+            False,
+        ),
+        # snap without service
+        ({}, True),
+    ],
+)
+@mock.patch("service.snap.SnapCache")
+def test_snap_exporter_check_health(mock_snap_cache, services, expected):
+    mock_snap_client = mock.MagicMock()
+    mock_snap_client.services = services
+    mock_snap_cache.return_value = {"my-exporter": mock_snap_client}
+
+    exporter = MySnapExporter(mock.MagicMock())
+    assert exporter.check_health() is expected
+
+
+@mock.patch("service.snap.SnapCache")
+def test_snap_exporter_configure(_):
+    exporter = MySnapExporter(mock.MagicMock())
+
+    assert exporter.configure() is True
+
+
+def test_dcgm_exporter():
+    mock_config = {
+        "dcgm-snap-channel": "latest/stable",
+        "dcgm-exporter-port": "9400",
+    }
+
+    exporter = service.DCGMExporter(mock_config)
+    assert exporter.channel == "latest/stable"
+    assert exporter.port == 9400
+    assert exporter.exporter_name == "dcgm"
+    assert exporter.hw_tools() == {HWTool.DCGM}
+
+
+@mock.patch("service.SnapExporter._install")
+@mock.patch("service.snap.SnapCache")
+def test_dcgm_exporter_configure(mock_snap_cache, mock_install):
+    mock_install.return_value = True
+    mock_snap_client = mock.MagicMock()
+    mock_snap_cache.return_value = {"dcgm": mock_snap_client}
+
+    mock_config = {
+        "dcgm-snap-channel": "latest/stable",
+        "dcgm-exporter-port": "9400",
+    }
+
+    exporter = service.DCGMExporter(mock_config)
+
+    assert exporter.configure() is True
+
+    mock_snap_client.set.assert_called_once_with(config={"dcgm-exporter-address": ":9400"})
+    mock_snap_client.restart.assert_called_once()
+
+
+@mock.patch("service.SnapExporter._install")
+@mock.patch("service.snap.SnapCache")
+def test_dcgm_exporter_configure_install_fails(mock_snap_cache, mock_install):
+    mock_install.return_value = False
+    mock_snap_client = mock.MagicMock()
+    mock_snap_cache.return_value = {"dcgm": mock_snap_client}
+
+    mock_config = {
+        "dcgm-snap-channel": "latest/stable",
+        "dcgm-exporter-port": "9400",
+    }
+
+    exporter = service.DCGMExporter(mock_config)
+
+    assert exporter.configure() is False
+
+    mock_snap_client.set.assert_not_called()
+    mock_snap_client.restart.assert_not_called()
 
 
 if __name__ == "__main__":
