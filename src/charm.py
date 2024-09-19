@@ -71,7 +71,6 @@ class HardwareObserverCharm(ops.CharmBase):
         """Return list of exporters based on detected hardware."""
         exporters: List[BaseExporter] = []
         stored_tools = self.get_stored_tools()
-        # breakpoint()
         if stored_tools & HardwareExporter.hw_tools():
             exporters.append(
                 HardwareExporter(

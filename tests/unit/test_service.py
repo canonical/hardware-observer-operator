@@ -324,8 +324,8 @@ class TestRendarableExporter(unittest.TestCase):
     @mock.patch("service.write_to_file")
     def test_set_config_okay(self, mock_write_to_file):
         self.exporter.exporter_config_path = "some-path"
-        self.exporter._set_config_content = mock.MagicMock()
-        self.exporter._set_config_content.return_value = "some-config-content"
+        self.exporter._render_config_content = mock.MagicMock()
+        self.exporter._render_config_content.return_value = "some-config-content"
         mock_write_to_file.return_value = "some-result"
 
         result = self.exporter.configure()
@@ -343,8 +343,8 @@ class TestRendarableExporter(unittest.TestCase):
         mock_write_to_file.assert_not_called()
         self.assertEqual(True, result)
 
-    def test__set_config_content(self):
-        result = self.exporter._set_config_content()
+    def test__render_config_content(self):
+        result = self.exporter._render_config_content()
         self.assertEqual(result, "")
 
     @parameterized.expand(
@@ -466,9 +466,9 @@ class TestHardwareExporter(unittest.TestCase):
             self.exporter.validate_exporter_configs(),
         )
 
-    def test_set_config_content_redfish_not_available(self):
+    def test_render_config_content_redfish_not_available(self):
         """Test render config content redfish not available."""
-        content = self.exporter._set_config_content()
+        content = self.exporter._render_config_content()
         content_config = yaml.safe_load(content)
         self.assertEqual(content_config["port"], 10200)
         self.assertEqual(content_config["level"], "INFO")
@@ -481,7 +481,7 @@ class TestHardwareExporter(unittest.TestCase):
         self.assertNotIn("redfish_password", content_config)
         self.assertNotIn("redfish_client_timeout", content_config)
 
-    def test_set_config_content_redfish_available_and_disabled(self):
+    def test_render_config_content_redfish_available_and_disabled(self):
         """Test render config content redfish is available but disabled."""
         self.exporter.available_tools = {HWTool.REDFISH, HWTool.IPMI_DCMI}
         self.exporter.config = {
@@ -492,7 +492,7 @@ class TestHardwareExporter(unittest.TestCase):
             "redfish-password": "my-pwd",
             "redfish-disable": True,
         }
-        content = self.exporter._set_config_content()
+        content = self.exporter._render_config_content()
         content_config = yaml.safe_load(content)
         self.assertEqual(content_config["port"], 10200)
         self.assertEqual(content_config["level"], "INFO")
@@ -502,7 +502,7 @@ class TestHardwareExporter(unittest.TestCase):
         self.assertNotIn("redfish_password", content_config)
         self.assertNotIn("redfish_client_timeout", content_config)
 
-    def test_set_config_content_redfish_available_and_enabled(self):
+    def test_render_config_content_redfish_available_and_enabled(self):
         """Test render config content when redfish is available and enabled."""
         self.exporter.available_tools = {HWTool.REDFISH}
         self.exporter.config = {
@@ -513,7 +513,7 @@ class TestHardwareExporter(unittest.TestCase):
             "redfish-password": "my-pwd",
             "redfish-disable": False,
         }
-        content = self.exporter._set_config_content()
+        content = self.exporter._render_config_content()
         content_config = yaml.safe_load(content)
         self.assertEqual(content_config["port"], 10200)
         self.assertEqual(content_config["level"], "INFO")

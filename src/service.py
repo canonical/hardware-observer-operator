@@ -167,13 +167,13 @@ class RendarableExporter(BaseExporter):
         return write_to_file(self.exporter_service_path, content)
 
     def configure(self) -> bool:
-        """Set exporter config file by rendering templates."""
+        """Configure the exporter by rendering templates."""
         if self.exporter_config_path is not None:
-            content = self._set_config_content()
+            content = self._render_config_content()
             return write_to_file(self.exporter_config_path, content, mode=0o600)
         return True
 
-    def _set_config_content(self) -> str:
+    def _render_config_content(self) -> str:
         """Overwrite this method to render config content."""
         return ""
 
@@ -450,7 +450,6 @@ class DCGMExporter(SnapExporter):
     def __init__(self, config: ConfigData):
         """Init."""
         super().__init__(config)
-        # breakpoint()
         self.channel = str(self.config["dcgm-snap-channel"])
         self.port = int(self.config["dcgm-exporter-port"])
 
@@ -487,7 +486,7 @@ class HardwareExporter(RendarableExporter):
         self.collect_timeout = int(config["collect-timeout"])
         self.bmc_address = get_bmc_address()
 
-    def _set_config_content(self) -> str:
+    def _render_config_content(self) -> str:
         """Render and install exporter config file."""
         collectors = set()
         for tool in self.enabled_tools:
