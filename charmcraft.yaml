@@ -14,22 +14,36 @@ bases:
   - build-on:
     - name: ubuntu
       channel: "22.04"
-      architectures: ["amd64", "arm64"]
+      architectures: ["amd64"]
     run-on:
       - name: ubuntu
         channel: "24.04"
         architectures:
           - amd64
-          - arm64
       - name: ubuntu
         channel: "22.04"
         architectures:
           - amd64
-          - arm64
       - name: ubuntu
         channel: "20.04"
         architectures:
           - amd64
+  - build-on:
+    - name: ubuntu
+      channel: "22.04"
+      architectures: ["arm64"]
+    run-on:
+      - name: ubuntu
+        channel: "24.04"
+        architectures:
+          - arm64
+      - name: ubuntu
+        channel: "22.04"
+        architectures:
+          - arm64
+      - name: ubuntu
+        channel: "20.04"
+        architectures:
           - arm64
 
 actions:
