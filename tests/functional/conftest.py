@@ -1,4 +1,5 @@
 import logging
+import platform
 
 import pytest
 from utils import RESOURCES_DIR, Resource
@@ -39,6 +40,14 @@ def pytest_addoption(parser):
 @pytest.fixture(scope="module")
 def series(request):
     return request.config.getoption("--series")
+
+
+@pytest.fixture(scope="module")
+def architecture():
+    machine = platform.machine()
+    if machine == "aarch64":
+        return "arm64"
+    return "amd64"
 
 
 @pytest.fixture(scope="module")
