@@ -36,6 +36,7 @@ from hw_tools import (
     SAS3IRCUStrategy,
     SmartCtlExporterStrategy,
     SmartCtlStrategy,
+    SnapStrategy,
     SSACLIStrategy,
     StorCLIStrategy,
     StrategyABC,
@@ -131,7 +132,7 @@ class TestHWToolHelper(unittest.TestCase):
         self.harness.begin()
         self.addCleanup(self.harness.cleanup)
 
-        self.hw_tool_helper = HWToolHelper()
+        self.hw_tool_helper = HWToolHelper(mock.MagicMock())
 
     def test_01_strategies(self):
         """Check strategies define correctly."""
@@ -1137,3 +1138,130 @@ class TestIPMIHWVerifier(unittest.TestCase):
             output = bmc_hw_verifier()
             mock_apt_helpers.add_pkg_with_candidate_version.assert_called_with("freeipmi-tools")
             self.assertCountEqual(output, [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL])
+
+
+@pytest.fixture
+def snap_exporter():
+    my_hw_tool = mock.MagicMock()
+    my_hw_tool.value = "my-snap"
+
+    class MySnapStrategy(SnapStrategy):
+        channel = "my-channel/stable"
+        _name = my_hw_tool
+
+    strategy = MySnapStrategy()
+    yield strategy
+
+
+@pytest.fixture
+def mock_snap_lib():
+    with mock.patch("hw_tools.snap") as mock_snap:
+        yield mock_snap
+    mock_snap.reset_mock()
+
+
+def test_snap_strategy_name(snap_exporter):
+    assert snap_exporter.snap == "my-snap"
+
+
+def test_snap_strategy_channel(snap_exporter):
+    assert snap_exporter.channel == "my-channel/stable"
+
+
+def test_snap_strategy_install_success(snap_exporter, mock_snap_lib):
+    snap_exporter.install()
+    mock_snap_lib.add.assert_called_once_with(snap_exporter.snap, channel=snap_exporter.channel)
+
+
+def test_snap_strategy_install_fail(snap_exporter, mock_snap_lib):
+    mock_snap_lib.add.side_effect = ValueError
+
+    with pytest.raises(ValueError):
+        snap_exporter.install()
+
+
+def test_snap_strategy_remove_success(snap_exporter, mock_snap_lib):
+    snap_exporter.remove()
+    mock_snap_lib.remove.assert_called_once_with([snap_exporter.snap])
+
+
+def test_snap_strategy_remove_fail(snap_exporter, mock_snap_lib):
+    mock_snap_lib.remove.side_effect = ValueError
+
+    with pytest.raises(ValueError):
+        snap_exporter.remove()
+
+
+@pytest.mark.parametrize(
+    "services, expected",
+    [
+        # all services active
+        (
+            {
+                "service_1": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": True,
+                    "activators": [],
+                },
+                "service_2": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": True,
+                    "activators": [],
+                },
+            },
+            True,
+        ),
+        # at least one services down
+        (
+            {
+                "service_1": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": False,
+                    "activators": [],
+                },
+                "service_2": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": True,
+                    "activators": [],
+                },
+            },
+            False,
+        ),
+        # all services down
+        (
+            {
+                "service_1": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": False,
+                    "activators": [],
+                },
+                "service_2": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": False,
+                    "activators": [],
+                },
+            },
+            False,
+        ),
+        # snap without service
+        ({}, True),
+    ],
+)
+def test_snap_strategy_check(snap_exporter, mock_snap_lib, services, expected):
+    mock_snap_client = mock.MagicMock()
+    mock_snap_client.services = services
+    mock_snap_lib.SnapCache.return_value = {"my-snap": mock_snap_client}
+
+    assert snap_exporter.check() is expected

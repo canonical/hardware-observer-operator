@@ -18,7 +18,8 @@ from typing import Dict, List, Set, Tuple
 import requests
 import urllib3
 from charms.operator_libs_linux.v0 import apt
-from ops.model import ModelError, Resources
+from charms.operator_libs_linux.v2 import snap
+from ops.model import ConfigData, ModelError, Resources
 
 import apt_helpers
 from checksum import (
@@ -185,6 +186,57 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     @abstractmethod
     def remove(self) -> None:
         """Remove details."""
+
+
+class SnapStrategy(StrategyABC):
+    """Snap strategy class."""
+
+    channel: str
+
+    @property
+    def snap(self) -> str:
+        """Snap name."""
+        return self._name.value
+
+    def install(self) -> None:
+        """Install the snap from a channel."""
+        try:
+            snap.add(self.snap, channel=self.channel)
+            logger.info("Installed %s from channel: %s", self.snap, self.channel)
+
+        # using the snap.SnapError will result into:
+        # TypeError: catching classes that do not inherit from BaseException is not allowed
+        except Exception as err:  # pylint: disable=broad-except
+            logger.error("Failed to install %s from channel: %s: %s", self.snap, self.channel, err)
+            raise err
+
+    def remove(self) -> None:
+        """Remove the snap."""
+        try:
+            snap.remove([self.snap])
+
+        # using the snap.SnapError will result into:
+        # TypeError: catching classes that do not inherit from BaseException is not allowed
+        except Exception as err:  # pylint: disable=broad-except
+            logger.error("Failed to remove %s: %s", self.snap, err)
+            raise err
+
+    def check(self) -> bool:
+        """Check if all services are active."""
+        return all(
+            service.get("active", False)
+            for service in snap.SnapCache()[self.snap].services.values()
+        )
+
+
+class DCGMExporterStrategy(SnapStrategy):
+    """DCGM strategy class."""
+
+    _name = HWTool.DCGM
+
+    def __init__(self, channel: str) -> None:
+        """Init."""
+        self.channel = channel
 
 
 class StorCLIStrategy(TPRStrategyABC):
@@ -615,6 +667,10 @@ def detect_available_tools() -> Set[HWTool]:
 class HWToolHelper:
     """Helper to install vendor's or hardware related tools."""
 
+    def __init__(self, config: ConfigData) -> None:
+        """Init."""
+        self.config = config
+
     @property
     def strategies(self) -> List[StrategyABC]:
         """Define strategies for every tools."""
@@ -629,6 +685,7 @@ class HWToolHelper:
             IPMISENSORStrategy(),
             RedFishStrategy(),
             SmartCtlStrategy(),
+            DCGMExporterStrategy(str(self.config["dcgm-snap-channel"])),
         ]
 
     def fetch_tools(  # pylint: disable=W0102
@@ -694,7 +751,7 @@ class HWToolHelper:
                     if path:
                         strategy.install(path)
 
-                elif isinstance(strategy, APTStrategyABC):
+                elif isinstance(strategy, (APTStrategyABC, SnapStrategy)):
                     strategy.install()  # pylint: disable=E1120
                 logger.info("Strategy %s install success", strategy)
             except (
@@ -716,7 +773,7 @@ class HWToolHelper:
         for strategy in self.strategies:
             if strategy.name not in hw_available:
                 continue
-            if isinstance(strategy, (TPRStrategyABC, APTStrategyABC)):
+            if isinstance(strategy, (TPRStrategyABC, APTStrategyABC, SnapStrategy)):
                 strategy.remove()
             logger.info("Strategy %s remove success", strategy)
 

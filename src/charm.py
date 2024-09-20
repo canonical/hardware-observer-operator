@@ -26,7 +26,7 @@ class HardwareObserverCharm(ops.CharmBase):
     def __init__(self, *args: Any) -> None:
         """Init."""
         super().__init__(*args)
-        self.hw_tool_helper = HWToolHelper()
+        self.hw_tool_helper = HWToolHelper(self.model.config)
 
         # Add refresh_events to COSAgentProvider to update relation data when
         # config changed (default behavior) and upgrade charm. This is useful
@@ -37,7 +37,7 @@ class HardwareObserverCharm(ops.CharmBase):
             metrics_endpoints=[
                 {"path": "/metrics", "port": int(self.model.config["hardware-exporter-port"])},
                 {"path": "/metrics", "port": int(self.model.config["smartctl-exporter-port"])},
-                {"path": "/metrics", "port": int(self.model.config["dcgm-exporter-port"])},
+                {"path": "/metrics", "port": 9400},
             ],
             # Setting scrape_timeout as collect_timeout in the `duration` format specified in
             # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration
@@ -83,7 +83,7 @@ class HardwareObserverCharm(ops.CharmBase):
         if stored_tools & SmartCtlExporter.hw_tools():
             exporters.append(SmartCtlExporter(self.charm_dir, self.model.config))
 
-        if DCGMExporter.hw_tools() & stored_tools:
+        if stored_tools & DCGMExporter.hw_tools():
             exporters.append(DCGMExporter(self.model.config))
 
         return exporters

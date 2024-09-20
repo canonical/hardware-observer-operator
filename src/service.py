@@ -22,7 +22,7 @@ from config import (
     HWTool,
 )
 from hardware import get_bmc_address
-from hw_tools import SmartCtlExporterStrategy
+from hw_tools import DCGMExporterStrategy, SmartCtlExporterStrategy, SnapStrategy
 
 logger = getLogger(__name__)
 
@@ -84,8 +84,8 @@ class BaseExporter(ABC):
         return True, "Exporter config is valid."
 
 
-class RendarableExporter(BaseExporter):
-    """A class representing a exporter that needs to render its configuration."""
+class RenderableExporter(BaseExporter):
+    """A class representing an exporter that needs to render its configuration."""
 
     # pylint: disable=too-many-instance-attributes
 
@@ -309,7 +309,7 @@ def remove_file(path: Path) -> bool:
     return success
 
 
-class SmartCtlExporter(RendarableExporter):
+class SmartCtlExporter(RenderableExporter):
     """A class representing the smartctl exporter and the metric endpoints."""
 
     required_config: bool = False
@@ -375,11 +375,12 @@ class SnapExporter(BaseExporter):
 
     exporter_name: str
     channel: str
+    strategy: SnapStrategy
 
     def __init__(self, config: ConfigData):
         """Init."""
         self.config = config
-        self.snap_client = snap.SnapCache()[self.exporter_name]
+        self.snap_client = snap.SnapCache()[self.strategy.snap]
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
@@ -388,35 +389,21 @@ class SnapExporter(BaseExporter):
 
     def install(self) -> bool:
         """Install the snap from a channel."""
-        if not self._install() or not self.configure():
-            return False
-
-        self.enable_and_start()
-        return True
-
-    def _install(self) -> bool:
         try:
-            snap.add(self.exporter_name, channel=self.channel)
-            logger.info("Installed %s from channel: %s", self.exporter_name, self.channel)
-            return True
-
-        # using the snap.SnapError will result into:
-        # TypeError: catching classes that do not inherit from BaseException is not allowed
-        except Exception as err:  # pylint: disable=broad-except
-            logger.error(
-                "Failed to install %s from channel: %s: %s", self.exporter_name, self.channel, err
-            )
+            self.strategy.install()
+            return self.snap_client.present is True
+        except Exception:  # pylint: disable=broad-except
             return False
 
     def uninstall(self) -> bool:
         """Uninstall the snap."""
         try:
-            snap.remove([self.exporter_name])
+            self.strategy.remove()
 
         # using the snap.SnapError will result into:
         # TypeError: catching classes that do not inherit from BaseException is not allowed
         except Exception as err:  # pylint: disable=broad-except
-            logger.error("Failed to remove %s: %s", self.exporter_name, err)
+            logger.error("Failed to remove %s: %s", self.strategy.snap, err)
             return False
 
         return self.snap_client.present is False
@@ -435,11 +422,11 @@ class SnapExporter(BaseExporter):
 
     def check_health(self) -> bool:
         """Check if all services are active."""
-        return all(service.get("active", False) for service in self.snap_client.services.values())
+        return self.strategy.check()
 
     def configure(self) -> bool:
-        """Set the necessary exporter configurations."""
-        return True
+        """Set the necessary exporter configurations or change snap channel."""
+        return self.install()
 
 
 class DCGMExporter(SnapExporter):
@@ -449,27 +436,16 @@ class DCGMExporter(SnapExporter):
 
     def __init__(self, config: ConfigData):
         """Init."""
+        self.strategy = DCGMExporterStrategy(str(config["dcgm-snap-channel"]))
         super().__init__(config)
-        self.channel = str(self.config["dcgm-snap-channel"])
-        self.port = int(self.config["dcgm-exporter-port"])
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
         """Return hardware tools to watch."""
         return {HWTool.DCGM}
 
-    def configure(self) -> bool:
-        """Set the necessary exporter configurations."""
-        # refresh the channel if necessary
-        if not self._install():
-            return False
 
-        self.snap_client.set(config={"dcgm-exporter-address": f":{self.port}"})
-        self.snap_client.restart(list(self.snap_client.services.keys()))
-        return True
-
-
-class HardwareExporter(RendarableExporter):
+class HardwareExporter(RenderableExporter):
     """A class representing the hardware exporter and the metric endpoints."""
 
     required_config: bool = True
