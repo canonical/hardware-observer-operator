@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.8", "3.10"]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
       with:
@@ -53,7 +53,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.8", "3.10"]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
       with:
@@ -83,7 +83,7 @@ jobs:
       fail-fast: false
       matrix:
         runs-on: [[ubuntu-22.04], [Ubuntu_ARM64_4C_16G_01]]
-        test-command: ['tox -e func -- --series focal --keep-models', 'tox -e func -- --series jammy --keep-models']
+        test-command: ['tox -e func -- -v --series focal --keep-model', 'tox -e func -- -v --series jammy --keep-model']
         juju-channel: ["3.4/stable"]
     steps:
 
@@ -91,11 +91,11 @@ jobs:
         with:
           submodules: true
 
-        # arm64 runners don't have make or gcc installed by default
+        # arm64 runners don't have gcc installed by default
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y make gcc
+          sudo apt install -y gcc
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -116,8 +116,22 @@ jobs:
             echo "TEST_MODEL_CONSTRAINTS=arch=arm64" >> "$GITHUB_ENV"
           fi
 
+      - name: Build the charm
+        run: charmcraft -v pack
+
       - name: Run tests
-        run: ${{ matrix.test-command }}
+        run: |
+          # These variables are for a consistent method to find the charm file(s) across all projects.
+          # It is designed to work both with charms that output one file per base,
+          # and charms that output a single file to run on all bases.
+          # Not all charms will use them, and for some charms the variables will resolve to the same file.
+          export CHARM_PATH_NOBLE="$(pwd)/$(ls | grep '.*24.04.*\.charm$')"
+          echo "$CHARM_PATH_NOBLE"
+          export CHARM_PATH_JAMMY="$(pwd)/$(ls | grep '.*22.04.*\.charm$')"
+          echo "$CHARM_PATH_JAMMY"
+          export CHARM_PATH_FOCAL="$(pwd)/$(ls | grep '.*20.04.*\.charm$')"
+          echo "$CHARM_PATH_FOCAL"
+          ${{ matrix.test-command }}
         env:
           TEST_JUJU3: "1"  # https://github.com/openstack-charmers/zaza/pull/653
           TEST_JUJU_CHANNEL: ${{ matrix.juju-channel }}
