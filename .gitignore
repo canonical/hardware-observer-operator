@@ -1,48 +1,45 @@
-# This is a template `.gitignore` file for ops charms
-# This file is managed by bootstack-charms-spec and should not be modified
-# within individual charm repos. https://launchpad.net/bootstack-charms-spec
+# This file is centrally managed as a template file in https://github.com/canonical/solutions-engineering-automation
+# To update the file:
+# - Edit it in the canonical/solutions-engineering-automation repository.
+# - Open a PR with the changes.
+# - When the PR merges, the soleng-terraform bot will open a PR to the target repositories with the changes.
 
-# Juju files
-.unit-state.db
-
-# Byte-compiled / optimized / DLL files
+# Python Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Tests files and dir
+# Test files and directories
 .pytest_cache/
 .coverage
 .tox
-.venv
 reports/
 **/report/
 htmlcov/
 .mypy_cache
 
-# Log files
-*.log
+# python virtual environments (for local dev)
+.venv
+venv
+env
 
-# IDEs
-.idea/
-.vscode/
-
-# vi
-.*.swp
-
-# version data
-repo-info
-version
-
-# Python builds
+# Build artefacts
+output/
+.build/
+build/
+*.charm
+*.snap
+# python build artefacts
 deb_dist/
 dist/
 *.egg-info/
 
-# Snaps
-*.snap
+# Log files
+*.log
 
-# Builds
-.build/
-build/
-*.charm
+# general backup files
+*~
+*.bak
+
+# Note: for editor-specific files, please don't add them here, as they are specific to your environment, not the project.
+# Instead, consider using a global gitignore on your workstation.
