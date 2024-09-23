@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [[ubuntu-22.04]]
+        runs-on: [[ubuntu-22.04], [Ubuntu_ARM64_4C_16G_01]]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
