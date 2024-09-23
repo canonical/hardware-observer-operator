@@ -375,6 +375,7 @@ class SnapExporter(BaseExporter):
 
     exporter_name: str
     channel: str
+    port: int
     strategy: SnapStrategy
 
     def __init__(self, config: ConfigData):
@@ -388,15 +389,23 @@ class SnapExporter(BaseExporter):
         return set()
 
     def install(self) -> bool:
-        """Install the snap from a channel."""
+        """Install the snap from a channel.
+
+        Returns true if the install is successful, false otherwise.
+        """
         try:
             self.strategy.install()
+            # dcgm-exporter is disabled by default
+            self.enable_and_start()
             return self.snap_client.present is True
         except Exception:  # pylint: disable=broad-except
             return False
 
     def uninstall(self) -> bool:
-        """Uninstall the snap."""
+        """Uninstall the snap.
+
+        Returns true if the uninstall is successful, false otherwise.
+        """
         try:
             self.strategy.remove()
 
@@ -418,14 +427,20 @@ class SnapExporter(BaseExporter):
 
     def restart(self) -> None:
         """Restart the exporter daemon."""
-        self.snap_client.restart(list(self.snap_client.services.keys()))
+        self.snap_client.restart(reload=True)
 
     def check_health(self) -> bool:
-        """Check if all services are active."""
+        """Check if all services are active.
+
+        Returns true if the service is healthy, false otherwise.
+        """
         return self.strategy.check()
 
     def configure(self) -> bool:
-        """Set the necessary exporter configurations or change snap channel."""
+        """Set the necessary exporter configurations or change snap channel.
+
+        Returns true if the configure is successful, false otherwise.
+        """
         return self.install()
 
 
@@ -433,6 +448,7 @@ class DCGMExporter(SnapExporter):
     """A class representing the DCGM exporter and the metric endpoints."""
 
     exporter_name: str = "dcgm"
+    port: int = 9400
 
     def __init__(self, config: ConfigData):
         """Init."""

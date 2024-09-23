@@ -132,7 +132,7 @@ class TestHWToolHelper(unittest.TestCase):
         self.harness.begin()
         self.addCleanup(self.harness.cleanup)
 
-        self.hw_tool_helper = HWToolHelper(mock.MagicMock())
+        self.hw_tool_helper = HWToolHelper()
 
     def test_01_strategies(self):
         """Check strategies define correctly."""

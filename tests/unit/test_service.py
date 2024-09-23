@@ -954,7 +954,7 @@ def test_snap_exporter_disable_and_stop(snap_exporter):
 
 def test_snap_exporter_restart(snap_exporter):
     snap_exporter.restart()
-    snap_exporter.snap_client.restart.assert_called_once_with(["service1", "service2"])
+    snap_exporter.snap_client.restart.assert_called_once_with(reload=True)
 
 
 def test_snap_exporter_check_health(snap_exporter):
