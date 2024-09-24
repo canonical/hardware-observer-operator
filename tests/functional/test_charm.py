@@ -56,7 +56,7 @@ class AppStatus(str, Enum):
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
 async def test_build_and_deploy(  # noqa: C901, function is too complex
-    ops_test: OpsTest, series, provided_collectors, required_resources
+    ops_test: OpsTest, series, architecture, provided_collectors, required_resources
 ):
     """Build the charm-under-test and deploy it together with related charms.
 
@@ -66,6 +66,11 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
     # Build and deploy charm from local source folder
     charm = await ops_test.build_charm(".")
     assert charm, "Charm was not built successfully."
+
+    # This is required for subordinate appliation to choose right revison
+    # on different architecture.
+    # See issue: https://bugs.launchpad.net/juju/+bug/2067749
+    await ops_test.model.set_constraints({"arch": architecture})
 
     bundle_template_path = get_this_script_dir() / "bundle.yaml.j2"
 

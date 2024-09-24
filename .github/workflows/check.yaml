@@ -1,11 +1,16 @@
-name: Check workflow running linter, unit and functional tests
+# This file is centrally managed as a template file in https://github.com/canonical/solutions-engineering-automation
+# To update the file:
+# - Edit it in the canonical/solutions-engineering-automation repository.
+# - Open a PR with the changes.
+# - When the PR merges, the soleng-terraform bot will open a PR to the target repositories with the changes.
+name: Tests
 
 on:
   workflow_call:
   workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: [master, main]
+    branches: [main]
     paths-ignore:
       - "**.md"
       - "**.rst"
@@ -15,29 +20,155 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-unit:
-    uses: canonical/bootstack-actions/.github/workflows/lint-unit.yaml@v2
+  lint:
+    name: Lint
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.8", "3.10"]
-    with:
-      python-version: ${{ matrix.python-version }}
-      tox-version: "<4"
-  
-  func:
-    uses: canonical/bootstack-actions/.github/workflows/func.yaml@v2
-    needs: [lint-unit, promtool]
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # pin tox to the current major version to avoid
+        # workflows breaking all at once when a new major version is released.
+        python -m pip install 'tox<5'
+
+    - name: Run linters
+      run: tox -e lint
+
+  unit:
+    name: Unit
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - juju-channel: "3.4/stable"
-            command: "FUNC_ARGS='--series jammy' make functional"
-    with:
-      command: ${{ matrix.command }}
-      juju-channel: ${{ matrix.juju-channel }}
-      nested-containers: false
-      provider: "lxd"
-      python-version: "3.10"
-      timeout-minutes: 120
+        python-version: ["3.8", "3.10"]
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install 'tox<5'
+
+    - name: Run unit tests
+      run: tox -e unit
+
+  func:
+    needs:
+      - lint
+      - unit
+    name: functional tests
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [[ubuntu-22.04], [Ubuntu_ARM64_4C_16G_01]]
+        test-command: ['tox -e func -- -v --series focal --keep-models', 'tox -e func -- -v --series jammy --keep-models']
+        juju-channel: ["3.4/stable"]
+    steps:
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+        # arm64 runners don't have gcc installed by default
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y gcc
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Setup Juju environment
+        uses: charmed-kubernetes/actions-operator@main
+        with:
+          provider: "lxd"
+          juju-channel: ${{ matrix.juju-channel }}
+          charmcraft-channel: "2.x/stable"
+
+        # This is used by zaza in the functional tests for non-amd64 architectures (if applicable)
+      - name: Set zaza juju model constraints for architecture
+        run: |
+          if [ "$(uname -m)" = "aarch64" ]; then
+            echo "TEST_MODEL_CONSTRAINTS=arch=arm64" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build the charm
+        run: charmcraft -v pack
+
+      - name: Run tests
+        run: |
+          # These variables are for a consistent method to find the charm file(s) across all projects.
+          # It is designed to work both with charms that output one file per base,
+          # and charms that output a single file to run on all bases.
+          # Not all charms will use them, and for some charms the variables will resolve to the same file.
+          export CHARM_PATH_NOBLE="$(pwd)/$(ls | grep '.*24.04.*\.charm$')"
+          echo "$CHARM_PATH_NOBLE"
+          export CHARM_PATH_JAMMY="$(pwd)/$(ls | grep '.*22.04.*\.charm$')"
+          echo "$CHARM_PATH_JAMMY"
+          export CHARM_PATH_FOCAL="$(pwd)/$(ls | grep '.*20.04.*\.charm$')"
+          echo "$CHARM_PATH_FOCAL"
+          ${{ matrix.test-command }}
+        env:
+          TEST_JUJU3: "1"  # https://github.com/openstack-charmers/zaza/pull/653
+          TEST_JUJU_CHANNEL: ${{ matrix.juju-channel }}
+
+      # Save output for debugging
+
+      - name: Generate debugging information
+        if: always()
+        run: |
+          set -x
+          # install dependencies
+          sudo snap install --classic juju-crashdump
+          sudo apt install -y jq uuid
+
+          # Print juju controller information for debugging
+          # to check controller and client are compatible versions;
+          # we can have a mismatch if using an external controller.
+          juju version
+          juju controllers
+
+          models="$(juju models --format json | jq -r '.models[]."short-name"')"
+          dir="$(mktemp -d)"
+          # Use a different dir to avoid charmed-kubernetes/actions-operator from also trying to upload crashdumps.
+          # We don't want to rely on that action, because it doesn't use a descriptive enough name for the artefact,
+          # and we may stop using that action soon.
+          echo "CRASHDUMPS_DIR=$dir" | tee -a "$GITHUB_ENV"
+          echo "CRASHDUMPS_ARTEFACT_SUFFIX=$(uuid)-$(uname -m)" | tee -a "$GITHUB_ENV"
+
+          for model in $models; do
+            # show status here for quick debugging
+            juju status -m "$model"
+            juju-crashdump --as-root -m "$model" -u "$model-$(uname -m)" -o "$dir"
+          done
+
+      - name: Upload juju crashdumps
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: "juju-crashdumps-${{ env.CRASHDUMPS_ARTEFACT_SUFFIX }}"
+          path: "${{ env.CRASHDUMPS_DIR }}/juju-crashdump-*.tar.xz"

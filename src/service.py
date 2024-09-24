@@ -8,6 +8,7 @@ from time import sleep
 from typing import Any, Dict, Optional, Set, Tuple
 
 from charms.operator_libs_linux.v1 import systemd
+from charms.operator_libs_linux.v2 import snap
 from jinja2 import Environment, FileSystemLoader
 from ops.model import ConfigData
 from redfish import redfish_client
@@ -21,7 +22,7 @@ from config import (
     HWTool,
 )
 from hardware import get_bmc_address
-from hw_tools import SmartCtlExporterStrategy
+from hw_tools import DCGMExporterStrategy, SmartCtlExporterStrategy, SnapStrategy
 
 logger = getLogger(__name__)
 
@@ -35,6 +36,56 @@ class ExporterError(Exception):
 
 class BaseExporter(ABC):
     """A class representing the exporter and the metric endpoints."""
+
+    config: ConfigData
+    exporter_name: str
+    port: int
+    log_level: str
+
+    @staticmethod
+    @abstractmethod
+    def hw_tools() -> Set[HWTool]:
+        """Return hardware tools to watch."""
+
+    @abstractmethod
+    def install(self) -> bool:
+        """Install the exporter."""
+
+    @abstractmethod
+    def uninstall(self) -> bool:
+        """Uninstall the exporter."""
+
+    @abstractmethod
+    def check_health(self) -> bool:
+        """Check if the exporter daemon is healthy or not."""
+
+    @abstractmethod
+    def restart(self) -> None:
+        """Restart exporter service with retry."""
+
+    @abstractmethod
+    def enable_and_start(self) -> None:
+        """Enable and start the exporter services."""
+
+    @abstractmethod
+    def disable_and_stop(self) -> None:
+        """Disable and stop the exporter services."""
+
+    @abstractmethod
+    def configure(self) -> bool:
+        """Set exporter config."""
+
+    def validate_exporter_configs(self) -> Tuple[bool, str]:
+        """Validate the static and runtime config options for the exporter."""
+        if not 1 <= self.port <= 65535:
+            logger.error("Invalid exporter port: port must be in [1, 65535].")
+            return False, "Invalid config: exporter's port"
+
+        return True, "Exporter config is valid."
+
+
+class RenderableExporter(BaseExporter):
+    """A class representing an exporter that needs to render its configuration."""
 
     # pylint: disable=too-many-instance-attributes
 
@@ -53,26 +104,6 @@ class BaseExporter(ABC):
         self.exporter_name = self.settings.name
 
         self.log_level = str(config["exporter-log-level"])
-
-    @staticmethod
-    @abstractmethod
-    def hw_tools() -> Set[HWTool]:
-        """Return hardware tools to watch."""
-
-    def validate_exporter_configs(self) -> Tuple[bool, str]:
-        """Validate the static and runtime config options for the exporter."""
-        if not 1 <= self.port <= 65535:
-            logger.error("Invalid exporter port: port must be in [1, 65535].")
-            return False, "Invalid config: exporter's port"
-
-        allowed_log_level_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-        if self.log_level.upper() not in allowed_log_level_choices:
-            logger.error(
-                "Invalid exporter-log-level: log-level must be in %s (case-insensitive).",
-                allowed_log_level_choices,
-            )
-            return False, "Invalid config: 'exporter-log-level'"
-        return True, "Exporter config is valid."
 
     def resources_exist(self) -> bool:
         """Return true if required resources exist.
@@ -135,8 +166,8 @@ class BaseExporter(ABC):
         content = self.service_template.render(**params)
         return write_to_file(self.exporter_service_path, content)
 
-    def render_config(self) -> bool:
-        """Render exporter config file."""
+    def configure(self) -> bool:
+        """Configure the exporter by rendering templates."""
         if self.exporter_config_path is not None:
             content = self._render_config_content()
             return write_to_file(self.exporter_config_path, content, mode=0o600)
@@ -173,8 +204,8 @@ class BaseExporter(ABC):
             return False
 
         # Render config
-        render_config_success = self.render_config()
-        if not render_config_success:
+        configure_success = self.configure()
+        if not configure_success:
             logger.error("Failed to render config files for %s.", self.exporter_name)
             return False
 
@@ -224,6 +255,21 @@ class BaseExporter(ABC):
             logger.error("Exporter %s crashed unexpectedly: %s", self.exporter_name, err)
             raise ExporterError() from err
 
+    def validate_exporter_configs(self) -> Tuple[bool, str]:
+        """Validate the static and runtime config options for the exporter."""
+        valid, msg = super().validate_exporter_configs()
+        if not valid:
+            return valid, msg
+
+        allowed_log_level_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        if self.log_level.upper() not in allowed_log_level_choices:
+            logger.error(
+                "Invalid exporter-log-level: log-level must be in %s (case-insensitive).",
+                allowed_log_level_choices,
+            )
+            return False, "Invalid config: 'exporter-log-level'"
+        return True, "Exporter config is valid."
+
 
 def write_to_file(path: Path, content: str, mode: Optional[int] = None) -> bool:
     """Write to file with provided content."""
@@ -263,7 +309,7 @@ def remove_file(path: Path) -> bool:
     return success
 
 
-class SmartCtlExporter(BaseExporter):
+class SmartCtlExporter(RenderableExporter):
     """A class representing the smartctl exporter and the metric endpoints."""
 
     required_config: bool = False
@@ -287,8 +333,8 @@ class SmartCtlExporter(BaseExporter):
         )
         return service_rendered
 
-    def render_config(self) -> bool:
-        """Override base render_config to render the service file.
+    def configure(self) -> bool:
+        """Override base configure to render the service file.
 
         This is because smartctl_exporter doesn't support providing config file.
         The config options need to be provided as flags while exectuting
@@ -324,7 +370,98 @@ class SmartCtlExporter(BaseExporter):
         return True
 
 
-class HardwareExporter(BaseExporter):
+class SnapExporter(BaseExporter):
+    """A class representing a snap exporter."""
+
+    exporter_name: str
+    channel: str
+    port: int
+    strategy: SnapStrategy
+
+    def __init__(self, config: ConfigData):
+        """Init."""
+        self.config = config
+        self.snap_client = snap.SnapCache()[self.strategy.snap]
+
+    @staticmethod
+    def hw_tools() -> Set[HWTool]:
+        """Return hardware tools to watch."""
+        return set()
+
+    def install(self) -> bool:
+        """Install the snap from a channel.
+
+        Returns true if the install is successful, false otherwise.
+        """
+        try:
+            self.strategy.install()
+            # dcgm-exporter is disabled by default
+            self.enable_and_start()
+            return self.snap_client.present is True
+        except Exception:  # pylint: disable=broad-except
+            return False
+
+    def uninstall(self) -> bool:
+        """Uninstall the snap.
+
+        Returns true if the uninstall is successful, false otherwise.
+        """
+        try:
+            self.strategy.remove()
+
+        # using the snap.SnapError will result into:
+        # TypeError: catching classes that do not inherit from BaseException is not allowed
+        except Exception as err:  # pylint: disable=broad-except
+            logger.error("Failed to remove %s: %s", self.strategy.snap, err)
+            return False
+
+        return self.snap_client.present is False
+
+    def enable_and_start(self) -> None:
+        """Enable and start the exporter services."""
+        self.snap_client.start(list(self.snap_client.services.keys()), enable=True)
+
+    def disable_and_stop(self) -> None:
+        """Disable and stop the services."""
+        self.snap_client.stop(list(self.snap_client.services.keys()), disable=True)
+
+    def restart(self) -> None:
+        """Restart the exporter daemon."""
+        self.snap_client.restart(reload=True)
+
+    def check_health(self) -> bool:
+        """Check if all services are active.
+
+        Returns true if the service is healthy, false otherwise.
+        """
+        return self.strategy.check()
+
+    def configure(self) -> bool:
+        """Set the necessary exporter configurations or change snap channel.
+
+        Returns true if the configure is successful, false otherwise.
+        """
+        return self.install()
+
+
+class DCGMExporter(SnapExporter):
+    """A class representing the DCGM exporter and the metric endpoints."""
+
+    exporter_name: str = "dcgm"
+    port: int = 9400
+
+    def __init__(self, config: ConfigData):
+        """Init."""
+        self.strategy = DCGMExporterStrategy(str(config["dcgm-snap-channel"]))
+        super().__init__(config)
+
+    @staticmethod
+    def hw_tools() -> Set[HWTool]:
+        """Return hardware tools to watch."""
+        return {HWTool.DCGM}
+
+
+class HardwareExporter(RenderableExporter):
     """A class representing the hardware exporter and the metric endpoints."""
 
     required_config: bool = True
