@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+import pytest
 import yaml
 from parameterized import parameterized
 from redfish.rest.v1 import InvalidCredentialsError
@@ -14,7 +15,7 @@ import service
 from config import HARDWARE_EXPORTER_SETTINGS, HWTool
 
 
-class TestBaseExporter(unittest.TestCase):
+class TestRenderableExporter(unittest.TestCase):
     """Test Hardware Exporter methods."""
 
     def setUp(self) -> None:
@@ -36,9 +37,9 @@ class TestBaseExporter(unittest.TestCase):
             "redfish-password": "",
         }
         self.mock_stored_hw_available = {"storcli", "ssacli"}
-        service.BaseExporter.__abstractmethods__ = set()
+        service.RenderableExporter.__abstractmethods__ = set()
 
-        self.exporter = service.BaseExporter(
+        self.exporter = service.RenderableExporter(
             search_path, self.mock_config, HARDWARE_EXPORTER_SETTINGS
         )
 
@@ -48,13 +49,13 @@ class TestBaseExporter(unittest.TestCase):
                 {
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "render_config": True,
+                    "configure": True,
                     "render_service": True,
                 },
                 {
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "render_config": True,
+                    "configure": True,
                     "render_service": True,
                 },
                 True,
@@ -64,13 +65,13 @@ class TestBaseExporter(unittest.TestCase):
                 {
                     "verify_render_files_exist": True,
                     "install_resources": False,
-                    "render_config": True,
+                    "configure": True,
                     "render_service": True,
                 },
                 {
                     "verify_render_files_exist": False,
                     "install_resources": True,
-                    "render_config": False,
+                    "configure": False,
                     "render_service": False,
                 },
                 False,
@@ -80,13 +81,13 @@ class TestBaseExporter(unittest.TestCase):
                 {
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "render_config": False,
+                    "configure": False,
                     "render_service": True,
                 },
                 {
                     "verify_render_files_exist": False,
                     "install_resources": True,
-                    "render_config": True,
+                    "configure": True,
                     "render_service": False,
                 },
                 False,
@@ -96,13 +97,13 @@ class TestBaseExporter(unittest.TestCase):
                 {
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "render_config": True,
+                    "configure": True,
                     "render_service": False,
                 },
                 {
                     "verify_render_files_exist": False,
                     "install_resources": True,
-                    "render_config": True,
+                    "configure": True,
                     "render_service": True,
                 },
                 False,
@@ -113,14 +114,14 @@ class TestBaseExporter(unittest.TestCase):
                     "verify_render_files_exist": False,
                     "install_resources": True,
                     "resources_exist": True,
-                    "render_config": True,
+                    "configure": True,
                     "render_service": True,
                 },
                 {
                     "verify_render_files_exist": True,
                     "verify_render_files_exist": True,
                     "install_resources": True,
-                    "render_config": True,
+                    "configure": True,
                     "render_service": True,
                 },
                 False,
@@ -156,8 +157,8 @@ class TestBaseExporter(unittest.TestCase):
         self.exporter.install_resources.return_value = True
         self.exporter.resources_exist = mock.MagicMock()
         self.exporter.resources_exist.return_value = False
-        self.exporter.render_config = mock.MagicMock()
-        self.exporter.render_config.return_value = True
+        self.exporter.configure = mock.MagicMock()
+        self.exporter.configure.return_value = True
         self.exporter.render_service = mock.MagicMock()
         self.exporter.render_service.return_value = True
 
@@ -166,7 +167,7 @@ class TestBaseExporter(unittest.TestCase):
 
         self.exporter.install_resources.assert_called()
         self.exporter.resources_exist.assert_called()
-        self.exporter.render_config.assert_not_called()
+        self.exporter.configure.assert_not_called()
         self.exporter.render_service.assert_not_called()
 
         self.mock_systemd.daemon_reload.assert_not_called()
@@ -321,23 +322,23 @@ class TestBaseExporter(unittest.TestCase):
         mock_write_to_file.assert_called_with("some-config-path", "some-content")
 
     @mock.patch("service.write_to_file")
-    def test_render_config_okay(self, mock_write_to_file):
+    def test_set_config_okay(self, mock_write_to_file):
         self.exporter.exporter_config_path = "some-path"
         self.exporter._render_config_content = mock.MagicMock()
         self.exporter._render_config_content.return_value = "some-config-content"
         mock_write_to_file.return_value = "some-result"
 
-        result = self.exporter.render_config()
+        result = self.exporter.configure()
 
         mock_write_to_file.assert_called_with("some-path", "some-config-content", mode=0o600)
         self.assertEqual("some-result", result)
 
     @mock.patch("service.write_to_file")
-    def test_render_config_skip(self, mock_write_to_file):
+    def test_set_config_skip(self, mock_write_to_file):
         self.exporter.exporter_config_path = None
         mock_write_to_file.return_value = "some-result"
 
-        result = self.exporter.render_config()
+        result = self.exporter.configure()
 
         mock_write_to_file.assert_not_called()
         self.assertEqual(True, result)
@@ -751,12 +752,12 @@ class TestSmartMetricExporter(unittest.TestCase):
             (False,),
         ]
     )
-    def test_render_config(self, service_render_success):
+    def test_set_config(self, service_render_success):
         """Test render config."""
         self.exporter.render_service = mock.MagicMock()
         self.exporter.render_service.return_value = service_render_success
 
-        result = self.exporter.render_config()
+        result = self.exporter.configure()
         self.assertEqual(result, service_render_success)
 
     def test_hw_tools(self):
@@ -877,6 +878,107 @@ class TestWriteToFile(unittest.TestCase):
 
         # Assert calls and result
         self.assertFalse(result)
+
+
+@pytest.fixture
+def snap_exporter():
+    my_strategy = mock.MagicMock(spec=service.SnapStrategy)
+
+    class MySnapExporter(service.SnapExporter):
+        exporter_name = "my-exporter"
+        channel = "my-channel"
+        strategy = my_strategy
+
+    mock_config = {
+        "dcgm-snap-channel": "latest/stable",
+    }
+
+    with mock.patch("service.snap.SnapCache"):
+        exporter = MySnapExporter(mock_config)
+
+        exporter.snap_client.services = {"service1": {}, "service2": {}}
+
+        yield exporter
+
+        my_strategy.reset_mock()
+
+
+def test_snap_exporter_hw_tools(snap_exporter):
+
+    assert snap_exporter.hw_tools() == set()
+
+
+def test_snap_exporter_install(snap_exporter):
+    snap_exporter.strategy.install.return_value = True
+    snap_exporter.snap_client.present = True
+
+    assert snap_exporter.install() is True
+    snap_exporter.strategy.install.assert_called_once()
+
+
+def test_snap_exporter_install_fail(snap_exporter):
+    snap_exporter.strategy.install.side_effect = ValueError
+
+    assert snap_exporter.install() is False
+
+
+def test_snap_exporter_uninstall(snap_exporter):
+    snap_exporter.snap_client.present = False
+
+    assert snap_exporter.uninstall() is True
+    snap_exporter.strategy.remove.assert_called_once()
+
+
+def test_snap_exporter_uninstall_fail(snap_exporter):
+    snap_exporter.strategy.remove.side_effect = ValueError
+
+    assert snap_exporter.uninstall() is False
+
+
+def test_snap_exporter_uninstall_present(snap_exporter):
+    snap_exporter.snap_client.present = True
+
+    assert snap_exporter.uninstall() is False
+    snap_exporter.strategy.remove.assert_called_once()
+
+
+def test_snap_exporter_enable_and_start(snap_exporter):
+    snap_exporter.enable_and_start()
+    snap_exporter.snap_client.start.assert_called_once_with(["service1", "service2"], enable=True)
+
+
+def test_snap_exporter_disable_and_stop(snap_exporter):
+    snap_exporter.disable_and_stop()
+    snap_exporter.snap_client.stop.assert_called_once_with(["service1", "service2"], disable=True)
+
+
+def test_snap_exporter_restart(snap_exporter):
+    snap_exporter.restart()
+    snap_exporter.snap_client.restart.assert_called_once_with(reload=True)
+
+
+def test_snap_exporter_check_health(snap_exporter):
+    snap_exporter.check_health()
+    snap_exporter.strategy.check.assert_called_once()
+
+
+@pytest.mark.parametrize("install_result, expected_result", [(True, True), (False, False)])
+@mock.patch("service.SnapExporter.install")
+def test_snap_exporter_configure(mock_install, snap_exporter, install_result, expected_result):
+    mock_install.return_value = install_result
+
+    assert snap_exporter.configure() is expected_result
+    mock_install.assert_called_once()
+
+
+def test_dcgm_exporter():
+    mock_config = {
+        "dcgm-snap-channel": "latest/stable",
+    }
+
+    exporter = service.DCGMExporter(mock_config)
+    assert exporter.exporter_name == "dcgm"
+    assert exporter.hw_tools() == {HWTool.DCGM}
 
 
 if __name__ == "__main__":
