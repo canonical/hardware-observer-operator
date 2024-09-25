@@ -15,6 +15,12 @@ options:
     description: |
       Start the prometheus smartctl exporter at "smartctl-exporter-port". By default,
       it will start at port 10201.
+  dcgm-snap-channel:
+    type: string
+    default: "latest/stable"
+    description: |
+      Channel to install the DCGM snap if the hardware has NVIDIA GPU. By default, it will install
+      from latest/stable
   exporter-log-level:
     type: string
     default: "INFO"

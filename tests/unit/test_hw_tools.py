@@ -36,6 +36,7 @@ from hw_tools import (
     SAS3IRCUStrategy,
     SmartCtlExporterStrategy,
     SmartCtlStrategy,
+    SnapStrategy,
     SSACLIStrategy,
     StorCLIStrategy,
     StrategyABC,
@@ -128,6 +129,7 @@ class TestMakeExecutable(unittest.TestCase):
 class TestHWToolHelper(unittest.TestCase):
     def setUp(self):
         self.harness = ops.testing.Harness(HardwareObserverCharm)
+        self.harness.begin()
         self.addCleanup(self.harness.cleanup)
 
         self.hw_tool_helper = HWToolHelper()
@@ -181,7 +183,6 @@ class TestHWToolHelper(unittest.TestCase):
     def test_04_install(self, mock_strategies):
         """Check strategy is been called."""
         self.harness.add_resource("storcli-deb", "storcli.deb")
-        self.harness.begin()
         mock_resources = self.harness.charm.model.resources
 
         mock_strategies.return_value[0].name = HWTool.STORCLI
@@ -207,7 +208,6 @@ class TestHWToolHelper(unittest.TestCase):
         new_callable=mock.PropertyMock,
     )
     def test_05_remove(self, mock_strategies):
-        self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         mock_strategies.return_value[0].name = HWTool.STORCLI
         mock_hw_available = {HWTool.STORCLI}
@@ -226,7 +226,6 @@ class TestHWToolHelper(unittest.TestCase):
     def test_06_install_not_available(self, mock_strategies):
         """Check strategy is been called."""
         self.harness.add_resource("storcli-deb", "storcli.deb")
-        self.harness.begin()
         mock_resources = self.harness.charm.model.resources
 
         mock_strategies.return_value[0].name = HWTool.STORCLI
@@ -247,7 +246,6 @@ class TestHWToolHelper(unittest.TestCase):
     def test_07_install_no_resource(self, mock_strategies):
         """Check tpr strategy is not been called if resource is not defined."""
         self.harness.add_resource("storcli-deb", "storcli.deb")
-        self.harness.begin()
         mock_resources = self.harness.charm.model.resources
 
         mock_strategies.return_value[0].name = HWTool.STORCLI
@@ -269,7 +267,6 @@ class TestHWToolHelper(unittest.TestCase):
         new_callable=mock.PropertyMock,
     )
     def test_08_remove_not_available(self, mock_strategies):
-        self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         mock_strategies.return_value[0].name = HWTool.STORCLI
         mock_hw_available = set()
@@ -285,7 +282,6 @@ class TestHWToolHelper(unittest.TestCase):
         new_callable=mock.PropertyMock,
     )
     def test_09_install_required_resource_not_uploaded(self, _):
-        self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         mock_hw_available = [HWTool.STORCLI, HWTool.PERCCLI]
         ok, msg = self.hw_tool_helper.install(mock_resources, mock_hw_available)
@@ -306,7 +302,6 @@ class TestHWToolHelper(unittest.TestCase):
     def test_10_install_strategy_errors(self, mock_strategies):
         """Catch excepted error when execute strategies' install method."""
         self.harness.add_resource("storcli-deb", "storcli.deb")
-        self.harness.begin()
         mock_resources = self.harness.charm.model.resources
         mock_strategies.return_value[0].name = HWTool.STORCLI
         mock_strategies.return_value[1].name = HWTool.IPMI_SENSOR
@@ -335,7 +330,6 @@ class TestHWToolHelper(unittest.TestCase):
 
     @mock.patch("hw_tools.file_is_empty", return_value=True)
     def test_11_check_missing_resources_zero_size_resources(self, file_is_empty):
-        self.harness.begin()
         ok, msg = self.hw_tool_helper.check_missing_resources(
             hw_available={HWTool.STORCLI},
             fetch_tools={HWTool.STORCLI: "fake-path"},
@@ -351,7 +345,6 @@ class TestHWToolHelper(unittest.TestCase):
         new_callable=mock.PropertyMock,
     )
     def test_12_check_installed_okay(self, mock_strategies):
-        self.harness.begin()
         mock_strategies.return_value[0].name = HWTool.STORCLI
         mock_hw_available = [HWTool.STORCLI]
         self.hw_tool_helper.check_installed(mock_hw_available)
@@ -366,7 +359,6 @@ class TestHWToolHelper(unittest.TestCase):
         new_callable=mock.PropertyMock,
     )
     def test_13_check_installed_okay(self, mock_strategies):
-        self.harness.begin()
         mock_strategies.return_value[0].name = HWTool.SSACLI
         mock_hw_available = [HWTool.STORCLI]
         success, msg = self.hw_tool_helper.check_installed(mock_hw_available)
@@ -376,7 +368,6 @@ class TestHWToolHelper(unittest.TestCase):
     @mock.patch("hw_tools.os")
     @mock.patch("hw_tools.Path")
     def test_14_check_installed_not_okay(self, mock_os, mock_path):
-        self.harness.begin()
         mock_hw_available = [
             HWTool.STORCLI,
             HWTool.PERCCLI,
@@ -1147,3 +1138,130 @@ class TestIPMIHWVerifier(unittest.TestCase):
             output = bmc_hw_verifier()
             mock_apt_helpers.add_pkg_with_candidate_version.assert_called_with("freeipmi-tools")
             self.assertCountEqual(output, [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL])
+
+
+@pytest.fixture
+def snap_exporter():
+    my_hw_tool = mock.MagicMock()
+    my_hw_tool.value = "my-snap"
+
+    class MySnapStrategy(SnapStrategy):
+        channel = "my-channel/stable"
+        _name = my_hw_tool
+
+    strategy = MySnapStrategy()
+    yield strategy
+
+
+@pytest.fixture
+def mock_snap_lib():
+    with mock.patch("hw_tools.snap") as mock_snap:
+        yield mock_snap
+    mock_snap.reset_mock()
+
+
+def test_snap_strategy_name(snap_exporter):
+    assert snap_exporter.snap == "my-snap"
+
+
+def test_snap_strategy_channel(snap_exporter):
+    assert snap_exporter.channel == "my-channel/stable"
+
+
+def test_snap_strategy_install_success(snap_exporter, mock_snap_lib):
+    snap_exporter.install()
+    mock_snap_lib.add.assert_called_once_with(snap_exporter.snap, channel=snap_exporter.channel)
+
+
+def test_snap_strategy_install_fail(snap_exporter, mock_snap_lib):
+    mock_snap_lib.add.side_effect = ValueError
+
+    with pytest.raises(ValueError):
+        snap_exporter.install()
+
+
+def test_snap_strategy_remove_success(snap_exporter, mock_snap_lib):
+    snap_exporter.remove()
+    mock_snap_lib.remove.assert_called_once_with([snap_exporter.snap])
+
+
+def test_snap_strategy_remove_fail(snap_exporter, mock_snap_lib):
+    mock_snap_lib.remove.side_effect = ValueError
+
+    with pytest.raises(ValueError):
+        snap_exporter.remove()
+
+
+@pytest.mark.parametrize(
+    "services, expected",
+    [
+        # all services active
+        (
+            {
+                "service_1": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": True,
+                    "activators": [],
+                },
+                "service_2": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": True,
+                    "activators": [],
+                },
+            },
+            True,
+        ),
+        # at least one services down
+        (
+            {
+                "service_1": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": False,
+                    "activators": [],
+                },
+                "service_2": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": True,
+                    "activators": [],
+                },
+            },
+            False,
+        ),
+        # all services down
+        (
+            {
+                "service_1": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": False,
+                    "activators": [],
+                },
+                "service_2": {
+                    "daemon": "simple",
+                    "daemon_scope": "system",
+                    "enabled": True,
+                    "active": False,
+                    "activators": [],
+                },
+            },
+            False,
+        ),
+        # snap without service
+        ({}, True),
+    ],
+)
+def test_snap_strategy_check(snap_exporter, mock_snap_lib, services, expected):
+    mock_snap_client = mock.MagicMock()
+    mock_snap_client.services = services
+    mock_snap_lib.SnapCache.return_value = {"my-snap": mock_snap_client}
+
+    assert snap_exporter.check() is expected
