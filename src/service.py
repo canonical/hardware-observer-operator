@@ -450,32 +450,25 @@ class DCGMExporter(SnapExporter):
 
     exporter_name: str = "dcgm"
     port: int = 9400
+    metrics_location: Path = Path("/var/snap/dcgm/common/")
+    metric_config: str = "dcgm-exporter-metrics-file"
 
     def __init__(self, charm_dir: Path, config: ConfigData):
         """Init."""
         self.strategy = DCGMExporterStrategy(str(config["dcgm-snap-channel"]))
         self.charm_dir = charm_dir
+        self.metrics_file = self.charm_dir / Path("src/gpu_metrics/dcgm_metrics.csv")
+        self.metric_config_value = self.metrics_file.name
         super().__init__(config)
 
     def install(self) -> bool:
         """Install the DCGM exporter and configure custom metrics."""
-        gpu_metrics_file: Path = self.charm_dir / Path("src/gpu_metrics/dcgm_metrics.csv")
-        dcgm_metrics_location: Path = Path("/var/snap/dcgm/common/")
-        metric_config: str = "dcgm-exporter-metrics-file"
-        metric_config_value: str = gpu_metrics_file.name
+        super().install()
 
-        if not super().install():
-            logger.error("Failed to install DCGM snap.")
-            return False
-
-        if not dcgm_metrics_location.exists():
-            logger.error("DCGM SNAP_COMMON location does not exist after install.")
-            return False
-
-        if self.snap_client.get(metric_config) != metric_config_value:
+        if self.snap_client.get(self.metric_config) != self.metric_config_value:
             try:
-                shutil.copy(gpu_metrics_file, dcgm_metrics_location)
-                self.snap_client.set({metric_config: metric_config_value})
+                shutil.copy(self.metrics_file, self.metrics_location)
+                self.snap_client.set({self.metric_config: self.metric_config_value})
                 self.snap_client.restart(reload=True)
             except Exception as err:  # pylint: disable=broad-except
                 logger.error("Failed to copy custom dcgm metrics file: %s", err)
