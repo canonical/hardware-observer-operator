@@ -457,7 +457,7 @@ class DCGMExporter(SnapExporter):
         """Init."""
         self.strategy = DCGMExporterStrategy(str(config["dcgm-snap-channel"]))
         self.charm_dir = charm_dir
-        self.metrics_file = self.charm_dir / Path("src/gpu_metrics/dcgm_metrics.csv")
+        self.metrics_file = self.charm_dir / "src/gpu_metrics/dcgm_metrics.csv"
         self.metric_config_value = self.metrics_file.name
         super().__init__(config)
 
@@ -468,12 +468,14 @@ class DCGMExporter(SnapExporter):
 
         if self.snap_client.get(self.metric_config) != self.metric_config_value:
             try:
+                logger.info(
+                    "Creating a custom metrics file and configuring the DCGM snap to use it."
+                )
                 shutil.copy(self.metrics_file, self.metrics_location)
                 self.snap_client.set({self.metric_config: self.metric_config_value})
                 self.snap_client.restart(reload=True)
             except Exception as err:  # pylint: disable=broad-except
-                logger.error("Failed to configure custom DCGM metrics")
-                logger.error("Failed to copy the metrics file: %s", err)
+                logger.error("Failed to configure custom DCGM metrics: %s", err)
                 return False
 
         return True
