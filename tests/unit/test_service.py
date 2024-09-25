@@ -975,8 +975,9 @@ def test_dcgm_exporter():
     mock_config = {
         "dcgm-snap-channel": "latest/stable",
     }
+    search_path = pathlib.Path(f"{__file__}/../../..").resolve()
 
-    exporter = service.DCGMExporter(mock_config)
+    exporter = service.DCGMExporter(search_path, mock_config)
     assert exporter.exporter_name == "dcgm"
     assert exporter.hw_tools() == {HWTool.DCGM}
 
