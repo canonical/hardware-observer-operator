@@ -463,7 +463,8 @@ class DCGMExporter(SnapExporter):
 
     def install(self) -> bool:
         """Install the DCGM exporter and configure custom metrics."""
-        super().install()
+        if not super().install():
+            return False
 
         if self.snap_client.get(self.metric_config) != self.metric_config_value:
             try:
@@ -471,7 +472,8 @@ class DCGMExporter(SnapExporter):
                 self.snap_client.set({self.metric_config: self.metric_config_value})
                 self.snap_client.restart(reload=True)
             except Exception as err:  # pylint: disable=broad-except
-                logger.error("Failed to copy custom dcgm metrics file: %s", err)
+                logger.error("Failed to configure custom DCGM metrics")
+                logger.error("Failed to copy the metrics file: %s", err)
                 return False
 
         return True

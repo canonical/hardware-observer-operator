@@ -834,10 +834,23 @@ class TestDCGMSnapExporter(unittest.TestCase):
     def test_hw_tools(self):
         self.assertEqual(self.exporter.hw_tools(), {HWTool.DCGM})
 
+    def test_install_failed(self):
+        self.exporter.strategy = mock.MagicMock()
+        self.exporter.snap_client = mock.MagicMock()
+        self.exporter.snap_client.present = mock.MagicMock()
+        self.exporter.snap_client.present = False
+
+        exporter_install_ok = self.exporter.install()
+
+        self.exporter.snap_client.get.assert_not_called()
+        self.assertFalse(exporter_install_ok)
+
     @mock.patch("service.shutil", return_value=mock.MagicMock())
     def test_install_success(self, mock_shutil):
         self.exporter.strategy = mock.MagicMock()
         self.exporter.snap_client = mock.MagicMock()
+        self.exporter.snap_client.present = mock.MagicMock()
+        self.exporter.snap_client.present = True
 
         self.exporter.snap_client.get = mock.MagicMock()
         self.exporter.snap_client.get.return_value = ""
@@ -859,6 +872,8 @@ class TestDCGMSnapExporter(unittest.TestCase):
     def test_install_metrics_preset(self, mock_shutil):
         self.exporter.strategy = mock.MagicMock()
         self.exporter.snap_client = mock.MagicMock()
+        self.exporter.snap_client.present = mock.MagicMock()
+        self.exporter.snap_client.present = True
 
         self.exporter.snap_client.get = mock.MagicMock()
         self.exporter.snap_client.get.return_value = self.exporter.metric_config_value
@@ -874,6 +889,8 @@ class TestDCGMSnapExporter(unittest.TestCase):
     def test_install_metrics_copy_fail(self, mock_shutil):
         self.exporter.strategy = mock.MagicMock()
         self.exporter.snap_client = mock.MagicMock()
+        self.exporter.snap_client.present = mock.MagicMock()
+        self.exporter.snap_client.present = True
 
         self.exporter.snap_client.get = mock.MagicMock()
         self.exporter.snap_client.get.return_value = ""
