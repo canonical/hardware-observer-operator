@@ -21,6 +21,12 @@ options:
     description: |
       Channel to install the DCGM snap if the hardware has NVIDIA GPU. By default, it will install
       from latest/stable
+  smartctl-exporter-snap-channel:
+    type: string
+    default: "latest/candidate"  # fix me
+    description: |
+      Channel to install the Smartctl exporter snap if the hardware has smart disk. By default, it will install
+      from latest/candidate  # fix me
   exporter-log-level:
     type: string
     default: "INFO"

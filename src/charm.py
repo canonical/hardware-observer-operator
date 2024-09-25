@@ -81,7 +81,7 @@ class HardwareObserverCharm(ops.CharmBase):
             )
 
         if stored_tools & SmartCtlExporter.hw_tools():
-            exporters.append(SmartCtlExporter(self.charm_dir, self.model.config))
+            exporters.append(SmartCtlExporter(self.model.config))
 
         if stored_tools & DCGMExporter.hw_tools():
             exporters.append(DCGMExporter(self.model.config))

@@ -3,15 +3,12 @@
 Define strategy for install, remove and verifier for different hardware.
 """
 
-import io
 import logging
 import os
 import shutil
 import stat
 import subprocess
-import tarfile
 from abc import ABCMeta, abstractmethod
-from http import HTTPStatus
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
@@ -239,6 +236,16 @@ class DCGMExporterStrategy(SnapStrategy):
         self.channel = channel
 
 
+class SmartCtlExporterStrategy(SnapStrategy):
+    """SmartCtl strategy class."""
+
+    _name = HWTool.SMARTCTL_EXPORTER
+
+    def __init__(self, channel: str) -> None:
+        """Init."""
+        self.channel = channel
+
+
 class StorCLIStrategy(TPRStrategyABC):
     """Strategy to install storcli."""
 
@@ -444,75 +451,6 @@ class RedFishStrategy(StrategyABC):  # pylint: disable=R0903
         return True
 
 
-class SmartCtlStrategy(APTStrategyABC):
-    """Strategy for installing ipmi."""
-
-    pkg = "smartmontools"
-    _name = HWTool.SMARTCTL
-
-    def install(self) -> None:
-        apt_helpers.add_pkg_with_candidate_version(self.pkg)
-
-    def remove(self) -> None:
-        # Skip removing because this may cause dependency error
-        # for other services on the same machine.
-        logger.info("%s skip removing %s", self._name, self.pkg)
-
-    def check(self) -> bool:
-        """Check package status."""
-        return check_deb_pkg_installed(self.pkg)
-
-
-class SmartCtlExporterStrategy(StrategyABC):  # pylint: disable=R0903
-    """Install smartctl exporter binary."""
-
-    _name = HWTool.SMARTCTL_EXPORTER
-
-    _resource_dir = Path("/opt/SmartCtlExporter/")
-    _release = (
-        "https://github.com/prometheus-community/"
-        "smartctl_exporter/releases/download/v0.12.0/smartctl_exporter-0.12.0.linux-amd64.tar.gz"
-    )
-    _exporter_name = "smartctl_exporter"
-    _exporter_path = Path(_resource_dir / "smartctl_exporter")
-
-    def install(self) -> None:
-        """Install exporter binary from internet."""
-        logger.debug("Installing SmartCtlExporter")
-        self._resource_dir.mkdir(parents=True, exist_ok=True)
-
-        resp = requests.get(self._release, timeout=60)
-        if resp.status_code != HTTPStatus.OK:
-            logger.error("Failed to download smartctl exporter binary.")
-            raise ResourceInstallationError(self._name)
-
-        success = False
-        fileobj = io.BytesIO(resp.content)
-        with tarfile.open(fileobj=fileobj, mode="r:gz") as tar:
-            for member in tar.getmembers():
-                if member.name.endswith(self._exporter_name):
-                    with open(self._exporter_path, "wb") as outfile:
-                        member_file = tar.extractfile(member)
-                        if member_file:
-                            outfile.write(member_file.read())
-                            success = True
-                    if success:
-                        make_executable(self._exporter_path)
-        if not success:
-            logger.error("Failed to install SmartCtlExporter binary.")
-            raise ResourceInstallationError(self._name)
-
-    def remove(self) -> None:
-        """Remove downloaded exporter binary."""
-        logger.debug("Remove SmartCtlExporter")
-        shutil.rmtree(self._resource_dir)
-
-    def check(self) -> bool:
-        """Check package status."""
-        logger.debug("Check SmartCtlExporter resources")
-        return self._exporter_path.is_file()
-
-
 def _raid_hw_verifier_hwinfo() -> Set[HWTool]:
     """Verify if a supported RAID card exists on the machine using the hwinfo command."""
     hwinfo_output = hwinfo("storage")
@@ -650,7 +588,7 @@ def bmc_hw_verifier() -> Set[HWTool]:
 
 def disk_hw_verifier() -> Set[HWTool]:
     """Verify if the disk exists on the machine."""
-    return {HWTool.SMARTCTL} if lshw(class_filter="disk") else set()
+    return {HWTool.SMARTCTL_EXPORTER} if lshw(class_filter="disk") else set()
 
 
 def nvidia_gpu_verifier() -> Set[HWTool]:
@@ -680,7 +618,6 @@ class HWToolHelper:
             IPMIDCMIStrategy(),
             IPMISENSORStrategy(),
             RedFishStrategy(),
-            SmartCtlStrategy(),
         ]
 
     def fetch_tools(  # pylint: disable=W0102
