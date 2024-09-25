@@ -1,6 +1,7 @@
 """Exporter service helper."""
 
 import os
+import shutil
 from abc import ABC, abstractmethod
 from logging import getLogger
 from pathlib import Path
@@ -459,6 +460,27 @@ class DCGMExporter(SnapExporter):
     def hw_tools() -> Set[HWTool]:
         """Return hardware tools to watch."""
         return {HWTool.DCGM}
+    
+    def configure(self) -> bool:
+        """Configure and enable custom metrics."""
+        gpu_metrics_file: Path = Path("./src/gpu_metrics/dcgm_metrics.csv")
+        dcgm_metrics_location = Path("/var/snap/dcgm/common/")
+        metric_config = "dcgm-exporter-metrics-file"
+        metric_config_value = gpu_metrics_file.name
+        
+        if not dcgm_metrics_location.exists():
+            logger.error("DCGM snap common location does not exist.")
+            return False
+        
+        if not self.snap_client.get(metric_config) != metric_config_value:
+            try:
+                shutil.copy(gpu_metrics_file, dcgm_metrics_location)
+                self.snap_client.set({metric_config: metric_config_value})
+            except Exception as err:  # pylint: disable=broad-except
+                logger.error("Failed to copy dcgm metrics file: %s", err)
+                return False
+
+        return True
 
 
 class HardwareExporter(RenderableExporter):
