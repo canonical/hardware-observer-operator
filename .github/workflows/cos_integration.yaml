@@ -20,10 +20,8 @@ jobs:
         uses: charmed-kubernetes/actions-operator@main
         with:
           # The juju version can be any stable version, as long as it is the same as libjuju version used.
-          # Currently, 3.1 is used to keep the version consistent with functional tests (func31)
-          # If, for example, 3.5/stable is used here in the future, the `update python-libjuju dependancy..`
-          # step below should also specify `...3.5.x/g'..` so it updates requirements.txt with the correct version.
-          juju-channel: 3.1/stable
+          # If you updated it here, update it also in tests/integration/requirements.txt
+          juju-channel: 3.5/stable
           provider: lxd
       - name: Save lxd controller name
         id: lxd-controller
@@ -43,11 +41,6 @@ jobs:
       - name: Fix microk8s permissions
         run: |
           chmod -R ugo+rwX ~/.kube
-      - name: Update python-libjuju dependency to match juju
-        # The juju CLI version and libjuju version(specified in requirements.txt) should be compatible.
-        # This replaces the libjuju version in requirements.txt and
-        # makes sure the same version is used, even if it has a different/incompatible version.
-        run: sed -E -i 's/^\s*juju\s*~=.+/    juju~=3.1.0/g' tests/integration/requirements.txt
       - name: Run integration tests
         run: tox -e integration
         env:
