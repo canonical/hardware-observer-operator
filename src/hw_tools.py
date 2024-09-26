@@ -233,10 +233,35 @@ class DCGMExporterStrategy(SnapStrategy):
     """DCGM strategy class."""
 
     _name = HWTool.DCGM
+    pkg = "ubuntu-drivers-common"
 
     def __init__(self, channel: str) -> None:
         """Init."""
         self.channel = channel
+
+    def install(self) -> None:
+        """Install the snap from a channel and the necessary nvidia driver."""
+        super().install()
+        self._install_nvidia_drivers()
+
+    def _install_nvidia_drivers(self) -> None:
+        """Install the NVIDIA driver if not present."""
+        if Path("/proc/driver/nvidia/version").exists():
+            logger.info("Driver already installed in the machine")
+            return
+
+        logger.info("Installing NVIDIA driver")
+        apt.add_package(self.pkg, update_cache=True)
+        cmd = "ubuntu-drivers install --gpgpu"
+        try:
+            result = subprocess.check_output(cmd.split(), text=True)
+            if "No drivers found for installation" in result:
+                raise ResourceInstallationError(self._name)
+            logger.info("NVIDIA driver installed")
+            return
+        except subprocess.CalledProcessError as err:
+            logger.error("Failed to install the NVIDIA driver: %s", err)
+            raise err
 
 
 class StorCLIStrategy(TPRStrategyABC):

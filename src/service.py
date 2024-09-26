@@ -1,6 +1,7 @@
 """Exporter service helper."""
 
 import os
+import subprocess
 from abc import ABC, abstractmethod
 from logging import getLogger
 from pathlib import Path
@@ -459,6 +460,18 @@ class DCGMExporter(SnapExporter):
     def hw_tools() -> Set[HWTool]:
         """Return hardware tools to watch."""
         return {HWTool.DCGM}
+
+    def validate_exporter_configs(self) -> Tuple[bool, str]:
+        """Validate the if the DCGM exporter is able to run."""
+        valid, msg = super().validate_exporter_configs()
+        if not valid:
+            return valid, msg
+
+        try:
+            subprocess.check_call("nvidia-smi")
+            return valid, msg
+        except subprocess.CalledProcessError:
+            return False, "Failed to communicate with NVIDIA driver. Reboot might solve the issue."
 
 
 class HardwareExporter(RenderableExporter):
