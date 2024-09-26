@@ -3,6 +3,12 @@ name: Integration tests with COS
 on:
   workflow_call:
   workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "**.rst"
 
 jobs:
   integration-tests-with-cos:
