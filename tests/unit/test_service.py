@@ -8,6 +8,7 @@ from unittest import mock
 
 import pytest
 import yaml
+from charms.operator_libs_linux.v2 import snap
 from parameterized import parameterized
 from redfish.rest.v1 import InvalidCredentialsError
 
@@ -722,95 +723,7 @@ class TestSmartMetricExporter(unittest.TestCase):
         systemd_lib_patcher = mock.patch.object(service, "systemd")
         self.mock_systemd = systemd_lib_patcher.start()
         self.addCleanup(systemd_lib_patcher.stop)
-
-        search_path = pathlib.Path(f"{__file__}/../../..").resolve()
-        self.mock_config = {
-            "smartctl-exporter-port": 10201,
-            "collect-timeout": 10,
-            "exporter-log-level": "INFO",
-        }
-        self.exporter = service.SmartCtlExporter(search_path, self.mock_config)
-
-    def test_render_service(self):
-        """Test render service."""
-        self.exporter._render_service = mock.MagicMock()
-        self.exporter._render_service.return_value = "some result"
-
-        result = self.exporter.render_service()
-        self.assertEqual(result, "some result")
-
-        self.exporter._render_service.assert_called_with(
-            {
-                "PORT": str(self.exporter.port),
-                "LEVEL": self.exporter.log_level,
-            }
-        )
-
-    @parameterized.expand(
-        [
-            (True,),
-            (False,),
-        ]
-    )
-    def test_set_config(self, service_render_success):
-        """Test render config."""
-        self.exporter.render_service = mock.MagicMock()
-        self.exporter.render_service.return_value = service_render_success
-
-        result = self.exporter.configure()
-        self.assertEqual(result, service_render_success)
-
-    def test_hw_tools(self):
-        self.assertEqual(self.exporter.hw_tools(), {HWTool.SMARTCTL})
-
-    @mock.patch("service.systemd", return_value=mock.MagicMock())
-    def test_install_resource_restart(self, mock_systemd):
-        self.exporter.strategy = mock.MagicMock()
-        self.exporter.check_active = mock.MagicMock()
-        self.exporter.check_active.return_value = True
-
-        self.exporter.install_resources()
-
-        self.exporter.strategy.install.assert_called()
-        self.exporter.check_active.assert_called()
-        mock_systemd.service_stop.assert_called_with(self.exporter.exporter_name)
-        mock_systemd.service_restart.assert_called_with(self.exporter.exporter_name)
-
-    @mock.patch("service.systemd", return_value=mock.MagicMock())
-    def test_install_resource_no_restart(self, mock_systemd):
-        self.exporter.strategy = mock.MagicMock()
-        self.exporter.check_active = mock.MagicMock()
-        self.exporter.check_active.return_value = False
-
-        self.exporter.install_resources()
-
-        self.exporter.strategy.install.assert_called()
-        self.exporter.check_active.assert_called()
-        mock_systemd.service_stop.assert_not_called()
-        mock_systemd.service_restart.assert_not_called()
-
-    def test_resource_exists(self):
-        self.exporter.strategy = mock.MagicMock()
-
-        self.exporter.resources_exist()
-        self.exporter.strategy.check.assert_called()
-
-    def test_resources_exist(self):
-        self.exporter.strategy = mock.MagicMock()
-        self.exporter.strategy.check.return_value = "some result"
-
-        result = self.exporter.resources_exist()
-
-        self.assertEqual(result, "some result")
-        self.exporter.strategy.check.assert_called()
-
-    def test_resource_remove(self):
-        self.exporter.strategy = mock.MagicMock()
-
-        result = self.exporter.remove_resources()
-        self.assertEqual(result, True)
-
-        self.exporter.strategy.remove.assert_called()
+        self.exporter = service.SmartCtlExporter(self.mock_config)
 
 
 class TestWriteToFile(unittest.TestCase):
@@ -957,6 +870,19 @@ def test_snap_exporter_restart(snap_exporter):
     snap_exporter.snap_client.restart.assert_called_once_with(reload=True)
 
 
+def test_snap_exporter_set(snap_exporter):
+    snap_config = {}
+    assert snap_exporter.set(snap_config) is True
+    snap_exporter.snap_client.set.assert_called_once_with(snap_config, typed=True)
+
+
+def test_snap_exporter_set_failed(snap_exporter):
+    snap_config = {}
+    snap_exporter.snap_client.set.side_effect = snap.SnapError()
+    assert snap_exporter.set(snap_config) is False
+    snap_exporter.snap_client.set.assert_called_once_with(snap_config, typed=True)
+
+
 def test_snap_exporter_check_health(snap_exporter):
     snap_exporter.check_health()
     snap_exporter.strategy.check.assert_called_once()
@@ -979,6 +905,24 @@ def test_dcgm_exporter():
     exporter = service.DCGMExporter(mock_config)
     assert exporter.exporter_name == "dcgm"
     assert exporter.hw_tools() == {HWTool.DCGM}
+
+
+@pytest.mark.parametrize("result, expected_result", [(True, True), (False, False)])
+@mock.patch("service.SnapExporter.install")
+@mock.patch("service.SnapExporter.set")
+def test_smartctl_exporter_configure(mock_set, mock_install, result, expected_result):
+    mock_config = {
+        "smartctl-exporter-port": "10000",
+        "exporter-log-level": "info",
+        "smartctl-exporter-snap-channel": "latest/stable",
+    }
+
+    mock_set.return_value = result
+    mock_install.return_value = result
+    exporter = service.SmartCtlExporter(mock_config)
+    assert exporter.exporter_name == "smartctl-exporter"
+    assert exporter.hw_tools() == {HWTool.SMARTCTL_EXPORTER}
+    assert exporter.configure() is expected_result
 
 
 if __name__ == "__main__":

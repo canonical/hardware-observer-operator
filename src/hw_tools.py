@@ -61,14 +61,6 @@ class ResourceFileSizeZeroError(Exception):
         self.message = f"Tool: {tool} path: {path} size is zero"
 
 
-class ResourceInstallationError(Exception):
-    """Exception raised when a hardware tool installation fails."""
-
-    def __init__(self, tool: HWTool):
-        """Init."""
-        super().__init__(f"Installation failed for tool: {tool}")
-
-
 def copy_to_snap_common_bin(source: Path, filename: str) -> None:
     """Copy file to $SNAP_COMMON/bin folder."""
     Path(f"{SNAP_COMMON}/bin").mkdir(parents=False, exist_ok=True)
