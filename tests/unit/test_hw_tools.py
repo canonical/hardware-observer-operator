@@ -50,7 +50,7 @@ from hw_tools import (
     raid_hw_verifier,
     redfish_available,
     remove_deb,
-    remove_legacy_smartctl_exporter_deb,
+    remove_legacy_smartctl_exporter,
     symlink,
 )
 from keys import HP_KEYS
@@ -1148,12 +1148,12 @@ def test_snap_strategy_check(snap_exporter, mock_snap_lib, services, expected):
 @mock.patch("hw_tools.Path.exists")
 @mock.patch("hw_tools.shutil")
 @mock.patch("hw_tools.systemd")
-def test_remove_legacy_smartctl_exporter_deb(
+def test_remove_legacy_smartctl_exporter(
     mock_systemd, mock_shutil, mock_path_exists, mock_path_unlink, legacy_exists
 ):
     stored_tools = {"smartctl"} if legacy_exists else {}
     mock_path_exists.return_value = legacy_exists
-    remove_legacy_smartctl_exporter_deb(stored_tools)
+    remove_legacy_smartctl_exporter(stored_tools)
     if legacy_exists:
         mock_systemd.service_stop.assert_called_once()
         mock_systemd.service_disable.assert_called_once()

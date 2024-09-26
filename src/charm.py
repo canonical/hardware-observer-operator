@@ -12,12 +12,7 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
-from hw_tools import (
-    HWTool,
-    HWToolHelper,
-    detect_available_tools,
-    remove_legacy_smartctl_exporter_deb,
-)
+from hw_tools import HWTool, HWToolHelper, detect_available_tools, remove_legacy_smartctl_exporter
 from service import BaseExporter, DCGMExporter, ExporterError, HardwareExporter, SmartCtlExporter
 
 logger = logging.getLogger(__name__)
@@ -135,7 +130,7 @@ class HardwareObserverCharm(ops.CharmBase):
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
 
-        remove_legacy_smartctl_exporter_deb(self._stored.stored_tools)  # type: ignore[arg-type]
+        remove_legacy_smartctl_exporter(self._stored.stored_tools)  # type: ignore[arg-type]
 
         stored_tools = self.get_stored_tools()
 

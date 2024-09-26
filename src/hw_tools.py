@@ -595,13 +595,13 @@ def detect_available_tools() -> Set[HWTool]:
     return raid_hw_verifier() | bmc_hw_verifier() | disk_hw_verifier() | nvidia_gpu_verifier()
 
 
-def remove_legacy_smartctl_exporter_deb(stored_tools: set) -> None:
+def remove_legacy_smartctl_exporter(stored_tools: set) -> None:
     """Remove any legacy tool from older revision.
 
-    Workaround for migrating smartctl exporter deb package to snap package.
+    Workaround for migrating legacy smartctl exporter to snap package.
     """
     name = "smartctl-exporter"
-    smartctl_exporter_deb = Path("opt/SmartCtlExporter/")
+    smartctl_exporter = Path("opt/SmartCtlExporter/")
     smartctl_exporter_config_path = Path(f"/etc/{name}-config.yaml")
     smartctl_exporter_service_path = Path(f"/etc/systemd/system/{name}.service")
     if smartctl_exporter_service_path.exists():
@@ -610,7 +610,7 @@ def remove_legacy_smartctl_exporter_deb(stored_tools: set) -> None:
         smartctl_exporter_service_path.unlink()
     if smartctl_exporter_config_path.exists():
         smartctl_exporter_config_path.unlink()
-    if smartctl_exporter_deb.exists():
+    if smartctl_exporter.exists():
         shutil.rmtree("/opt/SmartCtlExporter/")
     if "smartctl" in stored_tools:
         stored_tools.remove("smartctl")
