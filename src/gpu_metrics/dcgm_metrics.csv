@@ -1,3 +1,8 @@
+###############################################################################
+# [ WARNING ]
+# Configuration file maintained by Juju. Local changes may be overwritten.
+###############################################################################
+
 # Selected metrics for dcgm-exporter
 # Default metric list https://github.com/NVIDIA/dcgm-exporter/blob/main/etc/default-counters.csv
 
