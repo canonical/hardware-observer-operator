@@ -819,8 +819,11 @@ class TestDCGMSnapExporter(unittest.TestCase):
     def setUp(self) -> None:
         """Set up harness for each test case."""
         snap_lib_patcher = mock.patch.object(service, "snap")
+        shutil_lib_patcher = mock.patch.object(service, "shutil")
         self.mock_snap = snap_lib_patcher.start()
+        self.mock_shutil = shutil_lib_patcher.start()
         self.addCleanup(snap_lib_patcher.stop)
+        self.addCleanup(shutil_lib_patcher.stop)
 
         search_path = pathlib.Path(f"{__file__}/../../..").resolve()
         self.mock_config = {
@@ -828,12 +831,7 @@ class TestDCGMSnapExporter(unittest.TestCase):
         }
 
         self.exporter = service.DCGMExporter(search_path, self.mock_config)
-
-        # Set up mocks
         self.exporter.strategy = mock.MagicMock()
-        self.exporter.snap_client = mock.MagicMock()
-        self.exporter.snap_client.present = mock.MagicMock()
-        self.exporter.snap_client.get = mock.MagicMock()
 
     def test_exporter_name(self):
         self.assertEqual(self.exporter.exporter_name, "dcgm")
@@ -846,20 +844,18 @@ class TestDCGMSnapExporter(unittest.TestCase):
 
         exporter_install_ok = self.exporter.install()
 
-        self.exporter.snap_client.get.assert_not_called()
+        self.exporter.strategy.install.accept_called()
+        self.mock_shutil.copy.accept_not_called()
         self.assertFalse(exporter_install_ok)
 
-    @mock.patch("service.shutil", return_value=mock.MagicMock())
-    def test_install_success(self, mock_shutil):
+    def test_install_success(self):
         self.exporter.snap_client.present = True
-        self.exporter.snap_client.get.return_value = ""
 
         exporter_install_ok = self.exporter.install()
 
         self.exporter.strategy.install.accept_called()
-        self.exporter.snap_client.get.accept_called_with(self.exporter.metric_config)
-        mock_shutil.copy.accept_called_with(
-            self.exporter.metrics_file, self.exporter.metrics_location
+        self.mock_shutil.copy.accept_called_with(
+            self.exporter.metrics_file, self.exporter.snap_common
         )
         self.exporter.snap_client.set.accept_called_with(
             {self.exporter.metric_config: self.exporter.metric_config_value}
@@ -867,27 +863,13 @@ class TestDCGMSnapExporter(unittest.TestCase):
         self.exporter.snap_client.restart.accept_called_with(reload=True)
         self.assertTrue(exporter_install_ok)
 
-    @mock.patch("service.shutil", return_value=mock.MagicMock())
-    def test_install_metrics_preset(self, mock_shutil):
+    def test_install_metrics_copy_fail(self):
         self.exporter.snap_client.present = True
-        self.exporter.snap_client.get.return_value = self.exporter.metric_config_value
-        exporter_install_ok = self.exporter.install()
-
-        self.exporter.strategy.install.accept_called()
-        self.exporter.snap_client.get.accept_called_with(self.exporter.metric_config_value)
-        mock_shutil.copy.accept_not_called()
-        self.assertTrue(exporter_install_ok)
-
-    @mock.patch("service.shutil", return_value=mock.MagicMock())
-    def test_install_metrics_copy_fail(self, mock_shutil):
-        self.exporter.snap_client.present = True
-        self.exporter.snap_client.get.return_value = ""
-        mock_shutil.copy.side_effect = FileNotFoundError
+        self.mock_shutil.copy.side_effect = FileNotFoundError
 
         exporter_install_ok = self.exporter.install()
 
         self.exporter.strategy.install.accept_called()
-        self.exporter.snap_client.get.accept_called_with(self.exporter.metric_config_value)
         self.exporter.snap_client.restart.accept_not_called()
         self.assertFalse(exporter_install_ok)
 

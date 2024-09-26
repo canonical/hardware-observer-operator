@@ -450,7 +450,7 @@ class DCGMExporter(SnapExporter):
 
     exporter_name: str = "dcgm"
     port: int = 9400
-    metrics_location: Path = Path("/var/snap/dcgm/common/")
+    snap_common: Path = Path("/var/snap/dcgm/common/")
     metric_config: str = "dcgm-exporter-metrics-file"
 
     def __init__(self, charm_dir: Path, config: ConfigData):
@@ -466,17 +466,14 @@ class DCGMExporter(SnapExporter):
         if not super().install():
             return False
 
-        if self.snap_client.get(self.metric_config) != self.metric_config_value:
-            try:
-                logger.info(
-                    "Creating a custom metrics file and configuring the DCGM snap to use it."
-                )
-                shutil.copy(self.metrics_file, self.metrics_location)
-                self.snap_client.set({self.metric_config: self.metric_config_value})
-                self.snap_client.restart(reload=True)
-            except Exception as err:  # pylint: disable=broad-except
-                logger.error("Failed to configure custom DCGM metrics: %s", err)
-                return False
+        try:
+            logger.info("Creating a custom metrics file and configuring the DCGM snap to use it.")
+            shutil.copy(self.metrics_file, self.snap_common)
+            self.snap_client.set({self.metric_config: self.metric_config_value})
+            self.snap_client.restart(reload=True)
+        except Exception as err:  # pylint: disable=broad-except
+            logger.error("Failed to configure custom DCGM metrics: %s", err)
+            return False
 
         return True
 
