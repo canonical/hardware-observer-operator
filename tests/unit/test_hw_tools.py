@@ -1143,25 +1143,36 @@ def test_snap_strategy_check(snap_exporter, mock_snap_lib, services, expected):
     assert snap_exporter.check() is expected
 
 
-@pytest.mark.parametrize("legacy_exists", [True, False])
 @mock.patch("hw_tools.Path.unlink")
 @mock.patch("hw_tools.Path.exists")
 @mock.patch("hw_tools.shutil")
 @mock.patch("hw_tools.systemd")
-def test_remove_legacy_smartctl_exporter(
-    mock_systemd, mock_shutil, mock_path_exists, mock_path_unlink, legacy_exists
+def test_remove_legacy_smartctl_exporter_exist(
+    mock_systemd, mock_shutil, mock_path_exists, mock_path_unlink
 ):
-    stored_tools = {"smartctl"} if legacy_exists else {}
-    mock_path_exists.return_value = legacy_exists
+    stored_tools = {"smartctl"}
+    mock_path_exists.return_value = True
     remove_legacy_smartctl_exporter(stored_tools)
-    if legacy_exists:
-        mock_systemd.service_stop.assert_called_once()
-        mock_systemd.service_disable.assert_called_once()
-        mock_path_unlink.assert_called()
-        assert mock_path_unlink.call_count == 2
-        mock_shutil.rmtree.assert_called_once()
-    else:
-        mock_systemd.service_stop.assert_not_called()
-        mock_systemd.service_disable.assert_not_called()
-        mock_path_unlink.assert_not_called()
-        mock_shutil.rmtree.assert_not_called()
+
+    mock_systemd.service_stop.assert_called_once()
+    mock_systemd.service_disable.assert_called_once()
+    mock_path_unlink.assert_called()
+    assert mock_path_unlink.call_count == 2
+    mock_shutil.rmtree.assert_called_once()
+
+
+@mock.patch("hw_tools.Path.unlink")
+@mock.patch("hw_tools.Path.exists")
+@mock.patch("hw_tools.shutil")
+@mock.patch("hw_tools.systemd")
+def test_remove_legacy_smartctl_exporter_not_exists(
+    mock_systemd, mock_shutil, mock_path_exists, mock_path_unlink
+):
+    stored_tools = {}
+    mock_path_exists.return_value = False
+    remove_legacy_smartctl_exporter(stored_tools)
+
+    mock_systemd.service_stop.assert_not_called()
+    mock_systemd.service_disable.assert_not_called()
+    mock_path_unlink.assert_not_called()
+    mock_shutil.rmtree.assert_not_called()
