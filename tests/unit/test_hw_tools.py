@@ -1150,9 +1150,8 @@ def test_snap_strategy_check(snap_exporter, mock_snap_lib, services, expected):
 def test_remove_legacy_smartctl_exporter_exist(
     mock_systemd, mock_shutil, mock_path_exists, mock_path_unlink
 ):
-    stored_tools = {"smartctl"}
     mock_path_exists.return_value = True
-    remove_legacy_smartctl_exporter(stored_tools)
+    remove_legacy_smartctl_exporter()
 
     mock_systemd.service_stop.assert_called_once()
     mock_systemd.service_disable.assert_called_once()
@@ -1168,9 +1167,8 @@ def test_remove_legacy_smartctl_exporter_exist(
 def test_remove_legacy_smartctl_exporter_not_exists(
     mock_systemd, mock_shutil, mock_path_exists, mock_path_unlink
 ):
-    stored_tools = {}
     mock_path_exists.return_value = False
-    remove_legacy_smartctl_exporter(stored_tools)
+    remove_legacy_smartctl_exporter()
 
     mock_systemd.service_stop.assert_not_called()
     mock_systemd.service_disable.assert_not_called()

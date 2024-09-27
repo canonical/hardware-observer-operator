@@ -786,3 +786,8 @@ class TestCharm(unittest.TestCase):
             self.harness.begin()
             result = self.harness.charm.validate_configs()
             self.assertEqual(result, expect)
+
+    def test_get_stored_tools_remove_legacy_smartctl(self):
+        self.harness.begin()
+        self.harness.charm._stored.stored_tools = {"smartctl"}
+        assert self.harness.charm.get_stored_tools() == set()

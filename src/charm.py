@@ -97,6 +97,8 @@ class HardwareObserverCharm(ops.CharmBase):
         if not self._stored.stored_tools:  # type: ignore[truthy-function]
             available_tools = detect_available_tools()  # type: ignore[unreachable]
             self._stored.stored_tools = {tool.value for tool in available_tools}
+        if "smartctl" in self._stored.stored_tools:  # type: ignore[operator]
+            self._stored.stored_tools.remove("smartctl")  # type: ignore[attr-defined]
         return {HWTool(value) for value in self._stored.stored_tools}  # type: ignore[attr-defined]
 
     def _on_redetect_hardware(self, event: ops.ActionEvent) -> None:
@@ -130,7 +132,7 @@ class HardwareObserverCharm(ops.CharmBase):
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
 
-        remove_legacy_smartctl_exporter(self._stored.stored_tools)  # type: ignore[arg-type]
+        remove_legacy_smartctl_exporter()
 
         stored_tools = self.get_stored_tools()
 

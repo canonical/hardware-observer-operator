@@ -595,7 +595,7 @@ def detect_available_tools() -> Set[HWTool]:
     return raid_hw_verifier() | bmc_hw_verifier() | disk_hw_verifier() | nvidia_gpu_verifier()
 
 
-def remove_legacy_smartctl_exporter(stored_tools: set) -> None:
+def remove_legacy_smartctl_exporter() -> None:
     """Remove any legacy tool from older revision.
 
     Workaround for migrating legacy smartctl exporter to snap package.
@@ -612,8 +612,6 @@ def remove_legacy_smartctl_exporter(stored_tools: set) -> None:
         smartctl_exporter_config_path.unlink()
     if smartctl_exporter.exists():
         shutil.rmtree("/opt/SmartCtlExporter/")
-    if "smartctl" in stored_tools:
-        stored_tools.remove("smartctl")
 
 
 class HWToolHelper:
