@@ -23,10 +23,10 @@ options:
       from latest/stable
   smartctl-exporter-snap-channel:
     type: string
-    default: "latest/candidate"  # fix me
+    default: "latest/stable"
     description: |
       Channel to install the Smartctl exporter snap if the hardware has smart disk. By default, it will install
-      from latest/candidate  # fix me
+      from latest/stable.
   exporter-log-level:
     type: string
     default: "INFO"
