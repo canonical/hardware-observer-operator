@@ -16,7 +16,7 @@
       }
     ]
   },
-  "description": "This dashboard is to display the metrics from DCGM Exporter on a Kubernetes (1.19+) cluster",
+  "description": "This dashboard is to display the metrics for NVIDIA and AMD GPUs",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "gnetId": 12239,
@@ -901,7 +901,7 @@
     ]
   },
   "timezone": "",
-  "title": "NVIDIA DCGM Exporter Dashboard",
+  "title": "GPU Dashboard",
   "uid": "Oxed_c6Wz",
   "version": 7,
   "weekStart": ""
