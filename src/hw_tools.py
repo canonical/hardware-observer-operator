@@ -233,6 +233,7 @@ class DCGMExporterStrategy(SnapStrategy):
     """DCGM strategy class."""
 
     _name = HWTool.DCGM
+    snap_common: Path = Path("/var/snap/dcgm/common/")
     pkg = "ubuntu-drivers-common"
 
     def __init__(self, channel: str) -> None:
@@ -243,6 +244,7 @@ class DCGMExporterStrategy(SnapStrategy):
         """Install the snap from a channel and the necessary nvidia driver."""
         super().install()
         self._install_nvidia_drivers()
+        self._install_nvidia_utils()
 
     def _install_nvidia_drivers(self) -> None:
         """Install the NVIDIA driver if not present."""
@@ -252,7 +254,10 @@ class DCGMExporterStrategy(SnapStrategy):
 
         logger.info("Installing NVIDIA driver")
         apt.add_package(self.pkg, update_cache=True)
-        cmd = "ubuntu-drivers install --gpgpu"
+        cmd = (
+            "ubuntu-drivers install --gpgpu --package-list "
+            f"{self.snap_common}/nvidia-installed-pkgs.txt"
+        )
         try:
             result = subprocess.check_output(cmd.split(), text=True)
             if "No drivers found for installation" in result:
@@ -262,6 +267,22 @@ class DCGMExporterStrategy(SnapStrategy):
         except subprocess.CalledProcessError as err:
             logger.error("Failed to install the NVIDIA driver: %s", err)
             raise err
+
+    def _install_nvidia_utils(self) -> None:
+        """Install the nvidia utils to be able to use nvidia-smi."""
+        nvidia_pkg = Path(self.snap_common / "nvidia-installed-pkgs.txt")
+        if nvidia_pkg.exists():
+            installed_pkg = nvidia_pkg.read_text(encoding="utf-8").splitlines()[0]
+            logger.debug("installed driver from hardware-observer: %s", installed_pkg)
+            nvidia_version = installed_pkg.split("-")[-2]
+
+            if nvidia_version.isdigit():
+                pkg = f"nvidia-utils-{nvidia_version}"
+                apt.add_package(pkg, update_cache=True)
+                logger.info("installed %s", pkg)
+                return
+
+        logger.debug("nvidia-utils not installed")
 
 
 class StorCLIStrategy(TPRStrategyABC):

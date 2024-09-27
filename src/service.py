@@ -382,7 +382,11 @@ class SnapExporter(BaseExporter):
     def __init__(self, config: ConfigData):
         """Init."""
         self.config = config
-        self.snap_client = snap.SnapCache()[self.strategy.snap]
+
+    @property
+    def snap_client(self) -> snap.Snap:
+        """Return the snap client."""
+        return snap.SnapCache()[self.strategy.snap]
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
@@ -470,7 +474,7 @@ class DCGMExporter(SnapExporter):
         try:
             subprocess.check_call("nvidia-smi")
             return valid, msg
-        except subprocess.CalledProcessError:
+        except (FileNotFoundError, subprocess.CalledProcessError):
             return False, "Failed to communicate with NVIDIA driver. Reboot might solve the issue."
 
 
