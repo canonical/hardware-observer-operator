@@ -466,8 +466,8 @@ class DCGMExporter(SnapExporter):
         if not super().install():
             return False
 
+        logger.info("Creating a custom metrics file and configuring the DCGM snap to use it")
         try:
-            logger.info("Creating a custom metrics file and configuring the DCGM snap to use it")
             shutil.copy(self.metrics_file, self.snap_common)
             self.snap_client.set({self.metric_config: self.metric_config_value})
             self.snap_client.restart(reload=True)

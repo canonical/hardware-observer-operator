@@ -844,8 +844,8 @@ class TestDCGMSnapExporter(unittest.TestCase):
 
         exporter_install_ok = self.exporter.install()
 
-        self.exporter.strategy.install.accept_called()
-        self.mock_shutil.copy.accept_not_called()
+        self.exporter.strategy.install.assert_called()
+        self.mock_shutil.copy.assert_not_called()
         self.assertFalse(exporter_install_ok)
 
     def test_install_success(self):
@@ -853,14 +853,14 @@ class TestDCGMSnapExporter(unittest.TestCase):
 
         exporter_install_ok = self.exporter.install()
 
-        self.exporter.strategy.install.accept_called()
-        self.mock_shutil.copy.accept_called_with(
+        self.exporter.strategy.install.assert_called()
+        self.mock_shutil.copy.assert_called_with(
             self.exporter.metrics_file, self.exporter.snap_common
         )
-        self.exporter.snap_client.set.accept_called_with(
+        self.exporter.snap_client.set.assert_called_with(
             {self.exporter.metric_config: self.exporter.metric_config_value}
         )
-        self.exporter.snap_client.restart.accept_called_with(reload=True)
+        self.exporter.snap_client.restart.assert_called_with(reload=True)
         self.assertTrue(exporter_install_ok)
 
     def test_install_metrics_copy_fail(self):
@@ -869,8 +869,8 @@ class TestDCGMSnapExporter(unittest.TestCase):
 
         exporter_install_ok = self.exporter.install()
 
-        self.exporter.strategy.install.accept_called()
-        self.exporter.snap_client.restart.accept_not_called()
+        self.exporter.strategy.install.assert_called()
+        self.exporter.snap_client.restart.assert_not_called()
         self.assertFalse(exporter_install_ok)
 
 
