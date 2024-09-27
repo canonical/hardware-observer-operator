@@ -715,17 +715,6 @@ class TestHardwareExporter(unittest.TestCase):
         )
 
 
-class TestSmartMetricExporter(unittest.TestCase):
-    """Test SmartCtlExporter's methods."""
-
-    def setUp(self) -> None:
-        """Set up harness for each test case."""
-        systemd_lib_patcher = mock.patch.object(service, "systemd")
-        self.mock_systemd = systemd_lib_patcher.start()
-        self.addCleanup(systemd_lib_patcher.stop)
-        self.exporter = service.SmartCtlExporter(self.mock_config)
-
-
 class TestWriteToFile(unittest.TestCase):
     def setUp(self):
         self.temp_file = tempfile.NamedTemporaryFile(delete=False)
