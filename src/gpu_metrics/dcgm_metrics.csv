@@ -103,9 +103,6 @@ DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_TOTAL,   counter, Total number of NVLink r
 DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_TOTAL, counter, Total number of NVLink recovery errors.
 
 # VGPU
-# The metric is disabled because the DCGM-exporter produces an invalid value for it, ie "ERROR - FAILED TO CONVERT TO STRING"
-# see https://github.com/NVIDIA/dcgm-exporter/issues/394
-# DCGM_FI_DEV_VGPU_INSTANCE_IDS, counter, Count of vGPU Instances
 DCGM_FI_DEV_VGPU_UTILIZATIONS,   gauge, vGPUs utilization
 
 # Bar
