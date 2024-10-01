@@ -1,5 +1,5 @@
 jinja2
-juju~=3.1.0  # must be compatible with the juju CLI version installed by CI
+juju~=3.5.0  # must be compatible with the juju CLI version installed by CI - see .github/workflows/cos_integration.yaml
 pytest
 pytest-operator
 prometheus-client
