@@ -8,7 +8,7 @@ tests:
 - interval: 1m
   input_series:
     - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-0", gpu="0"}'
-      values: '128 128 128 128 128'
+      values: '128'
   alert_rule_test:
     - eval_time: 5m
       alertname: HWPowerBrakeThrottle
@@ -24,28 +24,28 @@ tests:
               This is an indicator of: 
                   - External Power Brake Assertion being triggered (e.g. by the system power supply)
               Throttle reasons (bitmask): 128
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:0 Hostname:ubuntu-0]
+                LABELS = map[Hostname:ubuntu-0 gpu:0]
     - eval_time: 5m
       alertname: HWThermalThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 6 isn't set
     - eval_time: 5m
       alertname: SWThermalThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
     - eval_time: 5m
       alertname: SyncBoostThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
       alertname: HWSlowdownThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
     - eval_time: 5m
       alertname: SWPowerThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
 # HW Thermal Throttle active
 - interval: 1m
   input_series:
     - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-0", gpu="1"}'
-      values: '64 64 64 64 64'
+      values: '64'
   alert_rule_test:
     - eval_time: 5m
       alertname: HWThermalThrottle
@@ -61,28 +61,28 @@ tests:
               This is an indicator of:
                   - Temperature being too high
               Throttle reasons (bitmask): 64
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:1 Hostname:ubuntu-0]
+                LABELS = map[Hostname:ubuntu-0 gpu:1]
     - eval_time: 5m
       alertname: HWPowerBrakeThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 7 isn't set
     - eval_time: 5m
       alertname: SWThermalThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
     - eval_time: 5m
       alertname: SyncBoostThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
       alertname: HWSlowdownThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
     - eval_time: 5m
       alertname: SWPowerThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
 # SW Thermal Throttle active
 - interval: 1m
   input_series:
     - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-1", gpu="0"}'
-      values: '32 32 32 32 32'
+      values: '32'
   alert_rule_test:
     - eval_time: 5m
       alertname: SWThermalThrottle
@@ -99,28 +99,28 @@ tests:
                   - Current GPU temperature above the GPU Max Operating Temperature
                   - Current memory temperature above the Memory Max Operating Temperature
               Throttle reasons (bitmask): 32
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:0 Hostname:ubuntu-1]
+                LABELS = map[Hostname:ubuntu-1 gpu:0]
     - eval_time: 5m
       alertname: HWPowerBrakeThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 7 isn't set
     - eval_time: 5m
       alertname: HWThermalThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 6 isn't set
     - eval_time: 5m
       alertname: SyncBoostThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
       alertname: HWSlowdownThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
     - eval_time: 5m
       alertname: SWPowerThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
 # Sync Boost Throttle active
 - interval: 1m
   input_series:
     - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-1", gpu="1"}'
-      values: '16 16 16 16 16'
+      values: '16'
   alert_rule_test:
     - eval_time: 5m
       alertname: SyncBoostThrottle
@@ -136,28 +136,28 @@ tests:
               All GPUs in the sync boost group will boost to the minimum possible clocks across the entire group.
               Look at the throttle reasons for other GPUs in the system to see why those GPUs are holding this one at lower clocks.
               Throttle reasons (bitmask): 16
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:1 Hostname:ubuntu-1]
+                LABELS = map[Hostname:ubuntu-1 gpu:1]
     - eval_time: 5m
       alertname: HWPowerBrakeThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 7 isn't set
     - eval_time: 5m
       alertname: HWThermalThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 6 isn't set
     - eval_time: 5m
       alertname: SWThermalThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
     - eval_time: 5m
       alertname: HWSlowdownThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
     - eval_time: 5m
       alertname: SWPowerThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
 # HW Slowdown Throttle active
 - interval: 1m
   input_series:
     - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-2", gpu="0"}'
-      values: '8 8 8 8 8'
+      values: '8'
   alert_rule_test:
     - eval_time: 5m
       alertname: HWSlowdownThrottle
@@ -176,28 +176,28 @@ tests:
                   - Power draw is too high and Fast Trigger protection is reducing the clocks
                   - May be also reported during PState or clock change
               Throttle reasons (bitmask): 8
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:0 Hostname:ubuntu-2]
+                LABELS = map[Hostname:ubuntu-2 gpu:0]
     - eval_time: 5m
       alertname: HWPowerBrakeThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 7 isn't set
     - eval_time: 5m
       alertname: HWThermalThrottle
-      exp_alerts: []
-    - eval_time: 5m
-      alertname: SyncBoostThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 6 isn't set
     - eval_time: 5m
       alertname: SWThermalThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
+    - eval_time: 5m
+      alertname: SyncBoostThrottle
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
       alertname: SWPowerThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
 # SW Power Throttle active
 - interval: 1m
   input_series:
     - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-2", gpu="1"}'
-      values: '4 4 4 4 4'
+      values: '4'
   alert_rule_test:
     - eval_time: 5m
       alertname: SWPowerThrottle
@@ -211,53 +211,53 @@ tests:
             description: |
               SW Power Scaling algorithm is reducing the clocks below requested clocks on NVIDIA GPU: 1
               Throttle reasons (bitmask): 4
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:1 Hostname:ubuntu-2]
+                LABELS = map[Hostname:ubuntu-2 gpu:1]
     - eval_time: 5m
       alertname: HWPowerBrakeThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 7 isn't set
     - eval_time: 5m
       alertname: HWThermalThrottle
-      exp_alerts: []
-    - eval_time: 5m
-      alertname: SyncBoostThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 6 isn't set
     - eval_time: 5m
       alertname: SWThermalThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
+    - eval_time: 5m
+      alertname: SyncBoostThrottle
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
       alertname: HWSlowdownThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
 
 # No throttling
 - interval: 1m
   input_series:
     - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-0", gpu="0"}'
-      values: '0 0 0 0 0'
+      values: '1'
   alert_rule_test:
     - eval_time: 5m
       alertname: HWPowerBrakeThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 7 isn't set
     - eval_time: 5m
       alertname: HWThermalThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 6 isn't set
     - eval_time: 5m
       alertname: SWThermalThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
     - eval_time: 5m
       alertname: SyncBoostThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
       alertname: HWSlowdownThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
     - eval_time: 5m
       alertname: SWPowerThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
 #  All throttling reasons active
 - interval: 1m
   input_series:
     - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-3", gpu="2"}'
-      values: '511 511 511 511 511'
+      values: '511'
   alert_rule_test:
     - eval_time: 5m
       alertname: HWPowerBrakeThrottle
@@ -273,7 +273,7 @@ tests:
               This is an indicator of: 
                   - External Power Brake Assertion being triggered (e.g. by the system power supply)
               Throttle reasons (bitmask): 511
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:2 Hostname:ubuntu-3]
+                LABELS = map[Hostname:ubuntu-3 gpu:2]
     - eval_time: 5m
       alertname: HWThermalThrottle
       exp_alerts:
@@ -288,7 +288,7 @@ tests:
               This is an indicator of:
                   - Temperature being too high
               Throttle reasons (bitmask): 511
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:2 Hostname:ubuntu-3]
+                LABELS = map[Hostname:ubuntu-3 gpu:2]
     - eval_time: 5m
       alertname: SWThermalThrottle
       exp_alerts:
@@ -304,7 +304,7 @@ tests:
                   - Current GPU temperature above the GPU Max Operating Temperature
                   - Current memory temperature above the Memory Max Operating Temperature
               Throttle reasons (bitmask): 511
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:2 Hostname:ubuntu-3]
+                LABELS = map[Hostname:ubuntu-3 gpu:2]
     - eval_time: 5m
       alertname: SyncBoostThrottle
       exp_alerts:
@@ -319,7 +319,7 @@ tests:
               All GPUs in the sync boost group will boost to the minimum possible clocks across the entire group.
               Look at the throttle reasons for other GPUs in the system to see why those GPUs are holding this one at lower clocks.
               Throttle reasons (bitmask): 511
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:2 Hostname:ubuntu-3]
+                LABELS = map[Hostname:ubuntu-3 gpu:2]
     - eval_time: 5m
       alertname: HWSlowdownThrottle
       exp_alerts:
@@ -337,7 +337,7 @@ tests:
                   - Power draw is too high and Fast Trigger protection is reducing the clocks
                   - May be also reported during PState or clock change
               Throttle reasons (bitmask): 511
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:2 Hostname:ubuntu-3]
+                LABELS = map[Hostname:ubuntu-3 gpu:2]
     - eval_time: 5m
       alertname: SWPowerThrottle
       exp_alerts:
@@ -350,13 +350,13 @@ tests:
             description: |
               SW Power Scaling algorithm is reducing the clocks below requested clocks on NVIDIA GPU: 2
               Throttle reasons (bitmask): 511
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:2 Hostname:ubuntu-3]
+                LABELS = map[Hostname:ubuntu-3 gpu:2]
 
 # Multiple throttling reasons
 - interval: 1m
   input_series:
     - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-0", gpu="0"}'
-      values: '196 196 196 196 196'  # 128 + 64 + 4
+      values: '196'
   alert_rule_test:
     - eval_time: 5m
       alertname: HWPowerBrakeThrottle
@@ -372,7 +372,7 @@ tests:
               This is an indicator of: 
                   - External Power Brake Assertion being triggered (e.g. by the system power supply)
               Throttle reasons (bitmask): 196
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:0 Hostname:ubuntu-0]
+                LABELS = map[Hostname:ubuntu-0 gpu:0]
     - eval_time: 5m
       alertname: HWThermalThrottle
       exp_alerts:
@@ -387,7 +387,7 @@ tests:
               This is an indicator of:
                   - Temperature being too high
               Throttle reasons (bitmask): 196
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:0 Hostname:ubuntu-0]
+                LABELS = map[Hostname:ubuntu-0 gpu:0]
     - eval_time: 5m
       alertname: SWPowerThrottle
       exp_alerts:
@@ -400,13 +400,13 @@ tests:
             description: |
               SW Power Scaling algorithm is reducing the clocks below requested clocks on NVIDIA GPU: 0
               Throttle reasons (bitmask): 196
-                LABELS = map[__name__:DCGM_FI_DEV_CLOCK_THROTTLE_REASONS gpu:0 Hostname:ubuntu-0]
-    - eval_time: 5m
-      alertname: SyncBoostThrottle
-      exp_alerts: []
+                LABELS = map[Hostname:ubuntu-0 gpu:0]
     - eval_time: 5m
       alertname: SWThermalThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
+    - eval_time: 5m
+      alertname: SyncBoostThrottle
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
       alertname: HWSlowdownThrottle
-      exp_alerts: []
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set

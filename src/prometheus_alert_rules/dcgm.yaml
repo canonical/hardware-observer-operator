@@ -4,7 +4,7 @@ groups:
     - alert: HWPowerBrakeThrottle
       # isolate the least significant 8 bits with % 256
       # check whether bit 7 (starts from bit 0) has been set with the >= 128 comparison
-      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 256 >= 128
+      expr: scalar(DCGM_FI_DEV_CLOCK_THROTTLE_REASONS) % 256 >= 128
       for: 5m
       labels:
         severity: warning
@@ -19,7 +19,7 @@ groups:
     - alert: HWThermalThrottle
       # isolate the least significant 7 bits with % 128
       # check whether bit 6 (starts from bit 0) has been set with the >= 64 comparison
-      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 128 >= 64
+      expr: scalar(DCGM_FI_DEV_CLOCK_THROTTLE_REASONS) % 128 >= 64
       for: 5m
       labels:
         severity: warning
@@ -34,7 +34,7 @@ groups:
     - alert: SWThermalThrottle
       # isolate the least significant 6 bits with % 64
       # check whether bit 5 (starts from bit 0) has been set with the >= 32 comparison
-      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 64 >= 32
+      expr: scalar(DCGM_FI_DEV_CLOCK_THROTTLE_REASONS) % 64 >= 32
       for: 5m
       labels:
         severity: warning
@@ -50,7 +50,7 @@ groups:
     - alert: SyncBoostThrottle
       # isolate the least significant 5 bits with % 32
       # check whether bit 4 (starts from bit 0) has been set with the >= 16 comparison
-      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 32 >= 16
+      expr: scalar(DCGM_FI_DEV_CLOCK_THROTTLE_REASONS) % 32 >= 16
       for: 5m
       labels:
         severity: warning
@@ -65,14 +65,14 @@ groups:
     - alert: HWSlowdownThrottle
       # isolate the least significant 4 bits with % 16
       # check whether bit 3 (starts from bit 0) has been set with the >= 8 comparison
-      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 16 >= 8
+      expr: scalar(DCGM_FI_DEV_CLOCK_THROTTLE_REASONS) % 16 >= 8
       for: 5m
       labels:
         severity: warning
       annotations:
         summary: GPU Hardware Slowdown throttling detected. (instance {{ $labels.Hostname }})
         description: |
-          HW Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: {{ $labels.gpu }}.
+          HW Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: {{ $labels.gpu }}
           This is an indicator of:
               - Temperature being too high
               - External Power Brake Assertion is triggered (e.g. by the system power supply)
@@ -83,7 +83,7 @@ groups:
     - alert: SWPowerThrottle
       # isolate the least significant 3 bits with % 8
       # check whether bit 2 (starts from bit 0) has been set with the >= 4 comparison
-      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 8 >= 4
+      expr: scalar(DCGM_FI_DEV_CLOCK_THROTTLE_REASONS) % 8 >= 4
       for: 5m
       labels:
         severity: warning
