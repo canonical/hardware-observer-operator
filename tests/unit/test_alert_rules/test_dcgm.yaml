@@ -1,0 +1,243 @@
+rule_files:
+  - ../../../src/prometheus_alert_rules/dcgm.yaml
+
+evaluation_interval: 1m
+
+tests:
+#  HW Power Brake Throttle active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{instance="ubuntu-0", nvidia_gpu="0"}'
+      values: '128 128 128 128 128'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-0
+            nvidia_gpu: 0
+            severity: warning
+          exp_annotations:
+            summary: GPU Hardware Power Brake Slowdown throttling detected. (instance ubuntu-0)
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts: []
+
+# HW Thermal Throttle active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{instance="ubuntu-0", nvidia_gpu="1"}'
+      values: '64 64 64 64 64'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-0
+            nvidia_gpu: 1
+            severity: warning
+          exp_annotations:
+            summary: GPU Hardware Thermal throttling detected. (instance ubuntu-0)
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts: []
+
+# SW Thermal Throttle active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{instance="ubuntu-1", nvidia_gpu="0"}'
+      values: '32 32 32 32 32'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-1
+            nvidia_gpu: 0
+            severity: warning
+          exp_annotations:
+            summary: GPU Software Thermal throttling detected. (instance ubuntu-1)
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts: []
+
+# HW Slowdown Throttle active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{instance="ubuntu-1", nvidia_gpu="1"}'
+      values: '8 8 8 8 8'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-1
+            nvidia_gpu: 1
+            severity: warning
+          exp_annotations:
+            summary: GPU Hardware Slowdown throttling detected. (instance ubuntu-1)
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts: []
+
+# SW Power Throttle active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{instance="ubuntu-2", nvidia_gpu="0"}'
+      values: '4 4 4 4 4'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-2
+            nvidia_gpu: 0
+            severity: warning
+          exp_annotations:
+            summary: GPU Software Power throttling detected. (instance ubuntu-2)
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: []
+
+# No throttling
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{instance="ubuntu-0", nvidia_gpu="0"}'
+      values: '0 0 0 0 0'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts: []
+
+#  All throttling reasons active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{instance="ubuntu-3", nvidia_gpu="2"}'
+      values: '255 255 255 255 255'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-3
+            nvidia_gpu: 2
+            severity: warning
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-3
+            nvidia_gpu: 2
+            severity: warning
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-3
+            nvidia_gpu: 2
+            severity: warning
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-3
+            nvidia_gpu: 2
+            severity: warning
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-3
+            nvidia_gpu: 2
+            severity: warning
+
+# Multiple throttling reasons
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{instance="ubuntu-0", nvidia_gpu="0"}'
+      values: '196 196 196 196 196'  # 128 + 64 + 4
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-0
+            nvidia_gpu: 0
+            severity: warning
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-0
+            nvidia_gpu: 0
+            severity: warning
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts:
+        - exp_labels:
+            instance: ubuntu-0
+            nvidia_gpu: 0
+            severity: warning
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: []
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: []

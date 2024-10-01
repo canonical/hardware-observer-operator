@@ -1,0 +1,65 @@
+groups:
+- name: NVIDIA DCGM Throttling Alerts
+  rules:
+    - alert: HWPowerBrakeThrottle
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS & 128 != 0
+      for: 3m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Hardware Power Brake Slowdown throttling detected. (instance {{ $labels.instance }})
+        description: |
+          HW Power Brake Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: {{ $labels.nvidia_gpu }}.
+          This is an indicator of: 
+              - External Power Brake Assertion being triggered (e.g. by the system power supply)
+          LABELS = {{ $labels }}
+    - alert: HWThermalThrottle
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS & 64 != 0
+      for: 3m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Hardware Thermal throttling detected. (instance {{ $labels.instance }})
+        description: |
+          HW Thermal Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: {{ $labels.nvidia_gpu }}.
+          This is an indicator of:
+              - Temperature being too high
+          LABELS = {{ $labels }}
+    - alert: SWThermalThrottle
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS & 32 != 0
+      for: 3m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Software Thermal throttling detected. (instance {{ $labels.instance }})
+        description: |
+          SW Thermal Slowdown is engaged on NVIDIA GPU: {{ $labels.nvidia_gpu }}.
+          This is an indicator of:
+              - Current GPU temperature above the GPU Max Operating Temperature
+              - Current memory temperature above the Memory Max Operating Temperature
+          LABELS = {{ $labels }}
+    - alert: HWSlowdownThrottle
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS & 8 != 0
+      for: 3m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Hardware Slowdown throttling detected. (instance {{ $labels.instance }})
+        description: |
+          HW Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: {{ $labels.nvidia_gpu }}.
+          This is an indicator of:
+              - Temperature being too high
+              - External Power Brake Assertion is triggered (e.g. by the system power supply)
+              - Power draw is too high and Fast Trigger protection is reducing the clocks
+              - May be also reported during PState or clock change
+          LABELS = {{ $labels }}
+    - alert: SWPowerThrottle
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS & 4 != 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Software Power throttling detected. (instance {{ $labels.instance }})
+        description: |
+          SW Power Scaling algorithm is reducing the clocks below requested clocks on NVIDIA GPU: {{ $labels.nvidia_gpu }}.
+          LABELS = {{ $labels }}
