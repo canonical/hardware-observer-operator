@@ -4,7 +4,7 @@ groups:
     - alert: HWPowerBrakeThrottle
       # isolate the least significant 8 bits with % 256
       # check whether bit 7 (starts from bit 0) has been set with the >= bool 128 comparison
-      expr: scalar(DCGM_FI_DEV_CLOCK_THROTTLE_REASONS) % 256 >= bool 128
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 256 >= 128
       for: 5m
       labels:
         severity: warning
@@ -14,12 +14,11 @@ groups:
           HW Power Brake Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: {{ $labels.gpu }}
           This is an indicator of: 
               - External Power Brake Assertion being triggered (e.g. by the system power supply)
-          Throttle reasons (bitmask): {{ $value }}
             LABELS = {{ $labels }}
     - alert: HWThermalThrottle
       # isolate the least significant 7 bits with % 128
       # check whether bit 6 (starts from bit 0) has been set with the >= bool 64 comparison
-      expr: scalar(DCGM_FI_DEV_CLOCK_THROTTLE_REASONS) % 128 >= bool 64
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 128 >= 64
       for: 5m
       labels:
         severity: warning
@@ -29,12 +28,11 @@ groups:
           HW Thermal Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: {{ $labels.gpu }}
           This is an indicator of:
               - Temperature being too high
-          Throttle reasons (bitmask): {{ $value }}
             LABELS = {{ $labels }}
     - alert: SWThermalThrottle
       # isolate the least significant 6 bits with % 64
       # check whether bit 5 (starts from bit 0) has been set with the >= bool 32 comparison
-      expr: scalar(DCGM_FI_DEV_CLOCK_THROTTLE_REASONS) % 64 >= bool 32
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 64 >= 32
       for: 5m
       labels:
         severity: warning
@@ -45,12 +43,11 @@ groups:
           This is an indicator of:
               - Current GPU temperature above the GPU Max Operating Temperature
               - Current memory temperature above the Memory Max Operating Temperature
-          Throttle reasons (bitmask): {{ $value }}
             LABELS = {{ $labels }}
     - alert: SyncBoostThrottle
       # isolate the least significant 5 bits with % 32
       # check whether bit 4 (starts from bit 0) has been set with the >= bool 16 comparison
-      expr: scalar(DCGM_FI_DEV_CLOCK_THROTTLE_REASONS) % 32 >= bool 16
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 32 >= 16
       for: 5m
       labels:
         severity: warning
@@ -60,12 +57,11 @@ groups:
           This NVIDIA GPU: {{ $labels.gpu }} has been added to a Sync boost group with nvidia-smi or DCGM in order to maximize performance per watt.
           All GPUs in the sync boost group will boost to the minimum possible clocks across the entire group.
           Look at the throttle reasons for other GPUs in the system to see why those GPUs are holding this one at lower clocks.
-          Throttle reasons (bitmask): {{ $value }}
             LABELS = {{ $labels }}
     - alert: HWSlowdownThrottle
       # isolate the least significant 4 bits with % 16
       # check whether bit 3 (starts from bit 0) has been set with the >= bool 8 comparison
-      expr: scalar(DCGM_FI_DEV_CLOCK_THROTTLE_REASONS) % 16 >= bool 8
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 16 >= 8
       for: 5m
       labels:
         severity: warning
@@ -78,12 +74,11 @@ groups:
               - External Power Brake Assertion is triggered (e.g. by the system power supply)
               - Power draw is too high and Fast Trigger protection is reducing the clocks
               - May be also reported during PState or clock change
-          Throttle reasons (bitmask): {{ $value }}
             LABELS = {{ $labels }}
     - alert: SWPowerThrottle
       # isolate the least significant 3 bits with % 8
       # check whether bit 2 (starts from bit 0) has been set with the >= bool 4 comparison
-      expr: scalar(DCGM_FI_DEV_CLOCK_THROTTLE_REASONS) % 8 >= bool 4
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 8 >= 4
       for: 5m
       labels:
         severity: warning
@@ -91,5 +86,4 @@ groups:
         summary: GPU Software Power throttling detected. (instance {{ $labels.Hostname }})
         description: |
           SW Power Scaling algorithm is reducing the clocks below requested clocks on NVIDIA GPU: {{ $labels.gpu }}
-          Throttle reasons (bitmask): {{ $value }}
             LABELS = {{ $labels }}
