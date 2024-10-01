@@ -472,10 +472,13 @@ class DCGMExporter(SnapExporter):
             return valid, msg
 
         try:
-            subprocess.check_call("nvidia-smi")
+            subprocess.check_call("nvidia-smi", timeout=60)
             return valid, msg
         except (FileNotFoundError, subprocess.CalledProcessError):
-            return False, "Failed to communicate with NVIDIA driver. Reboot might solve the issue."
+            return (
+                False,
+                "Failed to communicate with NVIDIA driver. Manual intervention is required.",
+            )
 
 
 class HardwareExporter(RenderableExporter):

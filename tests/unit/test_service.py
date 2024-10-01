@@ -971,14 +971,48 @@ def test_snap_exporter_configure(mock_install, snap_exporter, install_result, ex
     mock_install.assert_called_once()
 
 
-def test_dcgm_exporter():
+@pytest.fixture
+def dcgm_exporter():
     mock_config = {
         "dcgm-snap-channel": "latest/stable",
     }
-
     exporter = service.DCGMExporter(mock_config)
-    assert exporter.exporter_name == "dcgm"
-    assert exporter.hw_tools() == {HWTool.DCGM}
+    strategy = mock.MagicMock()
+    exporter.strategy = strategy
+    yield exporter
+    strategy.reset_mock()
+
+
+def test_dcgm_exporter(dcgm_exporter):
+    assert dcgm_exporter.exporter_name == "dcgm"
+    assert dcgm_exporter.hw_tools() == {HWTool.DCGM}
+    assert dcgm_exporter.port == 9400
+
+
+@mock.patch("service.subprocess.check_call")
+def test_dcgm_exporter_validate_exporter_configs_success(_, dcgm_exporter):
+    valid, msg = dcgm_exporter.validate_exporter_configs()
+    assert valid is True
+    assert msg == "Exporter config is valid."
+
+
+@pytest.mark.parametrize(
+    "exception", [FileNotFoundError, service.subprocess.CalledProcessError(1, [])]
+)
+@mock.patch("service.subprocess.check_call")
+def test_dcgm_exporter_validate_exporter_configs_fails(mock_subprocess, dcgm_exporter, exception):
+    mock_subprocess.side_effect = exception
+    valid, msg = dcgm_exporter.validate_exporter_configs()
+    assert valid is False
+    assert msg == "Failed to communicate with NVIDIA driver. Manual intervention is required."
+
+
+@mock.patch.object(service.BaseExporter, "validate_exporter_configs")
+def test_dcgm_exporter_validate_exporter_configs_fails_parent(mock_parent_validate, dcgm_exporter):
+    mock_parent_validate.return_value = False, "Invalid config: exporter's port"
+    valid, msg = dcgm_exporter.validate_exporter_configs()
+    assert valid is False
+    assert msg == "Invalid config: exporter's port"
 
 
 if __name__ == "__main__":

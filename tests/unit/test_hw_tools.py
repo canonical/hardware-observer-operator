@@ -24,6 +24,7 @@ from checksum import (
 from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor, SystemVendor
 from hw_tools import (
     APTStrategyABC,
+    DCGMExporterStrategy,
     HWToolHelper,
     IPMIDCMIStrategy,
     IPMISELStrategy,
@@ -1265,3 +1266,128 @@ def test_snap_strategy_check(snap_exporter, mock_snap_lib, services, expected):
     mock_snap_lib.SnapCache.return_value = {"my-snap": mock_snap_client}
 
     assert snap_exporter.check() is expected
+
+
+@pytest.fixture
+def dcgm_exporter_strategy(mock_snap_lib):
+    strategy = DCGMExporterStrategy("latest/stable")
+    yield strategy
+
+
+@mock.patch("hw_tools.DCGMExporterStrategy._install_nvidia_drivers")
+@mock.patch("hw_tools.DCGMExporterStrategy._install_nvidia_utils")
+def test_dcgm_exporter_strategy_install(
+    mock_install_nvidia_drivers, mock_install_nvidia_utils, dcgm_exporter_strategy
+):
+    dcgm_exporter_strategy.install()
+    mock_install_nvidia_drivers.assert_called_once()
+    mock_install_nvidia_utils.assert_called_once()
+
+
+@mock.patch("hw_tools.apt.add_package")
+@mock.patch("hw_tools.subprocess.check_output")
+@mock.patch("hw_tools.Path")
+def test_dcgm_install_nvidia_drivers_success(
+    mock_path, mock_subprocess, mock_add_package, dcgm_exporter_strategy
+):
+    nvidia_version = mock.MagicMock()
+    nvidia_version.exists.return_value = False
+    mock_path.return_value = nvidia_version
+
+    dcgm_exporter_strategy._install_nvidia_drivers()
+
+    mock_add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
+    mock_subprocess.assert_called_once()
+
+
+@mock.patch("hw_tools.apt.add_package")
+@mock.patch("hw_tools.subprocess.check_output")
+@mock.patch("hw_tools.Path")
+def test_dcgm_install_nvidia_drivers_already_installed(
+    mock_path, mock_subprocess, mock_add_package, dcgm_exporter_strategy
+):
+    nvidia_version = mock.MagicMock()
+    nvidia_version.exists.return_value = True
+    mock_path.return_value = nvidia_version
+
+    dcgm_exporter_strategy._install_nvidia_drivers()
+
+    mock_add_package.assert_not_called()
+    mock_subprocess.assert_not_called()
+
+
+@mock.patch("hw_tools.apt.add_package")
+@mock.patch("hw_tools.subprocess.check_output")
+@mock.patch("hw_tools.Path")
+def test_dcgm_install_nvidia_drivers_subprocess_exception(
+    mock_path, mock_subprocess, mock_add_package, dcgm_exporter_strategy
+):
+    nvidia_version = mock.MagicMock()
+    nvidia_version.exists.return_value = False
+    mock_path.return_value = nvidia_version
+    mock_subprocess.side_effect = subprocess.CalledProcessError(1, [])
+
+    with pytest.raises(subprocess.CalledProcessError):
+        dcgm_exporter_strategy._install_nvidia_drivers()
+
+    mock_add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
+
+
+@mock.patch("hw_tools.apt.add_package")
+@mock.patch("hw_tools.subprocess.check_output")
+@mock.patch("hw_tools.Path")
+def test_dcgm_install_nvidia_drivers_no_drivers_found(
+    mock_path, mock_subprocess, mock_add_package, dcgm_exporter_strategy
+):
+    nvidia_version = mock.MagicMock()
+    nvidia_version.exists.return_value = False
+    mock_path.return_value = nvidia_version
+    mock_subprocess.return_value = "No drivers found for installation"
+
+    with pytest.raises(ResourceInstallationError):
+        dcgm_exporter_strategy._install_nvidia_drivers()
+
+    mock_add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
+
+
+@mock.patch("hw_tools.apt.add_package")
+@mock.patch("hw_tools.Path")
+def test_install_nvidia_utils_driver_installed_from_charm(
+    mock_path, mock_add_package, dcgm_exporter_strategy
+):
+    driver_version = mock.MagicMock()
+    driver_version.exists.return_value = True
+    driver_version.read_text.return_value = (
+        "nvidia-headless-no-dkms-535-server\nlibnvidia-cfg1-535-server"
+    )
+    mock_path.return_value = driver_version
+
+    dcgm_exporter_strategy._install_nvidia_utils()
+    mock_add_package.assert_called_with("nvidia-utils-535", update_cache=True)
+
+
+@mock.patch("hw_tools.apt.add_package")
+@mock.patch("hw_tools.Path")
+def test_install_nvidia_utils_driver_not_installed_from_charm(
+    mock_path, mock_add_package, dcgm_exporter_strategy
+):
+    driver_version = mock.MagicMock()
+    driver_version.exists.return_value = False
+    mock_path.return_value = driver_version
+
+    dcgm_exporter_strategy._install_nvidia_utils()
+    mock_add_package.assert_not_called()
+
+
+@mock.patch("hw_tools.apt.add_package")
+@mock.patch("hw_tools.Path")
+def test_install_nvidia_utils_driver_unexpected_format(
+    mock_path, mock_add_package, dcgm_exporter_strategy
+):
+    driver_version = mock.MagicMock()
+    driver_version.exists.return_value = True
+    driver_version.read_text.return_value = "nvidia-my-version-server"
+    mock_path.return_value = driver_version
+
+    dcgm_exporter_strategy._install_nvidia_utils()
+    mock_add_package.assert_not_called()

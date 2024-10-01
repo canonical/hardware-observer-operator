@@ -254,11 +254,15 @@ class DCGMExporterStrategy(SnapStrategy):
 
         logger.info("Installing NVIDIA driver")
         apt.add_package(self.pkg, update_cache=True)
+
+        # output what driver was installed helps gets the version installed later
         cmd = (
             "ubuntu-drivers install --gpgpu --package-list "
             f"{self.snap_common}/nvidia-installed-pkgs.txt"
         )
         try:
+            # This can be changed to check_call and not rely in the output if this is fixed
+            # https://github.com/canonical/ubuntu-drivers-common/issues/106
             result = subprocess.check_output(cmd.split(), text=True)
             if "No drivers found for installation" in result:
                 raise ResourceInstallationError(self._name)
@@ -271,18 +275,25 @@ class DCGMExporterStrategy(SnapStrategy):
     def _install_nvidia_utils(self) -> None:
         """Install the nvidia utils to be able to use nvidia-smi."""
         nvidia_pkg = Path(self.snap_common / "nvidia-installed-pkgs.txt")
-        if nvidia_pkg.exists():
-            installed_pkg = nvidia_pkg.read_text(encoding="utf-8").splitlines()[0]
-            logger.debug("installed driver from hardware-observer: %s", installed_pkg)
-            nvidia_version = installed_pkg.split("-")[-2]
+        if not nvidia_pkg.exists():
+            logger.debug("nvidia-utils not installed by the charm")
+            return
 
-            if nvidia_version.isdigit():
-                pkg = f"nvidia-utils-{nvidia_version}"
-                apt.add_package(pkg, update_cache=True)
-                logger.info("installed %s", pkg)
-                return
+        installed_pkg = nvidia_pkg.read_text(encoding="utf-8").splitlines()[0]
+        logger.debug("installed driver from hardware-observer: %s", installed_pkg)
+        nvidia_version = installed_pkg.split("-")[-2]
 
-        logger.debug("nvidia-utils not installed")
+        if not nvidia_version.isdigit():
+            logger.warning(
+                "driver %s is an unexpected format and nvidia-utils was not installed",
+                installed_pkg,
+            )
+            return
+
+        pkg = f"nvidia-utils-{nvidia_version}"
+        apt.add_package(pkg, update_cache=True)
+        logger.info("installed %s", pkg)
+        return
 
 
 class StorCLIStrategy(TPRStrategyABC):
