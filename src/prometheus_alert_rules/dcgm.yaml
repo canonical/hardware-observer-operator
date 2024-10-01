@@ -2,7 +2,7 @@ groups:
 - name: NVIDIA DCGM Throttling Alerts
   rules:
     - alert: HWPowerBrakeThrottle
-      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS & 128 != 0
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS and 128 != 0
       for: 3m
       labels:
         severity: warning
@@ -14,7 +14,7 @@ groups:
               - External Power Brake Assertion being triggered (e.g. by the system power supply)
           LABELS = {{ $labels }}
     - alert: HWThermalThrottle
-      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS & 64 != 0
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS and 64 != 0
       for: 3m
       labels:
         severity: warning
@@ -26,7 +26,7 @@ groups:
               - Temperature being too high
           LABELS = {{ $labels }}
     - alert: SWThermalThrottle
-      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS & 32 != 0
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS and 32 != 0
       for: 3m
       labels:
         severity: warning
@@ -39,7 +39,7 @@ groups:
               - Current memory temperature above the Memory Max Operating Temperature
           LABELS = {{ $labels }}
     - alert: HWSlowdownThrottle
-      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS & 8 != 0
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS and 8 != 0
       for: 3m
       labels:
         severity: warning
@@ -54,7 +54,7 @@ groups:
               - May be also reported during PState or clock change
           LABELS = {{ $labels }}
     - alert: SWPowerThrottle
-      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS & 4 != 0
+      expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS and 4 != 0
       for: 5m
       labels:
         severity: warning
