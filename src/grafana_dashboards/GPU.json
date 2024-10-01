@@ -924,9 +924,13 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "uid": "$datasource"
@@ -965,7 +969,7 @@
           "uid": "$datasource"
         },
         "definition": "label_values(DCGM_FI_DEV_GPU_TEMP, gpu)",
-        "hide": 0,
+        "hide": 2,
         "includeAll": true,
         "label": "NVIDIA GPU",
         "multi": true,
@@ -995,7 +999,7 @@
           "uid": "$datasource"
         },
         "definition": "label_values(node_hwmon_chip_names{chip_name=\"amdgpu\"}, chip)",
-        "hide": 0,
+        "hide": 2,
         "includeAll": true,
         "label": "AMD GPU",
         "multi": true,
@@ -1037,6 +1041,6 @@
   "timezone": "",
   "title": "GPU Dashboard",
   "uid": "Oxed_c6Wz",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }
