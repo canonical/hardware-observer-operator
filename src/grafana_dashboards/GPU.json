@@ -21,7 +21,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 12239,
   "graphTooltip": 0,
-  "id": 19,
+  "id": 117,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -120,7 +120,7 @@
           "expr": "DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$instance\", gpu=~\"$nvidia_gpu\"}",
           "instant": false,
           "interval": "",
-          "legendFormat": "NVIDIA GPU {{gpu}}",
+          "legendFormat": "NVIDIA GPU: {{gpu}}",
           "refId": "A"
         },
         {
@@ -764,7 +764,7 @@
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "NVIDIA GPU {{gpu}}",
+          "legendFormat": "NVIDIA GPU: {{gpu}}",
           "range": true,
           "refId": "A"
         },
@@ -898,7 +898,7 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "",
+  "refresh": "5s",
   "schemaVersion": 38,
   "style": "dark",
   "tags": [],
@@ -907,8 +907,8 @@
       {
         "current": {
           "selected": false,
-          "text": "juju_cos_85afb05d-6cc7-4cb4-86f1-9e21f286b896_prometheus_0",
-          "value": "juju_cos_85afb05d-6cc7-4cb4-86f1-9e21f286b896_prometheus_0"
+          "text": "juju_cos_8738e89e-feb2-4d9d-82b4-c28b536197df_prometheus_0",
+          "value": "juju_cos_8738e89e-feb2-4d9d-82b4-c28b536197df_prometheus_0"
         },
         "hide": 0,
         "includeAll": false,
@@ -1037,6 +1037,6 @@
   "timezone": "",
   "title": "GPU Dashboard",
   "uid": "Oxed_c6Wz",
-  "version": 3,
+  "version": 2,
   "weekStart": ""
 }
