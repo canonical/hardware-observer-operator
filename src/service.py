@@ -18,7 +18,6 @@ from redfish.rest.v1 import InvalidCredentialsError
 from config import (
     HARDWARE_EXPORTER_COLLECTOR_MAPPING,
     HARDWARE_EXPORTER_SETTINGS,
-    SMARTCTL_EXPORTER_SETTINGS,
     ExporterSettings,
     HWTool,
 )
@@ -310,67 +309,6 @@ def remove_file(path: Path) -> bool:
     return success
 
 
-class SmartCtlExporter(RenderableExporter):
-    """A class representing the smartctl exporter and the metric endpoints."""
-
-    required_config: bool = False
-
-    def __init__(self, charm_dir: Path, config: ConfigData) -> None:
-        """Initialize the Hardware Exporter class."""
-        super().__init__(charm_dir, config, SMARTCTL_EXPORTER_SETTINGS)
-
-        self.port = int(config["smartctl-exporter-port"])
-        self.collect_timeout = int(config["collect-timeout"])
-        self.log_level = str(config["exporter-log-level"])
-        self.strategy = SmartCtlExporterStrategy()
-
-    def render_service(self) -> bool:
-        """Render required files for service."""
-        service_rendered = self._render_service(
-            {
-                "PORT": str(self.port),
-                "LEVEL": self.log_level,
-            }
-        )
-        return service_rendered
-
-    def configure(self) -> bool:
-        """Override base configure to render the service file.
-
-        This is because smartctl_exporter doesn't support providing config file.
-        The config options need to be provided as flags while exectuting
-        smartctl_exporter. So, the service file must be re-rendered when a config
-        value is changed.
-        """
-        service_rendered = self.render_service()
-        if service_rendered:
-            systemd.daemon_reload()
-        return service_rendered
-
-    @staticmethod
-    def hw_tools() -> Set[HWTool]:
-        """Return hardware tools to watch."""
-        return {HWTool.SMARTCTL}
-
-    def install_resources(self) -> bool:
-        restart = False
-        if self.check_active():
-            systemd.service_stop(self.exporter_name)
-            restart = True
-        self.strategy.install()
-        if restart:
-            systemd.service_restart(self.exporter_name)
-        logger.debug("Finish install resources for %s", self.exporter_name)
-        return True
-
-    def resources_exist(self) -> bool:
-        return self.strategy.check()
-
-    def remove_resources(self) -> bool:
-        self.strategy.remove()
-        return True
-
-
 class SnapExporter(BaseExporter):
     """A class representing a snap exporter."""
 
@@ -382,7 +320,11 @@ class SnapExporter(BaseExporter):
     def __init__(self, config: ConfigData):
         """Init."""
         self.config = config
-        self.snap_client = snap.SnapCache()[self.strategy.snap]
+
+    @property
+    def snap_client(self) -> snap.Snap:
+        """Return the snap client."""
+        return snap.SnapCache()[self.strategy.snap]
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
@@ -396,7 +338,6 @@ class SnapExporter(BaseExporter):
         """
         try:
             self.strategy.install()
-            # dcgm-exporter is disabled by default
             self.enable_and_start()
             return self.snap_client.present is True
         except Exception:  # pylint: disable=broad-except
@@ -429,6 +370,18 @@ class SnapExporter(BaseExporter):
     def restart(self) -> None:
         """Restart the exporter daemon."""
         self.snap_client.restart(reload=True)
+
+    def set(self, snap_config: dict) -> bool:
+        """Set config options for the snap service.
+
+        Return true if successfully updated snap config, otherwise false.
+        """
+        try:
+            self.snap_client.set(snap_config, typed=True)
+        except snap.SnapError as err:
+            logger.error("Failed to update snap configs %s: %s", self.strategy.snap, err)
+            return False
+        return True
 
     def check_health(self) -> bool:
         """Check if all services are active.
@@ -481,6 +434,33 @@ class DCGMExporter(SnapExporter):
     def hw_tools() -> Set[HWTool]:
         """Return hardware tools to watch."""
         return {HWTool.DCGM}
+
+
+class SmartCtlExporter(SnapExporter):
+    """A class representing the smartctl exporter and the metric endpoints."""
+
+    exporter_name: str = "smartctl-exporter"
+
+    def __init__(self, config: ConfigData) -> None:
+        """Initialize the SmartctlExporter class."""
+        self.port = int(config["smartctl-exporter-port"])
+        self.log_level = str(config["exporter-log-level"])
+        self.strategy = SmartCtlExporterStrategy(str(config["smartctl-exporter-snap-channel"]))
+        super().__init__(config)
+
+    @staticmethod
+    def hw_tools() -> Set[HWTool]:
+        """Return hardware tools to watch."""
+        return {HWTool.SMARTCTL_EXPORTER}
+
+    def configure(self) -> bool:
+        """Set the necessary exporter configurations or change snap channel."""
+        return super().configure() and self.set(
+            {
+                "log.level": self.log_level.lower(),
+                "web.listen-address": f":{self.port}",
+            }
+        )
 
 
 class HardwareExporter(RenderableExporter):

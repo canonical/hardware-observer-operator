@@ -8,6 +8,7 @@ from unittest import mock
 
 import pytest
 import yaml
+from charms.operator_libs_linux.v2 import snap
 from parameterized import parameterized
 from redfish.rest.v1 import InvalidCredentialsError
 
@@ -1018,6 +1019,19 @@ def test_snap_exporter_restart(snap_exporter):
     snap_exporter.snap_client.restart.assert_called_once_with(reload=True)
 
 
+def test_snap_exporter_set(snap_exporter):
+    snap_config = {}
+    assert snap_exporter.set(snap_config) is True
+    snap_exporter.snap_client.set.assert_called_once_with(snap_config, typed=True)
+
+
+def test_snap_exporter_set_failed(snap_exporter):
+    snap_config = {}
+    snap_exporter.snap_client.set.side_effect = snap.SnapError()
+    assert snap_exporter.set(snap_config) is False
+    snap_exporter.snap_client.set.assert_called_once_with(snap_config, typed=True)
+
+
 def test_snap_exporter_check_health(snap_exporter):
     snap_exporter.check_health()
     snap_exporter.strategy.check.assert_called_once()
@@ -1030,6 +1044,24 @@ def test_snap_exporter_configure(mock_install, snap_exporter, install_result, ex
 
     assert snap_exporter.configure() is expected_result
     mock_install.assert_called_once()
+
+
+@pytest.mark.parametrize("result, expected_result", [(True, True), (False, False)])
+@mock.patch("service.SnapExporter.install")
+@mock.patch("service.SnapExporter.set")
+def test_smartctl_exporter_configure(mock_set, mock_install, result, expected_result):
+    mock_config = {
+        "smartctl-exporter-port": "10000",
+        "exporter-log-level": "info",
+        "smartctl-exporter-snap-channel": "latest/stable",
+    }
+
+    mock_set.return_value = result
+    mock_install.return_value = result
+    exporter = service.SmartCtlExporter(mock_config)
+    assert exporter.exporter_name == "smartctl-exporter"
+    assert exporter.hw_tools() == {HWTool.SMARTCTL_EXPORTER}
+    assert exporter.configure() is expected_result
 
 
 if __name__ == "__main__":
