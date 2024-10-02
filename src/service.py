@@ -1,6 +1,7 @@
 """Exporter service helper."""
 
 import os
+import shutil
 from abc import ABC, abstractmethod
 from logging import getLogger
 from pathlib import Path
@@ -402,11 +403,32 @@ class DCGMExporter(SnapExporter):
 
     exporter_name: str = "dcgm"
     port: int = 9400
+    snap_common: Path = Path("/var/snap/dcgm/common/")
+    metric_config: str = "dcgm-exporter-metrics-file"
 
-    def __init__(self, config: ConfigData):
+    def __init__(self, charm_dir: Path, config: ConfigData):
         """Init."""
         self.strategy = DCGMExporterStrategy(str(config["dcgm-snap-channel"]))
+        self.charm_dir = charm_dir
+        self.metrics_file = self.charm_dir / "src/gpu_metrics/dcgm_metrics.csv"
+        self.metric_config_value = self.metrics_file.name
         super().__init__(config)
+
+    def install(self) -> bool:
+        """Install the DCGM exporter and configure custom metrics."""
+        if not super().install():
+            return False
+
+        logger.info("Creating a custom metrics file and configuring the DCGM snap to use it")
+        try:
+            shutil.copy(self.metrics_file, self.snap_common)
+            self.snap_client.set({self.metric_config: self.metric_config_value})
+            self.snap_client.restart(reload=True)
+        except Exception as err:  # pylint: disable=broad-except
+            logger.error("Failed to configure custom DCGM metrics: %s", err)
+            return False
+
+        return True
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
