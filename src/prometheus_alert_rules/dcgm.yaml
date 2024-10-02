@@ -1,3 +1,7 @@
+# The alerts use DCGM_FI_DEV_CLOCK_THROTTLE_REASONS metric to detect throttling events on NVIDIA GPUs,
+# which is a bitmask of throttle reasons found here: https://docs.nvidia.com/datacenter/dcgm/2.1/dcgm-api/group__dcgmFieldConstants.html.
+# The 8 least significant bits are used for the alerts, with each bit representing a different throttle reason.
+
 groups:
 - name: NVIDIA DCGM Throttling Alerts
   rules:
