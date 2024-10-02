@@ -234,7 +234,6 @@ class DCGMExporterStrategy(SnapStrategy):
 
     _name = HWTool.DCGM
     snap_common: Path = Path("/var/snap/dcgm/common/")
-    pkg = "ubuntu-drivers-common"
 
     def __init__(self, channel: str) -> None:
         """Init."""
@@ -249,11 +248,11 @@ class DCGMExporterStrategy(SnapStrategy):
     def _install_nvidia_drivers(self) -> None:
         """Install the NVIDIA driver if not present."""
         if Path("/proc/driver/nvidia/version").exists():
-            logger.info("Driver already installed in the machine")
+            logger.info("NVIDIA driver already installed in the machine")
             return
 
         logger.info("Installing NVIDIA driver")
-        apt.add_package(self.pkg, update_cache=True)
+        apt.add_package("ubuntu-drivers-common", update_cache=True)
 
         # output what driver was installed helps gets the version installed later
         cmd = (
@@ -265,12 +264,15 @@ class DCGMExporterStrategy(SnapStrategy):
             # https://github.com/canonical/ubuntu-drivers-common/issues/106
             result = subprocess.check_output(cmd.split(), text=True)
             if "No drivers found for installation" in result:
+                logger.warning(
+                    "No drivers for the NVIDIA GPU were found. Manual installation is necessary"
+                )
                 raise ResourceInstallationError(self._name)
-            logger.info("NVIDIA driver installed")
-            return
         except subprocess.CalledProcessError as err:
             logger.error("Failed to install the NVIDIA driver: %s", err)
             raise err
+
+        logger.info("NVIDIA driver installed")
 
     def _install_nvidia_utils(self) -> None:
         """Install the nvidia utils to be able to use nvidia-smi."""
@@ -290,7 +292,7 @@ class DCGMExporterStrategy(SnapStrategy):
             )
             return
 
-        pkg = f"nvidia-utils-{nvidia_version}"
+        pkg = f"nvidia-utils-{nvidia_version}-server"
         apt.add_package(pkg, update_cache=True)
         logger.info("installed %s", pkg)
         return

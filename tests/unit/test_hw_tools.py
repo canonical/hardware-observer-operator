@@ -1363,7 +1363,7 @@ def test_install_nvidia_utils_driver_installed_from_charm(
     mock_path.return_value = driver_version
 
     dcgm_exporter_strategy._install_nvidia_utils()
-    mock_add_package.assert_called_with("nvidia-utils-535", update_cache=True)
+    mock_add_package.assert_called_with("nvidia-utils-535-server", update_cache=True)
 
 
 @mock.patch("hw_tools.apt.add_package")

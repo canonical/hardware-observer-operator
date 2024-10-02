@@ -475,6 +475,11 @@ class DCGMExporter(SnapExporter):
             subprocess.check_call("nvidia-smi", timeout=60)
             return valid, msg
         except (FileNotFoundError, subprocess.CalledProcessError):
+            logger.warning(
+                "nvidia-smi is not working. It's necessary to manually remove and install "
+                "a different NVIDIA driver until nvidia-smi is working. See the docs for more "
+                "details: https://ubuntu.com/server/docs/nvidia-drivers-installation"
+            )
             return (
                 False,
                 "Failed to communicate with NVIDIA driver. Manual intervention is required.",
