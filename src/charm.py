@@ -12,7 +12,7 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
-from hw_tools import HWTool, HWToolHelper, detect_available_tools
+from hw_tools import HWTool, HWToolHelper, detect_available_tools, remove_legacy_smartctl_exporter
 from service import BaseExporter, DCGMExporter, ExporterError, HardwareExporter, SmartCtlExporter
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ class HardwareObserverCharm(ops.CharmBase):
             )
 
         if stored_tools & SmartCtlExporter.hw_tools():
-            exporters.append(SmartCtlExporter(self.charm_dir, self.model.config))
+            exporters.append(SmartCtlExporter(self.model.config))
 
         if stored_tools & DCGMExporter.hw_tools():
             exporters.append(DCGMExporter(self.model.config))
@@ -97,6 +97,8 @@ class HardwareObserverCharm(ops.CharmBase):
         if not self._stored.stored_tools:  # type: ignore[truthy-function]
             available_tools = detect_available_tools()  # type: ignore[unreachable]
             self._stored.stored_tools = {tool.value for tool in available_tools}
+        if "smartctl" in self._stored.stored_tools:  # type: ignore[operator]
+            self._stored.stored_tools.remove("smartctl")  # type: ignore[attr-defined]
         return {HWTool(value) for value in self._stored.stored_tools}  # type: ignore[attr-defined]
 
     def _on_redetect_hardware(self, event: ops.ActionEvent) -> None:
@@ -129,6 +131,8 @@ class HardwareObserverCharm(ops.CharmBase):
     def _on_install_or_upgrade(self, event: EventBase) -> None:
         """Install or upgrade charm."""
         self.model.unit.status = MaintenanceStatus("Installing resources...")
+
+        remove_legacy_smartctl_exporter()
 
         stored_tools = self.get_stored_tools()
 

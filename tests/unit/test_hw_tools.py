@@ -1,8 +1,6 @@
 import stat
 import subprocess
-import tempfile
 import unittest
-from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
 
@@ -31,11 +29,8 @@ from hw_tools import (
     PercCLIStrategy,
     ResourceChecksumError,
     ResourceFileSizeZeroError,
-    ResourceInstallationError,
     SAS2IRCUStrategy,
     SAS3IRCUStrategy,
-    SmartCtlExporterStrategy,
-    SmartCtlStrategy,
     SnapStrategy,
     SSACLIStrategy,
     StorCLIStrategy,
@@ -55,6 +50,7 @@ from hw_tools import (
     raid_hw_verifier,
     redfish_available,
     remove_deb,
+    remove_legacy_smartctl_exporter,
     symlink,
 )
 from keys import HP_KEYS
@@ -729,126 +725,6 @@ class TestIPMIDCMIStrategy(unittest.TestCase):
         mock_apt.remove_package.assert_not_called()
 
 
-class TestSmartCtlStrategy(unittest.TestCase):
-    @mock.patch("apt_helpers.get_candidate_version")
-    @mock.patch("apt_helpers.apt")
-    def test_install(self, mock_apt, mock_candidate_version):
-        strategy = SmartCtlStrategy()
-        mock_candidate_version.return_value = "some-candidate-version"
-        strategy.install()
-
-        mock_apt.add_package.assert_called_with(
-            "smartmontools", version="some-candidate-version", update_cache=False
-        )
-
-    @mock.patch("hw_tools.apt")
-    def test_remove(self, mock_apt):
-        strategy = SmartCtlStrategy()
-        strategy.remove()
-
-        mock_apt.remove_package.assert_not_called()
-
-    @mock.patch("hw_tools.check_deb_pkg_installed")
-    def test_check(self, mock_check_deb_method):
-        strategy = SmartCtlStrategy()
-        strategy.check()
-
-        mock_check_deb_method.assert_called_with("smartmontools")
-
-
-class TestSmartCtlExporterStrategy(unittest.TestCase):
-    def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.tmp_path = Path(self.temp_dir.name)
-
-    def tearDown(self):
-        self.temp_dir.cleanup()
-
-    @mock.patch("hw_tools.requests.get")
-    @mock.patch("hw_tools.tarfile.open")
-    @mock.patch("hw_tools.make_executable")
-    def test_install_success(
-        self,
-        mock_make_executable,
-        mock_tar_open,
-        mock_requests_get,
-    ):
-        strategy = SmartCtlExporterStrategy()
-        strategy._resource_dir = self.tmp_path
-        strategy._exporter_path = self.tmp_path / "smartctl_exporter"
-
-        mock_response = mock.MagicMock(status_code=HTTPStatus.OK)
-        mock_response.content = b"dummy content"
-        mock_requests_get.return_value = mock_response
-        mock_member = mock.MagicMock(name="member")
-        mock_member.name = "smartctl_exporter"
-        mock_member_file = mock.MagicMock()
-        mock_member_file.read.return_value = b"dummy content"
-        mock_tar_open.return_value.__enter__.return_value.getmembers.return_value = [mock_member]
-        mock_tar_open.return_value.__enter__.return_value.extractfile.return_value = (
-            mock_member_file  # noqa: E501
-        )
-
-        strategy.install()
-
-        mock_requests_get.assert_called_with(strategy._release, timeout=60)
-        # mock_tar_open.assert_called_with(fileobj=BytesIO(b"dummy content"), mode="r:gz")
-        mock_make_executable.assert_called_with(strategy._exporter_path)
-        self.assertTrue(strategy._resource_dir.exists())
-
-    @mock.patch("hw_tools.requests.get")
-    def test_install_download_failure(self, mock_requests_get):
-        strategy = SmartCtlExporterStrategy()
-        strategy._resource_dir = self.tmp_path
-        strategy._exporter_path = self.tmp_path / "smartctl_exporter"
-
-        mock_response = mock.MagicMock(status_code=HTTPStatus.NOT_FOUND)
-        mock_requests_get.return_value = mock_response
-
-        with self.assertRaises(ResourceInstallationError):
-            strategy.install()
-
-    @mock.patch("hw_tools.requests.get")
-    @mock.patch("hw_tools.tarfile.open")
-    def test_install_parse_failure(self, mock_tar_open, mock_requests_get):
-        strategy = SmartCtlExporterStrategy()
-        strategy._resource_dir = self.tmp_path
-        strategy._exporter_path = self.tmp_path / "smartctl_exporter"
-
-        mock_response = mock.MagicMock(status_code=HTTPStatus.OK)
-        mock_response.content = b"dummy content"
-        mock_requests_get.return_value = mock_response
-        mock_member = mock.MagicMock(name="member")
-        mock_member.name = "random name"
-        mock_member_file = mock.MagicMock()
-        mock_member_file.read.return_value = b"dummy content"
-        mock_tar_open.return_value.__enter__.return_value.getmembers.return_value = [mock_member]
-        mock_tar_open.return_value.__enter__.return_value.extractfile.return_value = (
-            mock_member_file  # noqa: E501
-        )
-
-        with self.assertRaises(ResourceInstallationError):
-            strategy.install()
-
-    @mock.patch("hw_tools.shutil.rmtree")
-    def test_remove(self, mock_shutil_rmtree):
-        strategy = SmartCtlExporterStrategy()
-
-        strategy.remove()
-
-        mock_shutil_rmtree.assert_called_with(strategy._resource_dir)
-
-    def test_check(self):
-        strategy = SmartCtlExporterStrategy()
-        strategy._exporter_path = mock.MagicMock()
-        strategy._exporter_path.is_file.return_value = True
-
-        result = strategy.check()
-        self.assertTrue(result)
-
-        strategy._exporter_path.is_file.assert_called()
-
-
 @mock.patch("hw_tools.disk_hw_verifier", return_value={7, 8, 9})
 @mock.patch("hw_tools.bmc_hw_verifier", return_value={1, 2, 3})
 @mock.patch("hw_tools.raid_hw_verifier", return_value={4, 5, 6})
@@ -982,7 +858,7 @@ class TestDiskHWVerifier(unittest.TestCase):
     @mock.patch("hw_tools.lshw", return_value=[True])
     def test_disk_available(self, mock_lshw):
         tools = disk_hw_verifier()
-        self.assertEqual(tools, {HWTool.SMARTCTL})
+        self.assertEqual(tools, {HWTool.SMARTCTL_EXPORTER})
 
     @mock.patch("hw_tools.lshw", return_value=[])
     def test_disk_not_available(self, mock_lshw):
@@ -1265,3 +1141,36 @@ def test_snap_strategy_check(snap_exporter, mock_snap_lib, services, expected):
     mock_snap_lib.SnapCache.return_value = {"my-snap": mock_snap_client}
 
     assert snap_exporter.check() is expected
+
+
+@mock.patch("hw_tools.Path.unlink")
+@mock.patch("hw_tools.Path.exists")
+@mock.patch("hw_tools.shutil")
+@mock.patch("hw_tools.systemd")
+def test_remove_legacy_smartctl_exporter_exist(
+    mock_systemd, mock_shutil, mock_path_exists, mock_path_unlink
+):
+    mock_path_exists.return_value = True
+    remove_legacy_smartctl_exporter()
+
+    mock_systemd.service_stop.assert_called_once()
+    mock_systemd.service_disable.assert_called_once()
+    mock_path_unlink.assert_called()
+    assert mock_path_unlink.call_count == 2
+    mock_shutil.rmtree.assert_called_once()
+
+
+@mock.patch("hw_tools.Path.unlink")
+@mock.patch("hw_tools.Path.exists")
+@mock.patch("hw_tools.shutil")
+@mock.patch("hw_tools.systemd")
+def test_remove_legacy_smartctl_exporter_not_exists(
+    mock_systemd, mock_shutil, mock_path_exists, mock_path_unlink
+):
+    mock_path_exists.return_value = False
+    remove_legacy_smartctl_exporter()
+
+    mock_systemd.service_stop.assert_not_called()
+    mock_systemd.service_disable.assert_not_called()
+    mock_path_unlink.assert_not_called()
+    mock_shutil.rmtree.assert_not_called()
