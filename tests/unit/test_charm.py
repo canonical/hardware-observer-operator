@@ -15,13 +15,7 @@ from parameterized import parameterized
 import charm
 from charm import ExporterError, HardwareObserverCharm
 from config import HWTool
-from service import (
-    HARDWARE_EXPORTER_SETTINGS,
-    SMARTCTL_EXPORTER_SETTINGS,
-    DCGMExporter,
-    HardwareExporter,
-    SmartCtlExporter,
-)
+from service import HARDWARE_EXPORTER_SETTINGS, DCGMExporter, HardwareExporter, SmartCtlExporter
 
 
 class TestCharm(unittest.TestCase):
@@ -72,12 +66,12 @@ class TestCharm(unittest.TestCase):
             ),
             (
                 "Enable two exporters",
-                {HWTool.IPMI_SEL, HWTool.SMARTCTL},
+                {HWTool.IPMI_SEL, HWTool.SMARTCTL_EXPORTER},
                 {"hardware-exporter", "smartctl-exporter"},
             ),
             (
                 "Enable all exporters",
-                {HWTool.IPMI_SEL, HWTool.SMARTCTL, HWTool.DCGM},
+                {HWTool.IPMI_SEL, HWTool.SMARTCTL_EXPORTER, HWTool.DCGM},
                 {"hardware-exporter", "smartctl-exporter", "dcgm"},
             ),
         ]
@@ -98,7 +92,7 @@ class TestCharm(unittest.TestCase):
         mock_hw_exporter.return_value = hw_exporter
 
         smart_exporter = mock.MagicMock()
-        smart_exporter.exporter_name = SMARTCTL_EXPORTER_SETTINGS.name
+        smart_exporter.exporter_name = SmartCtlExporter.exporter_name
         mock_smart_exporter.hw_tools.return_value = SmartCtlExporter.hw_tools()
         mock_smart_exporter.return_value = smart_exporter
 
@@ -117,7 +111,7 @@ class TestCharm(unittest.TestCase):
             (
                 "happy case",
                 "install",
-                {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL},
+                {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL_EXPORTER},
                 (True, ""),
                 [mock.MagicMock(), mock.MagicMock()],
                 [True, True],
@@ -125,7 +119,7 @@ class TestCharm(unittest.TestCase):
             (
                 "happy case",
                 "upgrade",
-                {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL},
+                {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL_EXPORTER},
                 (True, ""),
                 [mock.MagicMock(), mock.MagicMock()],
                 [True, True],
@@ -133,7 +127,7 @@ class TestCharm(unittest.TestCase):
             (
                 "missing resource",
                 "install",
-                {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL},
+                {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL_EXPORTER},
                 (False, "miss something"),
                 [mock.MagicMock(), mock.MagicMock()],
                 [True, True],
@@ -141,7 +135,7 @@ class TestCharm(unittest.TestCase):
             (
                 "missing resource",
                 "upgrade",
-                {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL},
+                {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL_EXPORTER},
                 (False, "miss something"),
                 [mock.MagicMock(), mock.MagicMock()],
                 [True, True],
@@ -149,7 +143,7 @@ class TestCharm(unittest.TestCase):
             (
                 "Exporter install fail",
                 "install",
-                {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL},
+                {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL_EXPORTER},
                 (True, ""),
                 [mock.MagicMock(), mock.MagicMock()],
                 [False, True],
@@ -157,7 +151,7 @@ class TestCharm(unittest.TestCase):
             (
                 "Exporter install fail",
                 "upgrade",
-                {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL},
+                {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL_EXPORTER},
                 (True, ""),
                 [mock.MagicMock(), mock.MagicMock()],
                 [False, True],
@@ -227,14 +221,14 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.get_stored_tools.return_value = {
                 HWTool.IPMI_SENSOR,
                 HWTool.IPMI_SEL,
-                HWTool.SMARTCTL,
+                HWTool.SMARTCTL_EXPORTER,
             }
 
             self.harness.charm.on.remove.emit()
 
         self.harness.charm.hw_tool_helper.remove.assert_called_with(
             self.harness.charm.model.resources,
-            {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL},
+            {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL_EXPORTER},
         )
         for mock_exporter in mock_exporters:
             mock_exporter.uninstall.assert_called()
@@ -792,3 +786,8 @@ class TestCharm(unittest.TestCase):
             self.harness.begin()
             result = self.harness.charm.validate_configs()
             self.assertEqual(result, expect)
+
+    def test_get_stored_tools_remove_legacy_smartctl(self):
+        self.harness.begin()
+        self.harness.charm._stored.stored_tools = {"smartctl"}
+        assert self.harness.charm.get_stored_tools() == set()
