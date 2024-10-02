@@ -452,7 +452,7 @@ class TestHardwareExporter(unittest.TestCase):
         mock_super.return_value.validate_exporter_configs.return_value = (False, "something wrong")
         self.assertEqual((False, "something wrong"), self.exporter.validate_exporter_configs())
 
-        mock_super.return_value.validate_exporter_configs.accept_called()
+        mock_super.return_value.validate_exporter_configs.assert_called()
         self.exporter.redfish_conn_params_valid.assert_not_called()
 
     @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
@@ -771,10 +771,10 @@ class TestSmartMetricExporter(unittest.TestCase):
 
         self.exporter.install_resources()
 
-        self.exporter.strategy.install.accept_called()
-        self.exporter.check_active.accept_called()
-        mock_systemd.service_stop.accept_called_with(self.exporter.exporter_name)
-        mock_systemd.service_restart.accept_called_with(self.exporter.exporter_name)
+        self.exporter.strategy.install.assert_called()
+        self.exporter.check_active.assert_called()
+        mock_systemd.service_stop.assert_called_with(self.exporter.exporter_name)
+        mock_systemd.service_restart.assert_called_with(self.exporter.exporter_name)
 
     @mock.patch("service.systemd", return_value=mock.MagicMock())
     def test_install_resource_no_restart(self, mock_systemd):
@@ -784,16 +784,16 @@ class TestSmartMetricExporter(unittest.TestCase):
 
         self.exporter.install_resources()
 
-        self.exporter.strategy.install.accept_called()
-        self.exporter.check_active.accept_called()
-        mock_systemd.service_stop.accept_not_called()
-        mock_systemd.service_restart.accept_not_called()
+        self.exporter.strategy.install.assert_called()
+        self.exporter.check_active.assert_called()
+        mock_systemd.service_stop.assert_not_called()
+        mock_systemd.service_restart.assert_not_called()
 
     def test_resource_exists(self):
         self.exporter.strategy = mock.MagicMock()
 
         self.exporter.resources_exist()
-        self.exporter.strategy.check.accept_called()
+        self.exporter.strategy.check.assert_called()
 
     def test_resources_exist(self):
         self.exporter.strategy = mock.MagicMock()
@@ -802,7 +802,7 @@ class TestSmartMetricExporter(unittest.TestCase):
         result = self.exporter.resources_exist()
 
         self.assertEqual(result, "some result")
-        self.exporter.strategy.check.accept_called()
+        self.exporter.strategy.check.assert_called()
 
     def test_resource_remove(self):
         self.exporter.strategy = mock.MagicMock()
@@ -810,7 +810,7 @@ class TestSmartMetricExporter(unittest.TestCase):
         result = self.exporter.remove_resources()
         self.assertEqual(result, True)
 
-        self.exporter.strategy.remove.accept_called()
+        self.exporter.strategy.remove.assert_called()
 
 
 class TestDCGMSnapExporter(unittest.TestCase):
