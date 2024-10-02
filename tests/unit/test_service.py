@@ -8,6 +8,7 @@ from unittest import mock
 
 import pytest
 import yaml
+from charms.operator_libs_linux.v2 import snap
 from parameterized import parameterized
 from redfish.rest.v1 import InvalidCredentialsError
 
@@ -714,103 +715,89 @@ class TestHardwareExporter(unittest.TestCase):
         )
 
 
-class TestSmartMetricExporter(unittest.TestCase):
-    """Test SmartCtlExporter's methods."""
+class TestDCGMSnapExporter(unittest.TestCase):
+    """Test DCGM Snap exporter's methods."""
 
     def setUp(self) -> None:
         """Set up harness for each test case."""
-        systemd_lib_patcher = mock.patch.object(service, "systemd")
-        self.mock_systemd = systemd_lib_patcher.start()
-        self.addCleanup(systemd_lib_patcher.stop)
+        snap_lib_patcher = mock.patch.object(service, "snap")
+        shutil_lib_patcher = mock.patch.object(service, "shutil")
+        subprocess = mock.patch.object(service, "subprocess")
+
+        self.mock_snap = snap_lib_patcher.start()
+        self.mock_shutil = shutil_lib_patcher.start()
+        self.mock_subprocess = subprocess.start()
+        self.addCleanup(snap_lib_patcher.stop)
+        self.addCleanup(shutil_lib_patcher.stop)
+        self.addCleanup(subprocess.stop)
 
         search_path = pathlib.Path(f"{__file__}/../../..").resolve()
         self.mock_config = {
-            "smartctl-exporter-port": 10201,
-            "collect-timeout": 10,
-            "exporter-log-level": "INFO",
+            "dcgm-snap-channel": "latest/stable",
         }
-        self.exporter = service.SmartCtlExporter(search_path, self.mock_config)
 
-    def test_render_service(self):
-        """Test render service."""
-        self.exporter._render_service = mock.MagicMock()
-        self.exporter._render_service.return_value = "some result"
+        self.exporter = service.DCGMExporter(search_path, self.mock_config)
+        self.exporter.strategy = mock.MagicMock()
 
-        result = self.exporter.render_service()
-        self.assertEqual(result, "some result")
-
-        self.exporter._render_service.assert_called_with(
-            {
-                "PORT": str(self.exporter.port),
-                "LEVEL": self.exporter.log_level,
-            }
-        )
-
-    @parameterized.expand(
-        [
-            (True,),
-            (False,),
-        ]
-    )
-    def test_set_config(self, service_render_success):
-        """Test render config."""
-        self.exporter.render_service = mock.MagicMock()
-        self.exporter.render_service.return_value = service_render_success
-
-        result = self.exporter.configure()
-        self.assertEqual(result, service_render_success)
+    def test_exporter_name(self):
+        self.assertEqual(self.exporter.exporter_name, "dcgm")
 
     def test_hw_tools(self):
-        self.assertEqual(self.exporter.hw_tools(), {HWTool.SMARTCTL})
+        self.assertEqual(self.exporter.hw_tools(), {HWTool.DCGM})
 
-    @mock.patch("service.systemd", return_value=mock.MagicMock())
-    def test_install_resource_restart(self, mock_systemd):
-        self.exporter.strategy = mock.MagicMock()
-        self.exporter.check_active = mock.MagicMock()
-        self.exporter.check_active.return_value = True
+    def test_install_failed(self):
+        self.exporter.snap_client.present = False
 
-        self.exporter.install_resources()
+        exporter_install_ok = self.exporter.install()
 
         self.exporter.strategy.install.assert_called()
-        self.exporter.check_active.assert_called()
-        mock_systemd.service_stop.assert_called_with(self.exporter.exporter_name)
-        mock_systemd.service_restart.assert_called_with(self.exporter.exporter_name)
+        self.mock_shutil.copy.assert_not_called()
+        self.assertFalse(exporter_install_ok)
 
-    @mock.patch("service.systemd", return_value=mock.MagicMock())
-    def test_install_resource_no_restart(self, mock_systemd):
-        self.exporter.strategy = mock.MagicMock()
-        self.exporter.check_active = mock.MagicMock()
-        self.exporter.check_active.return_value = False
+    def test_install_success(self):
+        self.exporter.snap_client.present = True
 
-        self.exporter.install_resources()
+        exporter_install_ok = self.exporter.install()
 
         self.exporter.strategy.install.assert_called()
-        self.exporter.check_active.assert_called()
-        mock_systemd.service_stop.assert_not_called()
-        mock_systemd.service_restart.assert_not_called()
+        self.mock_shutil.copy.assert_called_with(
+            self.exporter.metrics_file, self.exporter.snap_common
+        )
+        self.exporter.snap_client.set.assert_called_with(
+            {self.exporter.metric_config: self.exporter.metric_config_value}
+        )
+        self.exporter.snap_client.restart.assert_called_with(reload=True)
+        self.assertTrue(exporter_install_ok)
 
-    def test_resource_exists(self):
-        self.exporter.strategy = mock.MagicMock()
+    def test_install_metrics_copy_fail(self):
+        self.exporter.snap_client.present = True
+        self.mock_shutil.copy.side_effect = FileNotFoundError
 
-        self.exporter.resources_exist()
-        self.exporter.strategy.check.assert_called()
+        exporter_install_ok = self.exporter.install()
 
-    def test_resources_exist(self):
-        self.exporter.strategy = mock.MagicMock()
-        self.exporter.strategy.check.return_value = "some result"
+        self.exporter.strategy.install.assert_called()
+        self.exporter.snap_client.restart.assert_not_called()
+        self.assertFalse(exporter_install_ok)
 
-        result = self.exporter.resources_exist()
+    def test_validate_exporter_configs_success(self):
+        valid, msg = self.exporter.validate_exporter_configs()
+        self.assertTrue(valid)
+        self.assertEqual(msg, "Exporter config is valid.")
 
-        self.assertEqual(result, "some result")
-        self.exporter.strategy.check.assert_called()
+    def test_validate_exporter_configs_fails(self):
+        self.mock_subprocess.check_call.side_effect = FileNotFoundError
+        valid, msg = self.exporter.validate_exporter_configs()
+        self.assertFalse(valid)
+        self.assertEqual(
+            msg, "Failed to communicate with NVIDIA driver. Manual intervention is required."
+        )
 
-    def test_resource_remove(self):
-        self.exporter.strategy = mock.MagicMock()
-
-        result = self.exporter.remove_resources()
-        self.assertEqual(result, True)
-
-        self.exporter.strategy.remove.assert_called()
+    @mock.patch.object(service.BaseExporter, "validate_exporter_configs")
+    def test_validate_exporter_configs_fails_parent(self, mock_parent_validate):
+        mock_parent_validate.return_value = False, "Invalid config: exporter's port"
+        valid, msg = self.exporter.validate_exporter_configs()
+        self.assertFalse(valid)
+        self.assertEqual(msg, "Invalid config: exporter's port")
 
 
 class TestWriteToFile(unittest.TestCase):
@@ -957,6 +944,19 @@ def test_snap_exporter_restart(snap_exporter):
     snap_exporter.snap_client.restart.assert_called_once_with(reload=True)
 
 
+def test_snap_exporter_set(snap_exporter):
+    snap_config = {}
+    assert snap_exporter.set(snap_config) is True
+    snap_exporter.snap_client.set.assert_called_once_with(snap_config, typed=True)
+
+
+def test_snap_exporter_set_failed(snap_exporter):
+    snap_config = {}
+    snap_exporter.snap_client.set.side_effect = snap.SnapError()
+    assert snap_exporter.set(snap_config) is False
+    snap_exporter.snap_client.set.assert_called_once_with(snap_config, typed=True)
+
+
 def test_snap_exporter_check_health(snap_exporter):
     snap_exporter.check_health()
     snap_exporter.strategy.check.assert_called_once()
@@ -971,48 +971,21 @@ def test_snap_exporter_configure(mock_install, snap_exporter, install_result, ex
     mock_install.assert_called_once()
 
 
-@pytest.fixture
-def dcgm_exporter():
+@pytest.mark.parametrize("result, expected_result", [(True, True), (False, False)])
+@mock.patch("service.SnapExporter.install")
+@mock.patch("service.SnapExporter.set")
+def test_smartctl_exporter_configure(mock_set, mock_install, result, expected_result):
     mock_config = {
-        "dcgm-snap-channel": "latest/stable",
+        "smartctl-exporter-port": "10000",
+        "exporter-log-level": "info",
+        "smartctl-exporter-snap-channel": "latest/stable",
     }
-    exporter = service.DCGMExporter(mock_config)
-    strategy = mock.MagicMock()
-    exporter.strategy = strategy
-    yield exporter
-    strategy.reset_mock()
-
-
-def test_dcgm_exporter(dcgm_exporter):
-    assert dcgm_exporter.exporter_name == "dcgm"
-    assert dcgm_exporter.hw_tools() == {HWTool.DCGM}
-    assert dcgm_exporter.port == 9400
-
-
-@mock.patch("service.subprocess.check_call")
-def test_dcgm_exporter_validate_exporter_configs_success(_, dcgm_exporter):
-    valid, msg = dcgm_exporter.validate_exporter_configs()
-    assert valid is True
-    assert msg == "Exporter config is valid."
-
-
-@pytest.mark.parametrize(
-    "exception", [FileNotFoundError, service.subprocess.CalledProcessError(1, [])]
-)
-@mock.patch("service.subprocess.check_call")
-def test_dcgm_exporter_validate_exporter_configs_fails(mock_subprocess, dcgm_exporter, exception):
-    mock_subprocess.side_effect = exception
-    valid, msg = dcgm_exporter.validate_exporter_configs()
-    assert valid is False
-    assert msg == "Failed to communicate with NVIDIA driver. Manual intervention is required."
-
-
-@mock.patch.object(service.BaseExporter, "validate_exporter_configs")
-def test_dcgm_exporter_validate_exporter_configs_fails_parent(mock_parent_validate, dcgm_exporter):
-    mock_parent_validate.return_value = False, "Invalid config: exporter's port"
-    valid, msg = dcgm_exporter.validate_exporter_configs()
-    assert valid is False
-    assert msg == "Invalid config: exporter's port"
+    mock_set.return_value = result
+    mock_install.return_value = result
+    exporter = service.SmartCtlExporter(mock_config)
+    assert exporter.exporter_name == "smartctl-exporter"
+    assert exporter.hw_tools() == {HWTool.SMARTCTL_EXPORTER}
+    assert exporter.configure() is expected_result
 
 
 if __name__ == "__main__":
