@@ -11,12 +11,12 @@ tests:
       values: '128'
   alert_rule_test:
     - eval_time: 5m
-      alertname: HWPowerBrakeThrottle
+      alertname: GPUPowerBrakeThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-0
             gpu: 0
-            severity: warning
+            severity: critical
           exp_annotations:
             summary: GPU Hardware Power Brake Slowdown throttling detected. (instance ubuntu-0)
             description: |
@@ -25,19 +25,19 @@ tests:
                   - External Power Brake Assertion being triggered (e.g. by the system power supply)
                 LABELS = map[Hostname:ubuntu-0 gpu:0]
     - eval_time: 5m
-      alertname: HWThermalThrottle
+      alertname: GPUThermalHWThrottle
       exp_alerts: # alerts shouldn't fire since bit 6 isn't set
     - eval_time: 5m
-      alertname: SWThermalThrottle
+      alertname: GPUThermalSWThrottle
       exp_alerts: # alerts shouldn't fire since bit 5 isn't set
     - eval_time: 5m
-      alertname: SyncBoostThrottle
+      alertname: GPUSyncBoostThrottle
       exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
-      alertname: HWSlowdownThrottle
+      alertname: GPUSlowdownThrottle
       exp_alerts: # alerts shouldn't fire since bit 3 isn't set
     - eval_time: 5m
-      alertname: SWPowerThrottle
+      alertname: GPUPowerThrottle
       exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
 # HW Thermal Throttle active
@@ -47,7 +47,7 @@ tests:
       values: '64'
   alert_rule_test:
     - eval_time: 5m
-      alertname: HWThermalThrottle
+      alertname: GPUThermalHWThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-0
@@ -61,19 +61,19 @@ tests:
                   - Temperature being too high
                 LABELS = map[Hostname:ubuntu-0 gpu:1]
     - eval_time: 5m
-      alertname: HWPowerBrakeThrottle
+      alertname: GPUPowerBrakeThrottle
       exp_alerts: # alerts shouldn't fire since bit 7 isn't set
     - eval_time: 5m
-      alertname: SWThermalThrottle
+      alertname: GPUThermalSWThrottle
       exp_alerts: # alerts shouldn't fire since bit 5 isn't set
     - eval_time: 5m
-      alertname: SyncBoostThrottle
+      alertname: GPUSyncBoostThrottle
       exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
-      alertname: HWSlowdownThrottle
+      alertname: GPUSlowdownThrottle
       exp_alerts: # alerts shouldn't fire since bit 3 isn't set
     - eval_time: 5m
-      alertname: SWPowerThrottle
+      alertname: GPUPowerThrottle
       exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
 # SW Thermal Throttle active
@@ -83,7 +83,7 @@ tests:
       values: '32'
   alert_rule_test:
     - eval_time: 5m
-      alertname: SWThermalThrottle
+      alertname: GPUThermalSWThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-1
@@ -98,19 +98,19 @@ tests:
                   - Current memory temperature above the Memory Max Operating Temperature
                 LABELS = map[Hostname:ubuntu-1 gpu:0]
     - eval_time: 5m
-      alertname: HWPowerBrakeThrottle
+      alertname: GPUPowerBrakeThrottle
       exp_alerts: # alerts shouldn't fire since bit 7 isn't set
     - eval_time: 5m
-      alertname: HWThermalThrottle
+      alertname: GPUThermalHWThrottle
       exp_alerts: # alerts shouldn't fire since bit 6 isn't set
     - eval_time: 5m
-      alertname: SyncBoostThrottle
+      alertname: GPUSyncBoostThrottle
       exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
-      alertname: HWSlowdownThrottle
+      alertname: GPUSlowdownThrottle
       exp_alerts: # alerts shouldn't fire since bit 3 isn't set
     - eval_time: 5m
-      alertname: SWPowerThrottle
+      alertname: GPUPowerThrottle
       exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
 # Sync Boost Throttle active
@@ -120,7 +120,7 @@ tests:
       values: '16'
   alert_rule_test:
     - eval_time: 5m
-      alertname: SyncBoostThrottle
+      alertname: GPUSyncBoostThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-1
@@ -134,19 +134,19 @@ tests:
               Look at the throttle reasons for other GPUs in the system to see why those GPUs are holding this one at lower clocks.
                 LABELS = map[Hostname:ubuntu-1 gpu:1]
     - eval_time: 5m
-      alertname: HWPowerBrakeThrottle
+      alertname: GPUPowerBrakeThrottle
       exp_alerts: # alerts shouldn't fire since bit 7 isn't set
     - eval_time: 5m
-      alertname: HWThermalThrottle
+      alertname: GPUThermalHWThrottle
       exp_alerts: # alerts shouldn't fire since bit 6 isn't set
     - eval_time: 5m
-      alertname: SWThermalThrottle
+      alertname: GPUThermalSWThrottle
       exp_alerts: # alerts shouldn't fire since bit 5 isn't set
     - eval_time: 5m
-      alertname: HWSlowdownThrottle
+      alertname: GPUSlowdownThrottle
       exp_alerts: # alerts shouldn't fire since bit 3 isn't set
     - eval_time: 5m
-      alertname: SWPowerThrottle
+      alertname: GPUPowerThrottle
       exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
 # HW Slowdown Throttle active
@@ -156,7 +156,7 @@ tests:
       values: '8'
   alert_rule_test:
     - eval_time: 5m
-      alertname: HWSlowdownThrottle
+      alertname: GPUSlowdownThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-2
@@ -173,19 +173,19 @@ tests:
                   - May be also reported during PState or clock change
                 LABELS = map[Hostname:ubuntu-2 gpu:0]
     - eval_time: 5m
-      alertname: HWPowerBrakeThrottle
+      alertname: GPUPowerBrakeThrottle
       exp_alerts: # alerts shouldn't fire since bit 7 isn't set
     - eval_time: 5m
-      alertname: HWThermalThrottle
+      alertname: GPUThermalThrottle
       exp_alerts: # alerts shouldn't fire since bit 6 isn't set
     - eval_time: 5m
-      alertname: SWThermalThrottle
+      alertname: GPUThermalThrottle
       exp_alerts: # alerts shouldn't fire since bit 5 isn't set
     - eval_time: 5m
-      alertname: SyncBoostThrottle
+      alertname: GPUSyncBoostThrottle
       exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
-      alertname: SWPowerThrottle
+      alertname: GPUPowerThrottle
       exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
 # SW Power Throttle active
@@ -195,7 +195,7 @@ tests:
       values: '4'
   alert_rule_test:
     - eval_time: 5m
-      alertname: SWPowerThrottle
+      alertname: GPUPowerThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-2
@@ -207,19 +207,19 @@ tests:
               SW Power Scaling algorithm is reducing the clocks below requested clocks on NVIDIA GPU: 1
                 LABELS = map[Hostname:ubuntu-2 gpu:1]
     - eval_time: 5m
-      alertname: HWPowerBrakeThrottle
+      alertname: GPUPowerBrakeThrottle
       exp_alerts: # alerts shouldn't fire since bit 7 isn't set
     - eval_time: 5m
-      alertname: HWThermalThrottle
+      alertname: GPUThermalHWThrottle
       exp_alerts: # alerts shouldn't fire since bit 6 isn't set
     - eval_time: 5m
-      alertname: SWThermalThrottle
+      alertname: GPUThermalSWThrottle
       exp_alerts: # alerts shouldn't fire since bit 5 isn't set
     - eval_time: 5m
-      alertname: SyncBoostThrottle
+      alertname: GPUSyncBoostThrottle
       exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
-      alertname: HWSlowdownThrottle
+      alertname: GPUSlowdownThrottle
       exp_alerts: # alerts shouldn't fire since bit 3 isn't set
 
 # No throttling
@@ -229,22 +229,22 @@ tests:
       values: '1'
   alert_rule_test:
     - eval_time: 5m
-      alertname: HWPowerBrakeThrottle
+      alertname: GPUPowerBrakeThrottle
       exp_alerts: # alerts shouldn't fire since bit 7 isn't set
     - eval_time: 5m
-      alertname: HWThermalThrottle
+      alertname: GPUThermalHWThrottle
       exp_alerts: # alerts shouldn't fire since bit 6 isn't set
     - eval_time: 5m
-      alertname: SWThermalThrottle
+      alertname: GPUThermalSWThrottle
       exp_alerts: # alerts shouldn't fire since bit 5 isn't set
     - eval_time: 5m
-      alertname: SyncBoostThrottle
+      alertname: GPUSyncBoostThrottle
       exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
-      alertname: HWSlowdownThrottle
+      alertname: GPUSlowdownThrottle
       exp_alerts: # alerts shouldn't fire since bit 3 isn't set
     - eval_time: 5m
-      alertname: SWPowerThrottle
+      alertname: GPUPowerThrottle
       exp_alerts: # alerts shouldn't fire since bit 2 isn't set
 
 #  All throttling reasons active
@@ -254,12 +254,12 @@ tests:
       values: '511'
   alert_rule_test:
     - eval_time: 5m
-      alertname: HWPowerBrakeThrottle
+      alertname: GPUPowerBrakeThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-3
             gpu: 2
-            severity: warning
+            severity: critical
           exp_annotations:
             summary: GPU Hardware Power Brake Slowdown throttling detected. (instance ubuntu-3)
             description: |
@@ -268,7 +268,7 @@ tests:
                   - External Power Brake Assertion being triggered (e.g. by the system power supply)
                 LABELS = map[Hostname:ubuntu-3 gpu:2]
     - eval_time: 5m
-      alertname: HWThermalThrottle
+      alertname: GPUThermalHWThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-3
@@ -282,7 +282,7 @@ tests:
                   - Temperature being too high
                 LABELS = map[Hostname:ubuntu-3 gpu:2]
     - eval_time: 5m
-      alertname: SWThermalThrottle
+      alertname: GPUThermalSWThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-3
@@ -297,7 +297,7 @@ tests:
                   - Current memory temperature above the Memory Max Operating Temperature
                 LABELS = map[Hostname:ubuntu-3 gpu:2]
     - eval_time: 5m
-      alertname: SyncBoostThrottle
+      alertname: GPUSyncBoostThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-3
@@ -311,7 +311,7 @@ tests:
               Look at the throttle reasons for other GPUs in the system to see why those GPUs are holding this one at lower clocks.
                 LABELS = map[Hostname:ubuntu-3 gpu:2]
     - eval_time: 5m
-      alertname: HWSlowdownThrottle
+      alertname: GPUSlowdownThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-3
@@ -328,7 +328,7 @@ tests:
                   - May be also reported during PState or clock change
                 LABELS = map[Hostname:ubuntu-3 gpu:2]
     - eval_time: 5m
-      alertname: SWPowerThrottle
+      alertname: GPUPowerThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-3
@@ -347,12 +347,12 @@ tests:
       values: '196'
   alert_rule_test:
     - eval_time: 5m
-      alertname: HWPowerBrakeThrottle
+      alertname: GPUPowerBrakeThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-0
             gpu: 0
-            severity: warning
+            severity: critical
           exp_annotations:
             summary: GPU Hardware Power Brake Slowdown throttling detected. (instance ubuntu-0)
             description: |
@@ -361,7 +361,7 @@ tests:
                   - External Power Brake Assertion being triggered (e.g. by the system power supply)
                 LABELS = map[Hostname:ubuntu-0 gpu:0]
     - eval_time: 5m
-      alertname: HWThermalThrottle
+      alertname: GPUThermalHWThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-0
@@ -375,7 +375,7 @@ tests:
                   - Temperature being too high
                 LABELS = map[Hostname:ubuntu-0 gpu:0]
     - eval_time: 5m
-      alertname: SWPowerThrottle
+      alertname: GPUPowerThrottle
       exp_alerts:
         - exp_labels:
             Hostname: ubuntu-0
@@ -387,11 +387,11 @@ tests:
               SW Power Scaling algorithm is reducing the clocks below requested clocks on NVIDIA GPU: 0
                 LABELS = map[Hostname:ubuntu-0 gpu:0]
     - eval_time: 5m
-      alertname: SWThermalThrottle
+      alertname: GPUThermalSWThrottle
       exp_alerts: # alerts shouldn't fire since bit 5 isn't set
     - eval_time: 5m
-      alertname: SyncBoostThrottle
+      alertname: GPUSyncBoostThrottle
       exp_alerts: # alerts shouldn't fire since bit 4 isn't set
     - eval_time: 5m
-      alertname: HWSlowdownThrottle
+      alertname: GPUSlowdownThrottle
       exp_alerts: # alerts shouldn't fire since bit 3 isn't set
