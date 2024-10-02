@@ -1,0 +1,397 @@
+rule_files:
+  - ../../../src/prometheus_alert_rules/dcgm.yaml
+
+evaluation_interval: 1m
+
+tests:
+#  HW Power Brake Throttle active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-0", gpu="0"}'
+      values: '128'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-0
+            gpu: 0
+            severity: warning
+          exp_annotations:
+            summary: GPU Hardware Power Brake Slowdown throttling detected. (instance ubuntu-0)
+            description: |
+              HW Power Brake Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: 0
+              This is an indicator of: 
+                  - External Power Brake Assertion being triggered (e.g. by the system power supply)
+                LABELS = map[Hostname:ubuntu-0 gpu:0]
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 6 isn't set
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
+    - eval_time: 5m
+      alertname: SyncBoostThrottle
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts: # alerts shouldn't fire since bit 2 isn't set
+
+# HW Thermal Throttle active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-0", gpu="1"}'
+      values: '64'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-0
+            gpu: 1
+            severity: warning
+          exp_annotations:
+            summary: GPU Hardware Thermal throttling detected. (instance ubuntu-0)
+            description: |
+              HW Thermal Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: 1
+              This is an indicator of:
+                  - Temperature being too high
+                LABELS = map[Hostname:ubuntu-0 gpu:1]
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts: # alerts shouldn't fire since bit 7 isn't set
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
+    - eval_time: 5m
+      alertname: SyncBoostThrottle
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts: # alerts shouldn't fire since bit 2 isn't set
+
+# SW Thermal Throttle active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-1", gpu="0"}'
+      values: '32'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-1
+            gpu: 0
+            severity: warning
+          exp_annotations:
+            summary: GPU Software Thermal throttling detected. (instance ubuntu-1)
+            description: |
+              SW Thermal Slowdown is engaged on NVIDIA GPU: 0
+              This is an indicator of:
+                  - Current GPU temperature above the GPU Max Operating Temperature
+                  - Current memory temperature above the Memory Max Operating Temperature
+                LABELS = map[Hostname:ubuntu-1 gpu:0]
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts: # alerts shouldn't fire since bit 7 isn't set
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 6 isn't set
+    - eval_time: 5m
+      alertname: SyncBoostThrottle
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts: # alerts shouldn't fire since bit 2 isn't set
+
+# Sync Boost Throttle active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-1", gpu="1"}'
+      values: '16'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: SyncBoostThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-1
+            gpu: 1
+            severity: warning
+          exp_annotations:
+            summary: GPU Sync Boost throttling detected. (instance ubuntu-1)
+            description: |
+              This NVIDIA GPU: 1 has been added to a Sync boost group with nvidia-smi or DCGM in order to maximize performance per watt.
+              All GPUs in the sync boost group will boost to the minimum possible clocks across the entire group.
+              Look at the throttle reasons for other GPUs in the system to see why those GPUs are holding this one at lower clocks.
+                LABELS = map[Hostname:ubuntu-1 gpu:1]
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts: # alerts shouldn't fire since bit 7 isn't set
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 6 isn't set
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts: # alerts shouldn't fire since bit 2 isn't set
+
+# HW Slowdown Throttle active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-2", gpu="0"}'
+      values: '8'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-2
+            gpu: 0
+            severity: warning
+          exp_annotations:
+            summary: GPU Hardware Slowdown throttling detected. (instance ubuntu-2)
+            description: |
+              HW Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: 0
+              This is an indicator of:
+                  - Temperature being too high
+                  - External Power Brake Assertion is triggered (e.g. by the system power supply)
+                  - Power draw is too high and Fast Trigger protection is reducing the clocks
+                  - May be also reported during PState or clock change
+                LABELS = map[Hostname:ubuntu-2 gpu:0]
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts: # alerts shouldn't fire since bit 7 isn't set
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 6 isn't set
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
+    - eval_time: 5m
+      alertname: SyncBoostThrottle
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts: # alerts shouldn't fire since bit 2 isn't set
+
+# SW Power Throttle active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-2", gpu="1"}'
+      values: '4'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-2
+            gpu: 1
+            severity: warning
+          exp_annotations:
+            summary: GPU Software Power throttling detected. (instance ubuntu-2)
+            description: |
+              SW Power Scaling algorithm is reducing the clocks below requested clocks on NVIDIA GPU: 1
+                LABELS = map[Hostname:ubuntu-2 gpu:1]
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts: # alerts shouldn't fire since bit 7 isn't set
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 6 isn't set
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
+    - eval_time: 5m
+      alertname: SyncBoostThrottle
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
+
+# No throttling
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-0", gpu="0"}'
+      values: '1'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts: # alerts shouldn't fire since bit 7 isn't set
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 6 isn't set
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
+    - eval_time: 5m
+      alertname: SyncBoostThrottle
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts: # alerts shouldn't fire since bit 2 isn't set
+
+#  All throttling reasons active
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-3", gpu="2"}'
+      values: '511'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-3
+            gpu: 2
+            severity: warning
+          exp_annotations:
+            summary: GPU Hardware Power Brake Slowdown throttling detected. (instance ubuntu-3)
+            description: |
+              HW Power Brake Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: 2
+              This is an indicator of: 
+                  - External Power Brake Assertion being triggered (e.g. by the system power supply)
+                LABELS = map[Hostname:ubuntu-3 gpu:2]
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-3
+            gpu: 2
+            severity: warning
+          exp_annotations:
+            summary: GPU Hardware Thermal throttling detected. (instance ubuntu-3)
+            description: |
+              HW Thermal Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: 2
+              This is an indicator of:
+                  - Temperature being too high
+                LABELS = map[Hostname:ubuntu-3 gpu:2]
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-3
+            gpu: 2
+            severity: warning
+          exp_annotations:
+            summary: GPU Software Thermal throttling detected. (instance ubuntu-3)
+            description: |
+              SW Thermal Slowdown is engaged on NVIDIA GPU: 2
+              This is an indicator of:
+                  - Current GPU temperature above the GPU Max Operating Temperature
+                  - Current memory temperature above the Memory Max Operating Temperature
+                LABELS = map[Hostname:ubuntu-3 gpu:2]
+    - eval_time: 5m
+      alertname: SyncBoostThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-3
+            gpu: 2
+            severity: warning
+          exp_annotations:
+            summary: GPU Sync Boost throttling detected. (instance ubuntu-3)
+            description: |
+              This NVIDIA GPU: 2 has been added to a Sync boost group with nvidia-smi or DCGM in order to maximize performance per watt.
+              All GPUs in the sync boost group will boost to the minimum possible clocks across the entire group.
+              Look at the throttle reasons for other GPUs in the system to see why those GPUs are holding this one at lower clocks.
+                LABELS = map[Hostname:ubuntu-3 gpu:2]
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-3
+            gpu: 2
+            severity: warning
+          exp_annotations:
+            summary: GPU Hardware Slowdown throttling detected. (instance ubuntu-3)
+            description: |
+              HW Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: 2
+              This is an indicator of:
+                  - Temperature being too high
+                  - External Power Brake Assertion is triggered (e.g. by the system power supply)
+                  - Power draw is too high and Fast Trigger protection is reducing the clocks
+                  - May be also reported during PState or clock change
+                LABELS = map[Hostname:ubuntu-3 gpu:2]
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-3
+            gpu: 2
+            severity: warning
+          exp_annotations:
+            summary: GPU Software Power throttling detected. (instance ubuntu-3)
+            description: |
+              SW Power Scaling algorithm is reducing the clocks below requested clocks on NVIDIA GPU: 2
+                LABELS = map[Hostname:ubuntu-3 gpu:2]
+
+# Multiple throttling reasons
+- interval: 1m
+  input_series:
+    - series: 'DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname="ubuntu-0", gpu="0"}'
+      values: '196'
+  alert_rule_test:
+    - eval_time: 5m
+      alertname: HWPowerBrakeThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-0
+            gpu: 0
+            severity: warning
+          exp_annotations:
+            summary: GPU Hardware Power Brake Slowdown throttling detected. (instance ubuntu-0)
+            description: |
+              HW Power Brake Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: 0
+              This is an indicator of: 
+                  - External Power Brake Assertion being triggered (e.g. by the system power supply)
+                LABELS = map[Hostname:ubuntu-0 gpu:0]
+    - eval_time: 5m
+      alertname: HWThermalThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-0
+            gpu: 0
+            severity: warning
+          exp_annotations:
+            summary: GPU Hardware Thermal throttling detected. (instance ubuntu-0)
+            description: |
+              HW Thermal Slowdown (reducing the core clocks by a factor of 2 or more) is engaged on NVIDIA GPU: 0
+              This is an indicator of:
+                  - Temperature being too high
+                LABELS = map[Hostname:ubuntu-0 gpu:0]
+    - eval_time: 5m
+      alertname: SWPowerThrottle
+      exp_alerts:
+        - exp_labels:
+            Hostname: ubuntu-0
+            gpu: 0
+            severity: warning
+          exp_annotations:
+            summary: GPU Software Power throttling detected. (instance ubuntu-0)
+            description: |
+              SW Power Scaling algorithm is reducing the clocks below requested clocks on NVIDIA GPU: 0
+                LABELS = map[Hostname:ubuntu-0 gpu:0]
+    - eval_time: 5m
+      alertname: SWThermalThrottle
+      exp_alerts: # alerts shouldn't fire since bit 5 isn't set
+    - eval_time: 5m
+      alertname: SyncBoostThrottle
+      exp_alerts: # alerts shouldn't fire since bit 4 isn't set
+    - eval_time: 5m
+      alertname: HWSlowdownThrottle
+      exp_alerts: # alerts shouldn't fire since bit 3 isn't set
