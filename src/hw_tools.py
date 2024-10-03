@@ -231,15 +231,20 @@ class DCGMExporterStrategy(SnapStrategy):
     """DCGM strategy class."""
 
     _name = HWTool.DCGM
-    snap_common: Path = Path("/var/snap/dcgm/common/")
 
     def __init__(self, channel: str) -> None:
         """Init."""
         self.channel = channel
 
+
+class NVIDIADriverStrategy(StrategyABC):
+    """NVIDIA driver strategy class."""
+
+    _name = HWTool.NVIDIA_DRIVER
+    snap_common: Path = Path("/var/snap/dcgm/common/")
+
     def install(self) -> None:
-        """Install the snap from a channel and the necessary nvidia driver."""
-        super().install()
+        """Install the driver and NVIDIA utils."""
         self._install_nvidia_drivers()
         self._install_nvidia_utils()
 
@@ -261,14 +266,16 @@ class DCGMExporterStrategy(SnapStrategy):
             # This can be changed to check_call and not rely in the output if this is fixed
             # https://github.com/canonical/ubuntu-drivers-common/issues/106
             result = subprocess.check_output(cmd.split(), text=True)
-            if "No drivers found for installation" in result:
-                logger.warning(
-                    "No drivers for the NVIDIA GPU were found. Manual installation is necessary"
-                )
-                raise ResourceInstallationError(self._name)
+
         except subprocess.CalledProcessError as err:
             logger.error("Failed to install the NVIDIA driver: %s", err)
             raise err
+
+        if "No drivers found for installation" in result:
+            logger.warning(
+                "No drivers for the NVIDIA GPU were found. Manual installation is necessary"
+            )
+            raise ResourceInstallationError(self._name)
 
         logger.info("NVIDIA driver installed")
 
@@ -294,6 +301,20 @@ class DCGMExporterStrategy(SnapStrategy):
         apt.add_package(pkg, update_cache=True)
         logger.info("installed %s", pkg)
         return
+
+    def check(self) -> bool:
+        """Check if nvidia-smi is working."""
+        try:
+            subprocess.check_call("nvidia-smi", timeout=60)
+            return True
+        except (FileNotFoundError, subprocess.CalledProcessError) as e:
+            logger.error(e)
+            logger.warning(
+                "nvidia-smi is not working. It's necessary to manually remove and install "
+                "a different NVIDIA driver until nvidia-smi is working. See the docs for more "
+                "details: https://ubuntu.com/server/docs/nvidia-drivers-installation"
+            )
+            return False
 
 
 class SmartCtlExporterStrategy(SnapStrategy):

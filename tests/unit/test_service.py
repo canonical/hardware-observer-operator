@@ -4,6 +4,7 @@
 import pathlib
 import tempfile
 import unittest
+from subprocess import CalledProcessError
 from unittest import mock
 
 import pytest
@@ -722,14 +723,11 @@ class TestDCGMSnapExporter(unittest.TestCase):
         """Set up harness for each test case."""
         snap_lib_patcher = mock.patch.object(service, "snap")
         shutil_lib_patcher = mock.patch.object(service, "shutil")
-        subprocess = mock.patch.object(service, "subprocess")
 
         self.mock_snap = snap_lib_patcher.start()
         self.mock_shutil = shutil_lib_patcher.start()
-        self.mock_subprocess = subprocess.start()
         self.addCleanup(snap_lib_patcher.stop)
         self.addCleanup(shutil_lib_patcher.stop)
-        self.addCleanup(subprocess.stop)
 
         search_path = pathlib.Path(f"{__file__}/../../..").resolve()
         self.mock_config = {
@@ -738,6 +736,7 @@ class TestDCGMSnapExporter(unittest.TestCase):
 
         self.exporter = service.DCGMExporter(search_path, self.mock_config)
         self.exporter.strategy = mock.MagicMock()
+        self.exporter.nvidia_driver_strategy = mock.MagicMock()
 
     def test_exporter_name(self):
         self.assertEqual(self.exporter.exporter_name, "dcgm")
@@ -745,21 +744,41 @@ class TestDCGMSnapExporter(unittest.TestCase):
     def test_hw_tools(self):
         self.assertEqual(self.exporter.hw_tools(), {HWTool.DCGM})
 
-    def test_install_failed(self):
-        self.exporter.snap_client.present = False
+    @mock.patch("service.DCGMExporter._create_custom_metrics")
+    @mock.patch("service.DCGMExporter._install_nvidia_drivers")
+    @mock.patch("service.SnapExporter.install")
+    def test_install_dcgm(
+        self,
+        mock_super_install,
+        mock_nvidia,
+        mock_custom_metrics,
+    ):
+        test_cases = [
+            (True, True, True, True),
+            (False, True, True, False),
+            (True, False, True, False),
+            (True, True, False, False),
+            (False, False, False, False),
+        ]
+        for super_install, nvidia_drivers, custom_metrics, expected in test_cases:
+            with self.subTest(
+                super_install=super_install,
+                nvidia_drivers=nvidia_drivers,
+                custom_metrics=custom_metrics,
+                expected=expected,
+            ):
+                mock_super_install.return_value = super_install
+                mock_nvidia.return_value = nvidia_drivers
+                mock_custom_metrics.return_value = custom_metrics
 
-        exporter_install_ok = self.exporter.install()
+                result = self.exporter.install()
 
-        self.exporter.strategy.install.assert_called()
-        self.mock_shutil.copy.assert_not_called()
-        self.assertFalse(exporter_install_ok)
+                self.assertEqual(result, expected)
 
-    def test_install_success(self):
-        self.exporter.snap_client.present = True
+    def test_create_custom_metrics(self):
 
-        exporter_install_ok = self.exporter.install()
+        result = self.exporter._create_custom_metrics()
 
-        self.exporter.strategy.install.assert_called()
         self.mock_shutil.copy.assert_called_with(
             self.exporter.metrics_file, self.exporter.snap_common
         )
@@ -767,33 +786,45 @@ class TestDCGMSnapExporter(unittest.TestCase):
             {self.exporter.metric_config: self.exporter.metric_config_value}
         )
         self.exporter.snap_client.restart.assert_called_with(reload=True)
-        self.assertTrue(exporter_install_ok)
+        self.assertTrue(result)
 
     def test_install_metrics_copy_fail(self):
         self.exporter.snap_client.present = True
         self.mock_shutil.copy.side_effect = FileNotFoundError
 
-        exporter_install_ok = self.exporter.install()
+        result = self.exporter.install()
 
-        self.exporter.strategy.install.assert_called()
+        self.exporter.snap_client.set.assert_not_called()
         self.exporter.snap_client.restart.assert_not_called()
-        self.assertFalse(exporter_install_ok)
+        self.assertFalse(result)
+
+    def test_install_nvidia_drivers_success(self):
+        result = self.exporter._install_nvidia_drivers()
+        self.assertTrue(result)
+        self.exporter.nvidia_driver_strategy.install.assert_called_once()
+
+    def test_install_nvidia_drivers_fails(self):
+        self.exporter.nvidia_driver_strategy.install.side_effect = CalledProcessError(1, [])
+        result = self.exporter._install_nvidia_drivers()
+        self.assertFalse(result)
 
     def test_validate_exporter_configs_success(self):
+        self.exporter.nvidia_driver_strategy.check.return_value = True
         valid, msg = self.exporter.validate_exporter_configs()
         self.assertTrue(valid)
         self.assertEqual(msg, "Exporter config is valid.")
 
     def test_validate_exporter_configs_fails(self):
-        self.mock_subprocess.check_call.side_effect = FileNotFoundError
+        self.exporter.nvidia_driver_strategy.check.return_value = False
         valid, msg = self.exporter.validate_exporter_configs()
         self.assertFalse(valid)
         self.assertEqual(
-            msg, "Failed to communicate with NVIDIA driver. Manual intervention is required."
+            msg, "Failed to communicate with NVIDIA driver. See more details in the logs"
         )
 
     @mock.patch.object(service.BaseExporter, "validate_exporter_configs")
     def test_validate_exporter_configs_fails_parent(self, mock_parent_validate):
+        self.exporter.nvidia_driver_strategy.check.return_value = True
         mock_parent_validate.return_value = False, "Invalid config: exporter's port"
         valid, msg = self.exporter.validate_exporter_configs()
         self.assertFalse(valid)

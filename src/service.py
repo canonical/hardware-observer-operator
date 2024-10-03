@@ -2,11 +2,9 @@
 
 import os
 import shutil
-import subprocess
 from abc import ABC, abstractmethod
 from logging import getLogger
 from pathlib import Path
-from subprocess import CalledProcessError
 from time import sleep
 from typing import Any, Dict, Optional, Set, Tuple
 
@@ -24,7 +22,12 @@ from config import (
     HWTool,
 )
 from hardware import get_bmc_address
-from hw_tools import DCGMExporterStrategy, SmartCtlExporterStrategy, SnapStrategy
+from hw_tools import (
+    DCGMExporterStrategy,
+    NVIDIADriverStrategy,
+    SmartCtlExporterStrategy,
+    SnapStrategy,
+)
 
 logger = getLogger(__name__)
 
@@ -411,6 +414,7 @@ class DCGMExporter(SnapExporter):
     def __init__(self, charm_dir: Path, config: ConfigData):
         """Init."""
         self.strategy = DCGMExporterStrategy(str(config["dcgm-snap-channel"]))
+        self.nvidia_driver_strategy = NVIDIADriverStrategy()
         self.charm_dir = charm_dir
         self.metrics_file = self.charm_dir / "src/gpu_metrics/dcgm_metrics.csv"
         self.metric_config_value = self.metrics_file.name
@@ -418,9 +422,20 @@ class DCGMExporter(SnapExporter):
 
     def install(self) -> bool:
         """Install the DCGM exporter and configure custom metrics."""
-        if not super().install():
+        return all(
+            (super().install(), self._install_nvidia_drivers(), self._create_custom_metrics())
+        )
+
+    def _install_nvidia_drivers(self) -> bool:
+        try:
+            self.nvidia_driver_strategy.install()
+            return True
+        except Exception as err:  # pylint: disable=broad-except
+            logger.error("Failed to install the NVIDIA drivers %s", err)
             return False
 
+    def _create_custom_metrics(self) -> bool:
+        """Create the custom metric files for the DCGM exporter."""
         logger.info("Creating a custom metrics file and configuring the DCGM snap to use it")
         try:
             shutil.copy(self.metrics_file, self.snap_common)
@@ -441,22 +456,13 @@ class DCGMExporter(SnapExporter):
         """Validate the if the DCGM exporter is able to run."""
         valid, msg = super().validate_exporter_configs()
         if not valid:
-            return valid, msg
-
-        try:
-            subprocess.check_call("nvidia-smi", timeout=60)
-            return valid, msg
-        except (FileNotFoundError, CalledProcessError) as e:
-            logger.error(e)
-            logger.warning(
-                "nvidia-smi is not working. It's necessary to manually remove and install "
-                "a different NVIDIA driver until nvidia-smi is working. See the docs for more "
-                "details: https://ubuntu.com/server/docs/nvidia-drivers-installation"
-            )
+            return False, msg
+        if not self.nvidia_driver_strategy.check():
             return (
                 False,
-                "Failed to communicate with NVIDIA driver. Manual intervention is required.",
+                "Failed to communicate with NVIDIA driver. See more details in the logs",
             )
+        return valid, msg
 
 
 class SmartCtlExporter(SnapExporter):
