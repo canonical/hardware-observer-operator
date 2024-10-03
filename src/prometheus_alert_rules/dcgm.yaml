@@ -11,7 +11,7 @@ groups:
       expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS % 256 >= 128
       for: 5m
       labels:
-        severity: critical
+        severity: warning
       annotations:
         summary: GPU Hardware Power Brake Slowdown throttling detected. (instance {{ $labels.Hostname }})
         description: |

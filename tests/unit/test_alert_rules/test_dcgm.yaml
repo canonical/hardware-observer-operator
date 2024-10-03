@@ -16,7 +16,7 @@ tests:
         - exp_labels:
             Hostname: ubuntu-0
             gpu: 0
-            severity: critical
+            severity: warning
           exp_annotations:
             summary: GPU Hardware Power Brake Slowdown throttling detected. (instance ubuntu-0)
             description: |
@@ -259,7 +259,7 @@ tests:
         - exp_labels:
             Hostname: ubuntu-3
             gpu: 2
-            severity: critical
+            severity: warning
           exp_annotations:
             summary: GPU Hardware Power Brake Slowdown throttling detected. (instance ubuntu-3)
             description: |
@@ -352,7 +352,7 @@ tests:
         - exp_labels:
             Hostname: ubuntu-0
             gpu: 0
-            severity: critical
+            severity: warning
           exp_annotations:
             summary: GPU Hardware Power Brake Slowdown throttling detected. (instance ubuntu-0)
             description: |
