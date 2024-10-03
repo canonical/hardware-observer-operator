@@ -715,6 +715,67 @@ class TestHardwareExporter(unittest.TestCase):
         )
 
 
+class TestDCGMSnapExporter(unittest.TestCase):
+    """Test DCGM Snap exporter's methods."""
+
+    def setUp(self) -> None:
+        """Set up harness for each test case."""
+        snap_lib_patcher = mock.patch.object(service, "snap")
+        shutil_lib_patcher = mock.patch.object(service, "shutil")
+        self.mock_snap = snap_lib_patcher.start()
+        self.mock_shutil = shutil_lib_patcher.start()
+        self.addCleanup(snap_lib_patcher.stop)
+        self.addCleanup(shutil_lib_patcher.stop)
+
+        search_path = pathlib.Path(f"{__file__}/../../..").resolve()
+        self.mock_config = {
+            "dcgm-snap-channel": "latest/stable",
+        }
+
+        self.exporter = service.DCGMExporter(search_path, self.mock_config)
+        self.exporter.strategy = mock.MagicMock()
+
+    def test_exporter_name(self):
+        self.assertEqual(self.exporter.exporter_name, "dcgm")
+
+    def test_hw_tools(self):
+        self.assertEqual(self.exporter.hw_tools(), {HWTool.DCGM})
+
+    def test_install_failed(self):
+        self.exporter.snap_client.present = False
+
+        exporter_install_ok = self.exporter.install()
+
+        self.exporter.strategy.install.assert_called()
+        self.mock_shutil.copy.assert_not_called()
+        self.assertFalse(exporter_install_ok)
+
+    def test_install_success(self):
+        self.exporter.snap_client.present = True
+
+        exporter_install_ok = self.exporter.install()
+
+        self.exporter.strategy.install.assert_called()
+        self.mock_shutil.copy.assert_called_with(
+            self.exporter.metrics_file, self.exporter.snap_common
+        )
+        self.exporter.snap_client.set.assert_called_with(
+            {self.exporter.metric_config: self.exporter.metric_config_value}
+        )
+        self.exporter.snap_client.restart.assert_called_with(reload=True)
+        self.assertTrue(exporter_install_ok)
+
+    def test_install_metrics_copy_fail(self):
+        self.exporter.snap_client.present = True
+        self.mock_shutil.copy.side_effect = FileNotFoundError
+
+        exporter_install_ok = self.exporter.install()
+
+        self.exporter.strategy.install.assert_called()
+        self.exporter.snap_client.restart.assert_not_called()
+        self.assertFalse(exporter_install_ok)
+
+
 class TestWriteToFile(unittest.TestCase):
     def setUp(self):
         self.temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -884,16 +945,6 @@ def test_snap_exporter_configure(mock_install, snap_exporter, install_result, ex
 
     assert snap_exporter.configure() is expected_result
     mock_install.assert_called_once()
-
-
-def test_dcgm_exporter():
-    mock_config = {
-        "dcgm-snap-channel": "latest/stable",
-    }
-
-    exporter = service.DCGMExporter(mock_config)
-    assert exporter.exporter_name == "dcgm"
-    assert exporter.hw_tools() == {HWTool.DCGM}
 
 
 @pytest.mark.parametrize("result, expected_result", [(True, True), (False, False)])
