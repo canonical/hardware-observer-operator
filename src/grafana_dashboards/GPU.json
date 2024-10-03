@@ -21,7 +21,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 12239,
   "graphTooltip": 0,
-  "id": 117,
+  "id": 228,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -129,10 +129,10 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "node_hwmon_temp_celsius{instance=~\"^$instance.*\", chip=~\"$amd_gpu\"}\n",
+          "expr": "label_replace(node_hwmon_temp_celsius{instance=~\"^$instance.*\", chip=~\"$amd_gpu\"} * on(chip) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}, \"gpu\", \"$1\", \"card\", \"card([0-9]+)\")\n",
           "hide": false,
           "interval": "",
-          "legendFormat": "AMD GPU: {{chip}}",
+          "legendFormat": "AMD GPU: {{gpu}}",
           "range": true,
           "refId": "B"
         }
@@ -324,9 +324,9 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "node_hwmon_power_average_watt{agent_hostname=~\"$instance\", chip=~\"$amd_gpu\"}",
+          "expr": "label_replace(node_hwmon_power_average_watt{agent_hostname=~\"$instance\", chip=~\"$amd_gpu\"} * on(chip) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}, \"gpu\", \"$1\", \"card\", \"card([0-9]+)\")",
           "hide": false,
-          "legendFormat": "AMD GPU: {{chip}}",
+          "legendFormat": "AMD GPU: {{gpu}}",
           "range": true,
           "refId": "B"
         }
@@ -547,9 +547,9 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "node_drm_gpu_busy_percent{instance=~\"^$instance.*\"}",
+          "expr": "label_replace(node_drm_gpu_busy_percent{instance=~\"^$instance.*\"} * on(card) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}, \"gpu\", \"$1\", \"card\", \"card([0-9]+)\")\n",
           "hide": false,
-          "legendFormat": "AMD GPU: {{chip}}",
+          "legendFormat": "AMD GPU: {{gpu}}",
           "range": true,
           "refId": "B"
         }
@@ -660,9 +660,9 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "(node_hwmon_fan_rpm{instance=~\"^$instance.*\", chip=\"$amd_gpu\"}) / (node_hwmon_fan_max_rpm{instance=~\"^$instance.*\", chip=\"$amd_gpu\"}) * 100",
+          "expr": "label_replace(\n  (\n    node_hwmon_fan_rpm{instance=~\"^$instance.*\", chip=~\"$amd_gpu\"} * on(chip) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}\n  ) /\n  (\n    node_hwmon_fan_max_rpm{instance=~\"^$instance.*\", chip=~\"$amd_gpu\"} * on(chip) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}\n  ) * 100,\n  \"gpu\", \"$1\", \"card\", \"card([0-9]+)\"\n)",
           "hide": false,
-          "legendFormat": "AMD GPU: {{chip}}",
+          "legendFormat": "AMD GPU: {{gpu}}",
           "range": true,
           "refId": "B"
         }
@@ -774,9 +774,9 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "node_hwmon_freq_freq_mhz{exported_instance=~\"^$instance.*\", chip=~\"$amd_gpu\", sensor=\"sclk\"} * 1000000",
+          "expr": "label_replace(node_hwmon_freq_freq_mhz{agent_hostname=~\"^$instance.*\", chip=~\"$amd_gpu\", sensor=\"sclk\"} * on(chip) group_right() node_drm_card_info{chip=~\"$amd_gpu\"} * 1000000, \"gpu\", \"$1\", \"card\", \"card([0-9]+)\")",
           "hide": false,
-          "legendFormat": "AMD GPU: {{chip}}",
+          "legendFormat": "AMD GPU: {{gpu}}",
           "range": true,
           "refId": "B"
         }
@@ -887,9 +887,9 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "(node_drm_memory_vram_used_bytes{instance=~\"^$instance.*\"}) / (node_drm_memory_vram_size_bytes{instance=~\"^$instance.*\"}) * 100",
+          "expr": "label_replace(\n    (\n        node_drm_memory_vram_used_bytes{instance=~\"^$instance.*\"} * on(card) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}\n    ) \n    / \n    (\n        node_drm_memory_vram_size_bytes{instance=~\"^$instance.*\"} * on(card) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}\n    ) * 100,\n    \"gpu\", \"$1\", \"card\", \"card([0-9]+)\"\n)",
           "hide": false,
-          "legendFormat": "AMD GPU: {{chip}}",
+          "legendFormat": "AMD GPU: {{gpu}}",
           "range": true,
           "refId": "B"
         }
@@ -907,8 +907,8 @@
       {
         "current": {
           "selected": false,
-          "text": "juju_cos_8738e89e-feb2-4d9d-82b4-c28b536197df_prometheus_0",
-          "value": "juju_cos_8738e89e-feb2-4d9d-82b4-c28b536197df_prometheus_0"
+          "text": "juju_cos_f8e88307-f0df-40a4-88f1-745e6ab57e8e_prometheus_0",
+          "value": "juju_cos_f8e88307-f0df-40a4-88f1-745e6ab57e8e_prometheus_0"
         },
         "hide": 0,
         "includeAll": false,
@@ -998,7 +998,7 @@
         "datasource": {
           "uid": "$datasource"
         },
-        "definition": "label_values(node_hwmon_chip_names{chip_name=\"amdgpu\"}, chip)",
+        "definition": "label_values(node_drm_card_info,chip)",
         "hide": 2,
         "includeAll": true,
         "label": "AMD GPU",
@@ -1006,7 +1006,7 @@
         "name": "amd_gpu",
         "options": [],
         "query": {
-          "query": "label_values(node_hwmon_chip_names{chip_name=\"amdgpu\"}, chip)",
+          "query": "label_values(node_drm_card_info,chip)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1040,7 +1040,7 @@
   },
   "timezone": "",
   "title": "GPU Dashboard",
-  "uid": "Oxed_c6Wz",
-  "version": 3,
+  "uid": "Oxed_c6Wzv",
+  "version": 1,
   "weekStart": ""
 }
