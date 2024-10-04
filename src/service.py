@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from logging import getLogger
 from pathlib import Path
 from time import sleep
-from typing import Any, Dict, Optional, Set, Tuple, List
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from charms.operator_libs_linux.v1 import systemd
 from charms.operator_libs_linux.v2 import snap
@@ -22,11 +22,11 @@ from config import (
 )
 from hardware import get_bmc_address
 from hw_tools import (
+    APTStrategyABC,
     DCGMExporterStrategy,
     NVIDIADriverStrategy,
     SmartCtlExporterStrategy,
     SnapStrategy,
-    StrategyABC,
 )
 
 logger = getLogger(__name__)
@@ -320,7 +320,7 @@ class SnapExporter(BaseExporter):
     exporter_name: str
     channel: str
     port: int
-    strategies: List[StrategyABC]
+    strategies: List[Union[SnapStrategy, APTStrategyABC]]
 
     def __init__(self, config: ConfigData):
         """Init."""

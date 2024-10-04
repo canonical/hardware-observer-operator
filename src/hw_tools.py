@@ -193,43 +193,45 @@ class SnapStrategy(StrategyABC):
     channel: str
 
     @property
-    def snap(self) -> str:
+    def snap_name(self) -> str:
         """Snap name."""
         return self._name.value
 
     @property
     def snap_client(self) -> snap.Snap:
         """Return the snap client."""
-        return snap.SnapCache()[self.snap]
+        return snap.SnapCache()[self.snap_name]
 
     def install(self) -> None:
         """Install the snap from a channel."""
         try:
-            snap.add(self.snap, channel=self.channel)
-            logger.info("Installed %s from channel: %s", self.snap, self.channel)
+            snap.add(self.snap_name, channel=self.channel)
+            logger.info("Installed %s from channel: %s", self.snap_name, self.channel)
 
         # using the snap.SnapError will result into:
         # TypeError: catching classes that do not inherit from BaseException is not allowed
         except Exception as err:  # pylint: disable=broad-except
-            logger.error("Failed to install %s from channel: %s: %s", self.snap, self.channel, err)
+            logger.error(
+                "Failed to install %s from channel: %s: %s", self.snap_name, self.channel, err
+            )
             raise err
 
     def remove(self) -> None:
         """Remove the snap."""
         try:
-            snap.remove([self.snap])
+            snap.remove([self.snap_name])
 
         # using the snap.SnapError will result into:
         # TypeError: catching classes that do not inherit from BaseException is not allowed
         except Exception as err:  # pylint: disable=broad-except
-            logger.error("Failed to remove %s: %s", self.snap, err)
+            logger.error("Failed to remove %s: %s", self.snap_name, err)
             raise err
 
     def check(self) -> bool:
         """Check if all services are active."""
         return all(
             service.get("active", False)
-            for service in snap.SnapCache()[self.snap].services.values()
+            for service in snap.SnapCache()[self.snap_name].services.values()
         )
 
 
@@ -260,7 +262,7 @@ class DCGMExporterStrategy(SnapStrategy):
             raise err
 
 
-class NVIDIADriverStrategy(StrategyABC):
+class NVIDIADriverStrategy(APTStrategyABC):
     """NVIDIA driver strategy class."""
 
     _name = HWTool.NVIDIA_DRIVER
