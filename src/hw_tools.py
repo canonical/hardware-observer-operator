@@ -5,6 +5,7 @@ Define strategy for install, remove and verifier for different hardware.
 
 import logging
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -196,6 +197,11 @@ class SnapStrategy(StrategyABC):
         """Snap name."""
         return self._name.value
 
+    @property
+    def snap_client(self) -> snap.Snap:
+        """Return the snap client."""
+        return snap.SnapCache()[self.snap]
+
     def install(self) -> None:
         """Install the snap from a channel."""
         try:
@@ -228,20 +234,38 @@ class SnapStrategy(StrategyABC):
 
 
 class DCGMExporterStrategy(SnapStrategy):
-    """DCGM strategy class."""
+    """DCGM exporter strategy class."""
 
     _name = HWTool.DCGM
+    metric_file = Path().parent / "/gpu_metrics/dcgm_metrics.csv"
+    snap_common: Path = Path("/var/snap/dcgm/common/")
 
     def __init__(self, channel: str) -> None:
         """Init."""
         self.channel = channel
+
+    def install(self) -> None:
+        """Install the snap and the custom metrics."""
+        super().install()
+        self._create_custom_metrics()
+
+    def _create_custom_metrics(self) -> None:
+        logger.info("Creating a custom metrics file and configuring the DCGM snap to use it")
+        try:
+            shutil.copy(self.metric_file, self.snap_common)
+            self.snap_client.set({"dcgm-exporter-metrics-file": self.metric_file.name})
+            self.snap_client.restart(reload=True)
+        except Exception as err:  # pylint: disable=broad-except
+            logger.error("Failed to configure custom DCGM metrics: %s", err)
+            raise err
 
 
 class NVIDIADriverStrategy(StrategyABC):
     """NVIDIA driver strategy class."""
 
     _name = HWTool.NVIDIA_DRIVER
-    snap_common: Path = Path("/var/snap/dcgm/common/")
+    installed_pkgs = Path("/tmp/nvidia-installed-pkgs.txt")
+    pkg_pattern = r"nvidia(?:-[a-zA-Z-]*)?-(\d+)(?:-[a-zA-Z]*)?"
 
     def install(self) -> None:
         """Install the driver and NVIDIA utils."""
@@ -258,10 +282,7 @@ class NVIDIADriverStrategy(StrategyABC):
         apt.add_package("ubuntu-drivers-common", update_cache=True)
 
         # output what driver was installed helps gets the version installed later
-        cmd = (
-            "ubuntu-drivers install --gpgpu --package-list "
-            f"{self.snap_common}/nvidia-installed-pkgs.txt"
-        )
+        cmd = f"ubuntu-drivers install --gpgpu --package-list {self.installed_pkgs}"
         try:
             # This can be changed to check_call and not rely in the output if this is fixed
             # https://github.com/canonical/ubuntu-drivers-common/issues/106
@@ -281,26 +302,29 @@ class NVIDIADriverStrategy(StrategyABC):
 
     def _install_nvidia_utils(self) -> None:
         """Install the nvidia utils to be able to use nvidia-smi."""
-        nvidia_pkg = Path(self.snap_common / "nvidia-installed-pkgs.txt")
-        if not nvidia_pkg.exists():
-            logger.debug("nvidia-utils not installed by the charm")
+        if not self.installed_pkgs.exists():
+            logger.debug("Drivers not installed by the charm. Skipping nvidia-utils")
             return
 
-        installed_pkg = nvidia_pkg.read_text(encoding="utf-8").splitlines()[0]
-        logger.debug("installed driver from hardware-observer: %s", installed_pkg)
-        nvidia_version = installed_pkg.split("-")[-2]
-
-        if not nvidia_version.isdigit():
+        installed_pkgs = self.installed_pkgs.read_text(encoding="utf-8").splitlines()
+        for line in installed_pkgs:
+            if match := re.search(self.pkg_pattern, line):
+                nvidia_version = match.group(1)
+                logger.debug("installed driver from hardware-observer: %s", line)
+                pkg = f"nvidia-utils-{nvidia_version}-server"
+                apt.add_package(pkg, update_cache=True)
+                logger.info("installed %s", pkg)
+                break
+        else:
             logger.warning(
-                "driver %s is an unexpected format and nvidia-utils was not installed",
-                installed_pkg,
+                "packages installed at %s are in an unexpected format. "
+                "nvidia-utils was not installed",
+                self.installed_pkgs,
             )
-            return
 
-        pkg = f"nvidia-utils-{nvidia_version}-server"
-        apt.add_package(pkg, update_cache=True)
-        logger.info("installed %s", pkg)
-        return
+    def remove(self) -> None:
+        """Drivers shouldn't be removed by the strategy."""
+        return None
 
     def check(self) -> bool:
         """Check if nvidia-smi is working."""
@@ -310,9 +334,9 @@ class NVIDIADriverStrategy(StrategyABC):
         except (FileNotFoundError, subprocess.CalledProcessError) as e:
             logger.error(e)
             logger.warning(
-                "nvidia-smi is not working. It's necessary to manually remove and install "
-                "a different NVIDIA driver until nvidia-smi is working. See the docs for more "
-                "details: https://ubuntu.com/server/docs/nvidia-drivers-installation"
+                "nvidia-smi is not working. Ensure the correct driver is installed. "
+                "See the docs for more details: "
+                "https://ubuntu.com/server/docs/nvidia-drivers-installation"
             )
             return False
 

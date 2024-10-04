@@ -1172,6 +1172,7 @@ def mock_path():
 @pytest.fixture
 def nvidia_driver_strategy(mock_check_output, mock_apt_lib, mock_path, mock_check_call):
     strategy = NVIDIADriverStrategy()
+    strategy.installed_pkgs = mock_path
     yield strategy
 
 
@@ -1239,41 +1240,39 @@ def test_install_nvidia_drivers_no_drivers_found(
     mock_apt_lib.add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
 
 
-def test_install_nvidia_utils_driver_installed_from_charm(
-    mock_path, mock_apt_lib, nvidia_driver_strategy
-):
+def test_install_nvidia_utils_driver_installed_from_charm(mock_apt_lib, nvidia_driver_strategy):
     driver_version = mock.MagicMock()
     driver_version.exists.return_value = True
     driver_version.read_text.return_value = (
         "nvidia-headless-no-dkms-535-server\nlibnvidia-cfg1-535-server"
     )
-    mock_path.return_value = driver_version
+    nvidia_driver_strategy.installed_pkgs = driver_version
 
     nvidia_driver_strategy._install_nvidia_utils()
     mock_apt_lib.add_package.assert_called_with("nvidia-utils-535-server", update_cache=True)
 
 
 def test_install_nvidia_utils_driver_not_installed_from_charm(
-    mock_path, mock_apt_lib, nvidia_driver_strategy
+    mock_apt_lib, nvidia_driver_strategy
 ):
-    driver_version = mock.MagicMock()
-    driver_version.exists.return_value = False
-    mock_path.return_value = driver_version
+    nvidia_driver_strategy.installed_pkgs.exists.return_value = False
 
     nvidia_driver_strategy._install_nvidia_utils()
     mock_apt_lib.add_package.assert_not_called()
 
 
-def test_install_nvidia_utils_driver_unexpected_format(
-    mock_path, mock_apt_lib, nvidia_driver_strategy
-):
+def test_install_nvidia_utils_driver_unexpected_format(mock_apt_lib, nvidia_driver_strategy):
     driver_version = mock.MagicMock()
     driver_version.exists.return_value = True
     driver_version.read_text.return_value = "nvidia-my-version-server"
-    mock_path.return_value = driver_version
+    nvidia_driver_strategy.installed_pkgs = driver_version
 
     nvidia_driver_strategy._install_nvidia_utils()
     mock_apt_lib.add_package.assert_not_called()
+
+
+def test_nvidia_strategy_remove(nvidia_driver_strategy):
+    assert nvidia_driver_strategy.remove() is None
 
 
 def test_nvidia_strategy_check(nvidia_driver_strategy):

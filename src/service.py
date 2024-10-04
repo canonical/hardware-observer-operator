@@ -1,12 +1,11 @@
 """Exporter service helper."""
 
 import os
-import shutil
 from abc import ABC, abstractmethod
 from logging import getLogger
 from pathlib import Path
 from time import sleep
-from typing import Any, Dict, Optional, Set, Tuple
+from typing import Any, Dict, Optional, Set, Tuple, List
 
 from charms.operator_libs_linux.v1 import systemd
 from charms.operator_libs_linux.v2 import snap
@@ -27,6 +26,7 @@ from hw_tools import (
     NVIDIADriverStrategy,
     SmartCtlExporterStrategy,
     SnapStrategy,
+    StrategyABC,
 )
 
 logger = getLogger(__name__)
@@ -320,16 +320,17 @@ class SnapExporter(BaseExporter):
     exporter_name: str
     channel: str
     port: int
-    strategy: SnapStrategy
+    strategies: List[StrategyABC]
 
     def __init__(self, config: ConfigData):
         """Init."""
         self.config = config
+        self.strategies = []
 
     @property
     def snap_client(self) -> snap.Snap:
         """Return the snap client."""
-        return snap.SnapCache()[self.strategy.snap]
+        return snap.SnapCache()[self.exporter_name]
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
@@ -342,10 +343,12 @@ class SnapExporter(BaseExporter):
         Returns true if the install is successful, false otherwise.
         """
         try:
-            self.strategy.install()
+            for strategy in self.strategies:
+                strategy.install()
             self.enable_and_start()
             return self.snap_client.present is True
-        except Exception:  # pylint: disable=broad-except
+        except Exception as err:  # pylint: disable=broad-except
+            logger.error("Failed to install %s: %s", strategy.name, err)
             return False
 
     def uninstall(self) -> bool:
@@ -354,12 +357,13 @@ class SnapExporter(BaseExporter):
         Returns true if the uninstall is successful, false otherwise.
         """
         try:
-            self.strategy.remove()
+            for strategy in self.strategies:
+                strategy.remove()
 
         # using the snap.SnapError will result into:
         # TypeError: catching classes that do not inherit from BaseException is not allowed
         except Exception as err:  # pylint: disable=broad-except
-            logger.error("Failed to remove %s: %s", self.strategy.snap, err)
+            logger.error("Failed to remove %s: %s", strategy.name, err)
             return False
 
         return self.snap_client.present is False
@@ -384,7 +388,7 @@ class SnapExporter(BaseExporter):
         try:
             self.snap_client.set(snap_config, typed=True)
         except snap.SnapError as err:
-            logger.error("Failed to update snap configs %s: %s", self.strategy.snap, err)
+            logger.error("Failed to update snap configs %s: %s", self.exporter_name, err)
             return False
         return True
 
@@ -393,14 +397,21 @@ class SnapExporter(BaseExporter):
 
         Returns true if the service is healthy, false otherwise.
         """
-        return self.strategy.check()
+        return all(strategy.check() for strategy in self.strategies)
 
     def configure(self) -> bool:
         """Set the necessary exporter configurations or change snap channel.
 
         Returns true if the configure is successful, false otherwise.
         """
-        return self.install()
+        for strategy in self.strategies:
+            if isinstance(strategy, SnapStrategy):
+                try:
+                    return self.install()
+                except Exception as err:  # pylint: disable=broad-except
+                    logger.error("Failed to configure %s: %s", self.exporter_name, err)
+                    return False
+        return True
 
 
 class DCGMExporter(SnapExporter):
@@ -408,44 +419,14 @@ class DCGMExporter(SnapExporter):
 
     exporter_name: str = "dcgm"
     port: int = 9400
-    snap_common: Path = Path("/var/snap/dcgm/common/")
-    metric_config: str = "dcgm-exporter-metrics-file"
 
-    def __init__(self, charm_dir: Path, config: ConfigData):
+    def __init__(self, config: ConfigData):
         """Init."""
-        self.strategy = DCGMExporterStrategy(str(config["dcgm-snap-channel"]))
-        self.nvidia_driver_strategy = NVIDIADriverStrategy()
-        self.charm_dir = charm_dir
-        self.metrics_file = self.charm_dir / "src/gpu_metrics/dcgm_metrics.csv"
-        self.metric_config_value = self.metrics_file.name
+        self.strategies = [
+            DCGMExporterStrategy(str(config["dcgm-snap-channel"])),
+            NVIDIADriverStrategy(),
+        ]
         super().__init__(config)
-
-    def install(self) -> bool:
-        """Install the DCGM exporter and configure custom metrics."""
-        return all(
-            (super().install(), self._install_nvidia_drivers(), self._create_custom_metrics())
-        )
-
-    def _install_nvidia_drivers(self) -> bool:
-        try:
-            self.nvidia_driver_strategy.install()
-            return True
-        except Exception as err:  # pylint: disable=broad-except
-            logger.error("Failed to install the NVIDIA drivers %s", err)
-            return False
-
-    def _create_custom_metrics(self) -> bool:
-        """Create the custom metric files for the DCGM exporter."""
-        logger.info("Creating a custom metrics file and configuring the DCGM snap to use it")
-        try:
-            shutil.copy(self.metrics_file, self.snap_common)
-            self.snap_client.set({self.metric_config: self.metric_config_value})
-            self.snap_client.restart(reload=True)
-        except Exception as err:  # pylint: disable=broad-except
-            logger.error("Failed to configure custom DCGM metrics: %s", err)
-            return False
-
-        return True
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
@@ -457,7 +438,8 @@ class DCGMExporter(SnapExporter):
         valid, msg = super().validate_exporter_configs()
         if not valid:
             return False, msg
-        if not self.nvidia_driver_strategy.check():
+
+        if not NVIDIADriverStrategy().check():
             return (
                 False,
                 "Failed to communicate with NVIDIA driver. See more details in the logs",
@@ -474,7 +456,7 @@ class SmartCtlExporter(SnapExporter):
         """Initialize the SmartctlExporter class."""
         self.port = int(config["smartctl-exporter-port"])
         self.log_level = str(config["exporter-log-level"])
-        self.strategy = SmartCtlExporterStrategy(str(config["smartctl-exporter-snap-channel"]))
+        self.strategies = [SmartCtlExporterStrategy(str(config["smartctl-exporter-snap-channel"]))]
         super().__init__(config)
 
     @staticmethod
