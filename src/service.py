@@ -325,7 +325,6 @@ class SnapExporter(BaseExporter):
     def __init__(self, config: ConfigData):
         """Init."""
         self.config = config
-        self.strategies = []
 
     @property
     def snap_client(self) -> snap.Snap:
@@ -407,7 +406,8 @@ class SnapExporter(BaseExporter):
         for strategy in self.strategies:
             if isinstance(strategy, SnapStrategy):
                 try:
-                    return self.install()
+                    # refresh the snap for a new channel if necessary
+                    strategy.install()
                 except Exception as err:  # pylint: disable=broad-except
                     logger.error("Failed to configure %s: %s", self.exporter_name, err)
                     return False

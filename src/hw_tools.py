@@ -198,6 +198,11 @@ class SnapStrategy(StrategyABC):
         return self._name.value
 
     @property
+    def snap_common(self) -> Path:
+        """Snap common directory."""
+        return Path(f"/var/snap/{self.snap_name}/common/")
+
+    @property
     def snap_client(self) -> snap.Snap:
         """Return the snap client."""
         return snap.SnapCache()[self.snap_name]
@@ -239,8 +244,7 @@ class DCGMExporterStrategy(SnapStrategy):
     """DCGM exporter strategy class."""
 
     _name = HWTool.DCGM
-    metric_file = Path().parent / "/gpu_metrics/dcgm_metrics.csv"
-    snap_common: Path = Path("/var/snap/dcgm/common/")
+    metric_file = Path.cwd() / "src/gpu_metrics/dcgm_metrics.csv"
 
     def __init__(self, channel: str) -> None:
         """Init."""

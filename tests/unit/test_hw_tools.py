@@ -22,6 +22,7 @@ from checksum import (
 from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor, SystemVendor
 from hw_tools import (
     APTStrategyABC,
+    DCGMExporterStrategy,
     HWToolHelper,
     IPMIDCMIStrategy,
     IPMISELStrategy,
@@ -1039,7 +1040,7 @@ def mock_snap_lib():
 
 
 def test_snap_strategy_name(snap_exporter):
-    assert snap_exporter.snap == "my-snap"
+    assert snap_exporter.snap_name == "my-snap"
 
 
 def test_snap_strategy_channel(snap_exporter):
@@ -1048,7 +1049,9 @@ def test_snap_strategy_channel(snap_exporter):
 
 def test_snap_strategy_install_success(snap_exporter, mock_snap_lib):
     snap_exporter.install()
-    mock_snap_lib.add.assert_called_once_with(snap_exporter.snap, channel=snap_exporter.channel)
+    mock_snap_lib.add.assert_called_once_with(
+        snap_exporter.snap_name, channel=snap_exporter.channel
+    )
 
 
 def test_snap_strategy_install_fail(snap_exporter, mock_snap_lib):
@@ -1060,7 +1063,7 @@ def test_snap_strategy_install_fail(snap_exporter, mock_snap_lib):
 
 def test_snap_strategy_remove_success(snap_exporter, mock_snap_lib):
     snap_exporter.remove()
-    mock_snap_lib.remove.assert_called_once_with([snap_exporter.snap])
+    mock_snap_lib.remove.assert_called_once_with([snap_exporter.snap_name])
 
 
 def test_snap_strategy_remove_fail(snap_exporter, mock_snap_lib):
@@ -1170,10 +1173,49 @@ def mock_path():
 
 
 @pytest.fixture
+def mock_shutil_copy():
+    with mock.patch("hw_tools.shutil.copy") as mocked_copy:
+        yield mocked_copy
+
+
+@pytest.fixture
 def nvidia_driver_strategy(mock_check_output, mock_apt_lib, mock_path, mock_check_call):
     strategy = NVIDIADriverStrategy()
     strategy.installed_pkgs = mock_path
     yield strategy
+
+
+@pytest.fixture
+def dcgm_exporter_strategy(mock_snap_lib, mock_shutil_copy):
+    yield DCGMExporterStrategy("latest/stable")
+
+
+@mock.patch("hw_tools.DCGMExporterStrategy._create_custom_metrics")
+def test_dcgm_exporter_install(mock_custom_metrics, dcgm_exporter_strategy):
+    assert dcgm_exporter_strategy.install() is None
+    mock_custom_metrics.assert_called_once()
+
+
+def test_dcgm_create_custom_metrics(dcgm_exporter_strategy, mock_shutil_copy, mock_snap_lib):
+    assert dcgm_exporter_strategy._create_custom_metrics() is None
+    mock_shutil_copy.assert_called_once_with(
+        Path.cwd() / "src/gpu_metrics/dcgm_metrics.csv", Path("/var/snap/dcgm/common")
+    )
+    dcgm_exporter_strategy.snap_client.set.assert_called_once_with(
+        {"dcgm-exporter-metrics-file": "dcgm_metrics.csv"}
+    )
+    dcgm_exporter_strategy.snap_client.restart.assert_called_once_with(reload=True)
+
+
+def test_dcgm_create_custom_metrics_copy_fail(
+    dcgm_exporter_strategy, mock_shutil_copy, mock_snap_lib
+):
+    mock_shutil_copy.side_effect = FileNotFoundError
+    with pytest.raises(FileNotFoundError):
+        dcgm_exporter_strategy._create_custom_metrics()
+
+    dcgm_exporter_strategy.snap_client.set.assert_not_called()
+    dcgm_exporter_strategy.snap_client.restart.assert_not_called()
 
 
 @mock.patch("hw_tools.NVIDIADriverStrategy._install_nvidia_drivers")
