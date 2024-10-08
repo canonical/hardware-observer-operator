@@ -11,14 +11,14 @@ import stat
 import subprocess
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import List, Set
 
 import requests
 import urllib3
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v1 import systemd
 from charms.operator_libs_linux.v2 import snap
-from ops.model import ModelError, Resources
+from ops.model import Resources
 
 import apt_helpers
 from checksum import (
@@ -159,32 +159,28 @@ class StrategyABC(metaclass=ABCMeta):  # pylint: disable=R0903
     def check(self) -> bool:
         """Check installation status of the tool."""
 
-
-class APTStrategyABC(StrategyABC, metaclass=ABCMeta):
-    """Strategy for apt install tool."""
-
-    @abstractmethod
     def install(self) -> None:
         """Installation details."""
 
-    @abstractmethod
     def remove(self) -> None:
         """Remove details."""
-        # Note: The repo and keys should be remove when removing
-        # hook is triggered. But currently the apt lib don't have
-        # the remove option.
 
 
 class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     """Third party resource strategy class."""
 
-    @abstractmethod
-    def install(self, path: Path) -> None:
-        """Installation details."""
+    resources: Resources
 
-    @abstractmethod
-    def remove(self) -> None:
-        """Remove details."""
+    def __init__(self, resources: Resources) -> None:
+        """Inject the Resource object for fetching resource."""
+        self.resources = resources
+
+    def _fetch_tool(self) -> Path:
+        path = self.resources.fetch(TPR_RESOURCES[self._name])
+        if path is None or file_is_empty(path):
+            logger.info("Skipping %s resource install since empty file was detected.", self.name)
+            raise ResourceFileSizeZeroError(tool=self._name, path=path)
+        return path
 
 
 class SnapStrategy(StrategyABC):
@@ -266,7 +262,7 @@ class DCGMExporterStrategy(SnapStrategy):
             raise err
 
 
-class NVIDIADriverStrategy(APTStrategyABC):
+class NVIDIADriverStrategy(StrategyABC):
     """NVIDIA driver strategy class."""
 
     _name = HWTool.NVIDIA_DRIVER
@@ -364,11 +360,10 @@ class StorCLIStrategy(TPRStrategyABC):
     origin_path = Path("/opt/MegaRAID/storcli/storcli64")
     symlink_bin = TOOLS_DIR / HWTool.STORCLI.value
 
-    def install(self, path: Path) -> None:
+    def install(self) -> None:
         """Install storcli."""
-        if file_is_empty(path):
-            logger.info("Skipping StorCLI resource install since empty file was detected.")
-            raise ResourceFileSizeZeroError(tool=self._name, path=path)
+        path = self._fetch_tool()
+
         if not validate_checksum(STORCLI_VERSION_INFOS, path):
             raise ResourceChecksumError
         install_deb(self.name, path)
@@ -392,11 +387,9 @@ class PercCLIStrategy(TPRStrategyABC):
     origin_path = Path("/opt/MegaRAID/perccli/perccli64")
     symlink_bin = TOOLS_DIR / HWTool.PERCCLI.value
 
-    def install(self, path: Path) -> None:
+    def install(self) -> None:
         """Install perccli."""
-        if file_is_empty(path):
-            logger.info("Skipping PERCCLI resource install since empty file was detected.")
-            raise ResourceFileSizeZeroError(tool=self._name, path=path)
+        path = self._fetch_tool()
         if not validate_checksum(PERCCLI_VERSION_INFOS, path):
             raise ResourceChecksumError
         install_deb(self.name, path)
@@ -419,11 +412,9 @@ class SAS2IRCUStrategy(TPRStrategyABC):
     _name = HWTool.SAS2IRCU
     symlink_bin = TOOLS_DIR / HWTool.SAS2IRCU.value
 
-    def install(self, path: Path) -> None:
+    def install(self) -> None:
         """Install sas2ircu."""
-        if file_is_empty(path):
-            logger.info("Skipping SAS2IRCU resource install since empty file was detected.")
-            raise ResourceFileSizeZeroError(tool=self._name, path=path)
+        path = self._fetch_tool()
         if not validate_checksum(SAS2IRCU_VERSION_INFOS, path):
             raise ResourceChecksumError
         make_executable(path)
@@ -445,18 +436,16 @@ class SAS3IRCUStrategy(SAS2IRCUStrategy):
     _name = HWTool.SAS3IRCU
     symlink_bin = TOOLS_DIR / HWTool.SAS3IRCU.value
 
-    def install(self, path: Path) -> None:
+    def install(self) -> None:
         """Install sas3ircu."""
-        if file_is_empty(path):
-            logger.info("Skipping SAS3IRCU resource install since empty file was detected.")
-            raise ResourceFileSizeZeroError(tool=self._name, path=path)
+        path = self._fetch_tool()
         if not validate_checksum(SAS3IRCU_VERSION_INFOS, path):
             raise ResourceChecksumError
         make_executable(path)
         symlink(src=path, dst=self.symlink_bin)
 
 
-class SSACLIStrategy(APTStrategyABC):
+class SSACLIStrategy(StrategyABC):
     """Strategy for install ssacli."""
 
     _name = HWTool.SSACLI
@@ -489,7 +478,7 @@ class SSACLIStrategy(APTStrategyABC):
         return check_deb_pkg_installed(self.pkg)
 
 
-class IPMIStrategy(APTStrategyABC):
+class IPMIStrategy(StrategyABC):
     """Strategy for installing ipmi."""
 
     freeipmi_pkg = "freeipmi-tools"
@@ -730,126 +719,3 @@ def remove_legacy_smartctl_exporter() -> None:
         smartctl_exporter_config_path.unlink()
     if smartctl_exporter.exists():
         shutil.rmtree("/opt/SmartCtlExporter/")
-
-
-class HWToolHelper:
-    """Helper to install vendor's or hardware related tools."""
-
-    @property
-    def strategies(self) -> List[StrategyABC]:
-        """Define strategies for every tools."""
-        return [
-            StorCLIStrategy(),
-            PercCLIStrategy(),
-            SAS2IRCUStrategy(),
-            SAS3IRCUStrategy(),
-            SSACLIStrategy(),
-            IPMISELStrategy(),
-            IPMIDCMIStrategy(),
-            IPMISENSORStrategy(),
-            RedFishStrategy(),
-        ]
-
-    def fetch_tools(  # pylint: disable=W0102
-        self,
-        resources: Resources,
-        hw_available: Set[HWTool] = set(),
-    ) -> Dict[HWTool, Path]:
-        """Fetch resource from juju if it's VENDOR_TOOLS."""
-        fetch_tools: Dict[HWTool, Path] = {}
-        # Fetch all tools from juju resources
-        for tool, resource in TPR_RESOURCES.items():
-            if tool not in hw_available:
-                logger.info("Skip fetch tool: %s", tool)
-                continue
-            try:
-                path = resources.fetch(resource)
-                fetch_tools[tool] = path
-            except ModelError:
-                logger.warning("Fail to fetch tool: %s", resource)
-
-        return fetch_tools
-
-    def check_missing_resources(
-        self, hw_available: Set[HWTool], fetch_tools: Dict[HWTool, Path]
-    ) -> Tuple[bool, str]:
-        """Check if required resources are not been uploaded."""
-        missing_resources = []
-        for tool in hw_available:
-            if tool in TPR_RESOURCES:
-                # Resource hasn't been uploaded
-                if tool not in fetch_tools:
-                    missing_resources.append(TPR_RESOURCES[tool])
-                # Uploaded but file size is zero
-                path = fetch_tools.get(tool)
-                if path and file_is_empty(path):
-                    logger.warning(
-                        "Empty resource file detected for tool %s at path %s", tool, path
-                    )
-                    missing_resources.append(TPR_RESOURCES[tool])
-        if missing_resources:
-            return False, f"Missing resources: {missing_resources}"
-        return True, ""
-
-    def install(self, resources: Resources, hw_available: Set[HWTool]) -> Tuple[bool, str]:
-        """Install tools."""
-        logger.info("hw_available: %s", hw_available)
-
-        fetch_tools: Dict[HWTool, Path] = self.fetch_tools(resources, hw_available)
-
-        ok, msg = self.check_missing_resources(hw_available, fetch_tools)
-        if not ok:
-            return ok, msg
-
-        fail_strategies = []
-
-        # Iterate over each strategy and execute.
-        for strategy in self.strategies:
-            if strategy.name not in hw_available:
-                continue
-            try:
-                if isinstance(strategy, TPRStrategyABC):
-                    path = fetch_tools.get(strategy.name)  # pylint: disable=W0212
-                    if path:
-                        strategy.install(path)
-
-                elif isinstance(strategy, (APTStrategyABC, SnapStrategy)):
-                    strategy.install()  # pylint: disable=E1120
-                logger.info("Strategy %s install success", strategy)
-            except (
-                ResourceFileSizeZeroError,
-                OSError,
-                apt.PackageError,
-                ResourceChecksumError,
-            ) as e:
-                logger.warning("Strategy %s install fail: %s", strategy, e)
-                fail_strategies.append(strategy.name)
-
-        if fail_strategies:
-            return False, f"Fail strategies: {fail_strategies}"
-        return True, ""
-
-    # pylint: disable=W0613
-    def remove(self, resources: Resources, hw_available: Set[HWTool]) -> None:
-        """Execute all remove strategies."""
-        for strategy in self.strategies:
-            if strategy.name not in hw_available:
-                continue
-            if isinstance(strategy, (TPRStrategyABC, APTStrategyABC, SnapStrategy)):
-                strategy.remove()
-            logger.info("Strategy %s remove success", strategy)
-
-    def check_installed(self, hw_available: Set[HWTool]) -> Tuple[bool, str]:
-        """Check tool status."""
-        failed_checks: Set[HWTool] = set()
-
-        for strategy in self.strategies:
-            if strategy.name not in hw_available:
-                continue
-            ok = strategy.check()
-            if not ok:
-                failed_checks.add(strategy.name)
-
-        if failed_checks:
-            return False, f"Fail strategy checks: {failed_checks}"
-        return True, ""

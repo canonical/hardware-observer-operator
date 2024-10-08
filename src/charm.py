@@ -12,7 +12,7 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
-from hw_tools import HWTool, HWToolHelper, detect_available_tools, remove_legacy_smartctl_exporter
+from hw_tools import HWTool, detect_available_tools, remove_legacy_smartctl_exporter
 from service import BaseExporter, DCGMExporter, ExporterError, HardwareExporter, SmartCtlExporter
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,6 @@ class HardwareObserverCharm(ops.CharmBase):
     def __init__(self, *args: Any) -> None:
         """Init."""
         super().__init__(*args)
-        self.hw_tool_helper = HWToolHelper()
 
         # Add refresh_events to COSAgentProvider to update relation data when
         # config changed (default behavior) and upgrade charm. This is useful
@@ -75,6 +74,7 @@ class HardwareObserverCharm(ops.CharmBase):
             exporters.append(
                 HardwareExporter(
                     self.charm_dir,
+                    self.model.resources,
                     self.model.config,
                     stored_tools,
                 )
@@ -134,47 +134,30 @@ class HardwareObserverCharm(ops.CharmBase):
 
         remove_legacy_smartctl_exporter()
 
-        stored_tools = self.get_stored_tools()
-
         msg: str
         resource_installed: bool
 
-        # Install hw tools
-        resource_installed, msg = self.hw_tool_helper.install(self.model.resources, stored_tools)
-
-        self._stored.resource_installed = resource_installed
-        if not resource_installed:
-            logger.warning(msg)
-            self.model.unit.status = BlockedStatus(msg)
-            return
-
         # Install exporter services and resources
         for exporter in self.exporters:
-            exporter_install_ok = exporter.install()
+            exporter_install_ok, msg = exporter.install()
             if not exporter_install_ok:
                 resource_installed = False
                 self._stored.resource_installed = resource_installed
-                msg = f"Exporter {exporter.exporter_name} install failed"
                 logger.warning(msg)
                 self.model.unit.status = BlockedStatus(msg)
                 return
 
+        self._stored.resource_installed = True
         self._on_update_status(event)
 
     def _on_remove(self, _: EventBase) -> None:
         """Remove everything when charm is being removed."""
         logger.info("Start to remove.")
-        # Remove binary tool
-        self.hw_tool_helper.remove(
-            self.model.resources,
-            self.get_stored_tools(),
-        )
-        self._stored.resource_installed = False
-
         # Remove exporters
         for exporter in self.exporters:
             self.model.unit.status = MaintenanceStatus(f"Removing {exporter.exporter_name}...")
             exporter.uninstall()
+        self._stored.resource_installed = False
 
     def _on_update_status(self, _: EventBase) -> None:  # noqa: C901
         """Update the charm's status."""
@@ -187,15 +170,14 @@ class HardwareObserverCharm(ops.CharmBase):
             return
 
         for exporter in self.exporters:
+            resource_ready, resource_ready_message = exporter.check_resources()
+            if not resource_ready:
+                self.model.unit.status = BlockedStatus(resource_ready_message)
+                return
             config_valid, config_valid_message = exporter.validate_exporter_configs()
             if not config_valid:
                 self.model.unit.status = BlockedStatus(config_valid_message)
                 return
-
-        hw_tool_ok, error_msg = self.hw_tool_helper.check_installed(self.get_stored_tools())
-        if not hw_tool_ok:
-            self.model.unit.status = BlockedStatus(error_msg)
-            return
 
         # Check health of all exporters
         exporters_health = [self._check_exporter_health(exporter) for exporter in self.exporters]
