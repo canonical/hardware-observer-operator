@@ -65,6 +65,7 @@ class HWTool(str, Enum):
     REDFISH = "redfish"
     SMARTCTL_EXPORTER = "smartctl-exporter"
     DCGM = "dcgm"
+    NVIDIA_DRIVER = "nvidia-driver"
 
 
 TPR_RESOURCES: t.Dict[HWTool, str] = {

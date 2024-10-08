@@ -1,28 +1,47 @@
 """Exporter service helper."""
 
 import os
-import shutil
 from abc import ABC, abstractmethod
 from logging import getLogger
 from pathlib import Path
 from time import sleep
-from typing import Any, Dict, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
+from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v1 import systemd
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Environment, FileSystemLoader
-from ops.model import ConfigData
+from ops.model import ConfigData, Resources
 from redfish import redfish_client
 from redfish.rest.v1 import InvalidCredentialsError
 
+from checksum import (
+    ResourceChecksumError,
+)
 from config import (
     HARDWARE_EXPORTER_COLLECTOR_MAPPING,
     HARDWARE_EXPORTER_SETTINGS,
     ExporterSettings,
     HWTool,
+    TPR_RESOURCES,
 )
 from hardware import get_bmc_address
-from hw_tools import DCGMExporterStrategy, SmartCtlExporterStrategy, SnapStrategy
+from hw_tools import (
+    DCGMExporterStrategy,
+    NVIDIADriverStrategy,
+    SmartCtlExporterStrategy,
+    SnapStrategy,
+    StrategyABC,
+    StorCLIStrategy,
+    PercCLIStrategy,
+    SAS2IRCUStrategy,
+    SAS3IRCUStrategy,
+    IPMISELStrategy,
+    IPMIDCMIStrategy,
+    IPMISENSORStrategy,
+    RedFishStrategy,
+    ResourceFileSizeZeroError,
+)
 
 logger = getLogger(__name__)
 
@@ -34,7 +53,63 @@ class ExporterError(Exception):
     """
 
 
-class BaseExporter(ABC):
+class ResourceMixin():
+    """Mixin to handle multiple resource strategy install/remove/check."""
+
+    strategies: List[StrategyABC]
+    available_tools: Set[HWTool]
+
+    @staticmethod
+    @abstractmethod
+    def hw_tools() -> Set[HWTool]:
+        """Return hardware tools to watch."""
+
+    def install_resources(self) -> Tuple[bool, str]:
+        """Run install for all strategies."""
+        failed_strategies = []
+        missing_resources = []
+        for strategy in self.strategies:
+            if strategy.name in self.available_tools:
+                try:
+                    strategy.install()
+                except ResourceFileSizeZeroError as e:
+                    missing_resources.append(TPR_RESOURCES[strategy.name])
+                except (
+                    OSError,
+                    apt.PackageError,
+                    ResourceChecksumError,
+                ) as e:
+                    logger.warning("Strategy %s install fail: %s", strategy, e)
+                    failed_strategies.append(strategy.name)
+        if missing_resources:
+            return False, f"Missing resources: {missing_resources}"
+        if failed_strategies:
+            return False, f"Fail strategies: {failed_strategies}"
+        return True, ""
+
+    def remove_resources(self) -> bool:
+        """Run remove for strategies."""
+        for strategy in self.strategies:
+            if strategy.name in self.available_tools:
+                strategy.remove()
+        return True
+
+    def check_resources(self) -> Tuple[bool, str]:
+        """Run check for strategies."""
+        failed_checks: Set[HWTool] = set()
+        for strategy in self.strategies:
+            if strategy.name in self.available_tools:
+                continue
+            strategy.check()
+            ok = strategy.check()
+            if not ok:
+                failed_checks.add(strategy.name)
+        if failed_checks:
+            return False, f"Fail strategy checks: {failed_checks}"
+        return True, ""
+
+
+class BaseExporter(ABC, ResourceMixin):
     """A class representing the exporter and the metric endpoints."""
 
     config: ConfigData
@@ -42,13 +117,8 @@ class BaseExporter(ABC):
     port: int
     log_level: str
 
-    @staticmethod
     @abstractmethod
-    def hw_tools() -> Set[HWTool]:
-        """Return hardware tools to watch."""
-
-    @abstractmethod
-    def install(self) -> bool:
+    def install(self) -> Tuple[bool, str]:
         """Install the exporter."""
 
     @abstractmethod
@@ -94,7 +164,6 @@ class RenderableExporter(BaseExporter):
     def __init__(self, charm_dir: Path, config: ConfigData, settings: ExporterSettings) -> None:
         """Initialize the Exporter class."""
         self.charm_dir = charm_dir
-
         self.port: int
 
         self.settings = settings
@@ -104,28 +173,6 @@ class RenderableExporter(BaseExporter):
         self.exporter_name = self.settings.name
 
         self.log_level = str(config["exporter-log-level"])
-
-    def resources_exist(self) -> bool:
-        """Return true if required resources exist.
-
-        Overwrite this method if there are resources need to be installed.
-        """
-        return True
-
-    def install_resources(self) -> bool:
-        """Install the necessary resources for the exporter service.
-
-        Overwrite this method if there are resources need to be installed.
-        """
-        logger.debug("No required resources for %s", self.__class__.__name__)
-        return True
-
-    def remove_resources(self) -> bool:
-        """Remove exporter resources.
-
-        Overwrite this method if there are resources need to be removed.
-        """
-        return True
 
     def remove_config(self) -> bool:
         """Remove exporter configuration file."""
@@ -189,40 +236,38 @@ class RenderableExporter(BaseExporter):
         service_file_exists = self.exporter_service_path.exists()
         return service_file_exists and config_file_exists
 
-    def install(self) -> bool:
+    def install(self) -> Tuple[bool, str]:
         """Install the exporter."""
         logger.info("Installing %s.", self.exporter_name)
 
         # Install resources
-        install_resource_success = self.install_resources()
+        install_resource_success, msg = self.install_resources()
         if not install_resource_success:
             logger.error("Failed to install %s resources.", self.exporter_name)
-            return False
-        if not self.resources_exist():
-            logger.error("%s resources are not installed properly.", self.exporter_name)
-            # pylint: disable=too-many-instance-attributes
-            return False
+            return False, msg
 
         # Render config
         configure_success = self.configure()
         if not configure_success:
-            logger.error("Failed to render config files for %s.", self.exporter_name)
-            return False
+            msg = f"Failed to render config files for {self.exporter_name}."
+            logger.error(msg)
+            return False, msg
 
         # Install service
         render_service_success = self.render_service()
         if not render_service_success:
-            logger.error("Failed to install %s.", self.exporter_name)
-            return False
+            msg = f"Failed to install {self.exporter_name}."
+            logger.error(msg)
+            return False, msg
 
         if not self.verify_render_files_exist():
-            logger.error("%s is not installed properly.", self.exporter_name)
-            return False
+            msg = f"{self.exporter_name} is not installed properly."
+            return False, msg
 
         systemd.daemon_reload()
 
         logger.info("%s installed.", self.exporter_name)
-        return True
+        return True, ""
 
     def uninstall(self) -> bool:
         """Uninstall the exporter."""
@@ -315,7 +360,6 @@ class SnapExporter(BaseExporter):
     exporter_name: str
     channel: str
     port: int
-    strategy: SnapStrategy
 
     def __init__(self, config: ConfigData):
         """Init."""
@@ -324,39 +368,32 @@ class SnapExporter(BaseExporter):
     @property
     def snap_client(self) -> snap.Snap:
         """Return the snap client."""
-        return snap.SnapCache()[self.strategy.snap]
+        return snap.SnapCache()[self.exporter_name]
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
         """Return hardware tools to watch."""
         return set()
 
-    def install(self) -> bool:
+    def install(self) -> Tuple[bool, str]:
         """Install the snap from a channel.
 
         Returns true if the install is successful, false otherwise.
         """
-        try:
-            self.strategy.install()
-            self.enable_and_start()
-            return self.snap_client.present is True
-        except Exception:  # pylint: disable=broad-except
-            return False
+        ok, msg = self.install_resources()
+        if not ok:
+            return False, msg
+        self.enable_and_start()
+        if self.snap_client.present is False:
+            return False, "{self.exporter_name} service is not present"
+        return True, ""
 
     def uninstall(self) -> bool:
         """Uninstall the snap.
 
         Returns true if the uninstall is successful, false otherwise.
         """
-        try:
-            self.strategy.remove()
-
-        # using the snap.SnapError will result into:
-        # TypeError: catching classes that do not inherit from BaseException is not allowed
-        except Exception as err:  # pylint: disable=broad-except
-            logger.error("Failed to remove %s: %s", self.strategy.snap, err)
-            return False
-
+        self.remove_resources()
         return self.snap_client.present is False
 
     def enable_and_start(self) -> None:
@@ -379,7 +416,7 @@ class SnapExporter(BaseExporter):
         try:
             self.snap_client.set(snap_config, typed=True)
         except snap.SnapError as err:
-            logger.error("Failed to update snap configs %s: %s", self.strategy.snap, err)
+            logger.error("Failed to update snap configs %s: %s", self.exporter_name, err)
             return False
         return True
 
@@ -388,14 +425,22 @@ class SnapExporter(BaseExporter):
 
         Returns true if the service is healthy, false otherwise.
         """
-        return self.strategy.check()
+        return all(strategy.check() for strategy in self.strategies)
 
     def configure(self) -> bool:
         """Set the necessary exporter configurations or change snap channel.
 
         Returns true if the configure is successful, false otherwise.
         """
-        return self.install()
+        for strategy in self.strategies:
+            if isinstance(strategy, SnapStrategy):
+                try:
+                    # refresh the snap for a new channel if necessary
+                    strategy.install()
+                except Exception as err:  # pylint: disable=broad-except
+                    logger.error("Failed to configure %s: %s", self.exporter_name, err)
+                    return False
+        return True
 
 
 class DCGMExporter(SnapExporter):
@@ -403,37 +448,32 @@ class DCGMExporter(SnapExporter):
 
     exporter_name: str = "dcgm"
     port: int = 9400
-    snap_common: Path = Path("/var/snap/dcgm/common/")
-    metric_config: str = "dcgm-exporter-metrics-file"
 
-    def __init__(self, charm_dir: Path, config: ConfigData):
+    def __init__(self, config: ConfigData):
         """Init."""
-        self.strategy = DCGMExporterStrategy(str(config["dcgm-snap-channel"]))
-        self.charm_dir = charm_dir
-        self.metrics_file = self.charm_dir / "src/gpu_metrics/dcgm_metrics.csv"
-        self.metric_config_value = self.metrics_file.name
+        self.strategies = [
+            DCGMExporterStrategy(str(config["dcgm-snap-channel"])),
+            NVIDIADriverStrategy(),
+        ]
         super().__init__(config)
-
-    def install(self) -> bool:
-        """Install the DCGM exporter and configure custom metrics."""
-        if not super().install():
-            return False
-
-        logger.info("Creating a custom metrics file and configuring the DCGM snap to use it")
-        try:
-            shutil.copy(self.metrics_file, self.snap_common)
-            self.snap_client.set({self.metric_config: self.metric_config_value})
-            self.snap_client.restart(reload=True)
-        except Exception as err:  # pylint: disable=broad-except
-            logger.error("Failed to configure custom DCGM metrics: %s", err)
-            return False
-
-        return True
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
         """Return hardware tools to watch."""
         return {HWTool.DCGM}
+
+    def validate_exporter_configs(self) -> Tuple[bool, str]:
+        """Validate the if the DCGM exporter is able to run."""
+        valid, msg = super().validate_exporter_configs()
+        if not valid:
+            return False, msg
+
+        if not NVIDIADriverStrategy().check():
+            return (
+                False,
+                "Failed to communicate with NVIDIA driver. See more details in the logs",
+            )
+        return valid, msg
 
 
 class SmartCtlExporter(SnapExporter):
@@ -445,7 +485,7 @@ class SmartCtlExporter(SnapExporter):
         """Initialize the SmartctlExporter class."""
         self.port = int(config["smartctl-exporter-port"])
         self.log_level = str(config["exporter-log-level"])
-        self.strategy = SmartCtlExporterStrategy(str(config["smartctl-exporter-snap-channel"]))
+        self.strategies = [SmartCtlExporterStrategy(str(config["smartctl-exporter-snap-channel"]))]
         super().__init__(config)
 
     @staticmethod
@@ -466,9 +506,15 @@ class SmartCtlExporter(SnapExporter):
 class HardwareExporter(RenderableExporter):
     """A class representing the hardware exporter and the metric endpoints."""
 
-    required_config: bool = True
+    resources: Resources
 
-    def __init__(self, charm_dir: Path, config: ConfigData, available_tools: Set[HWTool]) -> None:
+    def __init__(
+        self,
+        charm_dir: Path,
+        resources: Resources,
+        config: ConfigData,
+        available_tools: Set[HWTool],
+    ) -> None:
         """Initialize the Hardware Exporter class."""
         super().__init__(charm_dir, config, HARDWARE_EXPORTER_SETTINGS)
 
@@ -479,6 +525,17 @@ class HardwareExporter(RenderableExporter):
         self.available_tools = available_tools
         self.collect_timeout = int(config["collect-timeout"])
         self.bmc_address = get_bmc_address()
+        self.resources = resources
+        self.strategies = [
+            StorCLIStrategy(resources=self.resources),
+            PercCLIStrategy(resources=self.resources),
+            SAS2IRCUStrategy(resources=self.resources),
+            SAS3IRCUStrategy(resources=self.resources),
+            IPMISELStrategy(),
+            IPMIDCMIStrategy(),
+            IPMISENSORStrategy(),
+            RedFishStrategy(),
+        ]
 
     def _render_config_content(self) -> str:
         """Render and install exporter config file."""
