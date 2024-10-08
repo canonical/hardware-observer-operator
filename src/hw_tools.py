@@ -5,7 +5,6 @@ Define strategy for install, remove and verifier for different hardware.
 
 import logging
 import os
-import re
 import shutil
 import stat
 import subprocess
@@ -270,15 +269,9 @@ class NVIDIADriverStrategy(APTStrategyABC):
     """NVIDIA driver strategy class."""
 
     _name = HWTool.NVIDIA_DRIVER
-    installed_pkgs = Path("/tmp/nvidia-installed-pkgs.txt")
     pkg_pattern = r"nvidia(?:-[a-zA-Z-]*)?-(\d+)(?:-[a-zA-Z]*)?"
 
     def install(self) -> None:
-        """Install the driver and NVIDIA utils."""
-        self._install_nvidia_drivers()
-        self._install_nvidia_utils()
-
-    def _install_nvidia_drivers(self) -> None:
         """Install the NVIDIA driver if not present."""
         if Path("/proc/driver/nvidia/version").exists():
             logger.info("NVIDIA driver already installed in the machine")
@@ -287,12 +280,10 @@ class NVIDIADriverStrategy(APTStrategyABC):
         logger.info("Installing NVIDIA driver")
         apt.add_package("ubuntu-drivers-common", update_cache=True)
 
-        # output what driver was installed helps gets the version installed later
-        cmd = f"ubuntu-drivers install --gpgpu --package-list {self.installed_pkgs}"
         try:
             # This can be changed to check_call and not rely in the output if this is fixed
             # https://github.com/canonical/ubuntu-drivers-common/issues/106
-            result = subprocess.check_output(cmd.split(), text=True)
+            result = subprocess.check_output("ubuntu-drivers install --gpgpu".split(), text=True)
 
         except subprocess.CalledProcessError as err:
             logger.error("Failed to install the NVIDIA driver: %s", err)
@@ -306,45 +297,13 @@ class NVIDIADriverStrategy(APTStrategyABC):
 
         logger.info("NVIDIA driver installed")
 
-    def _install_nvidia_utils(self) -> None:
-        """Install the nvidia utils to be able to use nvidia-smi."""
-        if not self.installed_pkgs.exists():
-            logger.debug("Drivers not installed by the charm. Skipping nvidia-utils")
-            return
-
-        installed_pkgs = self.installed_pkgs.read_text(encoding="utf-8").splitlines()
-        for line in installed_pkgs:
-            if match := re.search(self.pkg_pattern, line):
-                nvidia_version = match.group(1)
-                logger.debug("installed driver from hardware-observer: %s", line)
-                pkg = f"nvidia-utils-{nvidia_version}-server"
-                apt.add_package(pkg, update_cache=True)
-                logger.info("installed %s", pkg)
-                break
-        else:
-            logger.warning(
-                "packages installed at %s are in an unexpected format. "
-                "nvidia-utils was not installed",
-                self.installed_pkgs,
-            )
-
     def remove(self) -> None:
         """Drivers shouldn't be removed by the strategy."""
         return None
 
     def check(self) -> bool:
-        """Check if nvidia-smi is working."""
-        try:
-            subprocess.check_call("nvidia-smi", timeout=60)
-            return True
-        except (FileNotFoundError, subprocess.CalledProcessError) as e:
-            logger.error(e)
-            logger.warning(
-                "nvidia-smi is not working. Ensure the correct driver is installed. "
-                "See the docs for more details: "
-                "https://ubuntu.com/server/docs/nvidia-drivers-installation"
-            )
-            return False
+        """Check if driver was installed."""
+        return Path("/proc/driver/nvidia/version").exists()
 
 
 class SmartCtlExporterStrategy(SnapStrategy):
