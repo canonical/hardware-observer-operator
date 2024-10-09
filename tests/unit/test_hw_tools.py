@@ -22,13 +22,16 @@ from checksum import (
 from config import SNAP_COMMON, TOOLS_DIR, TPR_RESOURCES, HWTool, StorageVendor, SystemVendor
 from hw_tools import (
     APTStrategyABC,
+    DCGMExporterStrategy,
     HWToolHelper,
     IPMIDCMIStrategy,
     IPMISELStrategy,
     IPMISENSORStrategy,
+    NVIDIADriverStrategy,
     PercCLIStrategy,
     ResourceChecksumError,
     ResourceFileSizeZeroError,
+    ResourceInstallationError,
     SAS2IRCUStrategy,
     SAS3IRCUStrategy,
     SnapStrategy,
@@ -1037,7 +1040,7 @@ def mock_snap_lib():
 
 
 def test_snap_strategy_name(snap_exporter):
-    assert snap_exporter.snap == "my-snap"
+    assert snap_exporter.snap_name == "my-snap"
 
 
 def test_snap_strategy_channel(snap_exporter):
@@ -1046,7 +1049,9 @@ def test_snap_strategy_channel(snap_exporter):
 
 def test_snap_strategy_install_success(snap_exporter, mock_snap_lib):
     snap_exporter.install()
-    mock_snap_lib.add.assert_called_once_with(snap_exporter.snap, channel=snap_exporter.channel)
+    mock_snap_lib.add.assert_called_once_with(
+        snap_exporter.snap_name, channel=snap_exporter.channel
+    )
 
 
 def test_snap_strategy_install_fail(snap_exporter, mock_snap_lib):
@@ -1058,7 +1063,7 @@ def test_snap_strategy_install_fail(snap_exporter, mock_snap_lib):
 
 def test_snap_strategy_remove_success(snap_exporter, mock_snap_lib):
     snap_exporter.remove()
-    mock_snap_lib.remove.assert_called_once_with([snap_exporter.snap])
+    mock_snap_lib.remove.assert_called_once_with([snap_exporter.snap_name])
 
 
 def test_snap_strategy_remove_fail(snap_exporter, mock_snap_lib):
@@ -1141,6 +1146,142 @@ def test_snap_strategy_check(snap_exporter, mock_snap_lib, services, expected):
     mock_snap_lib.SnapCache.return_value = {"my-snap": mock_snap_client}
 
     assert snap_exporter.check() is expected
+
+
+@pytest.fixture
+def mock_check_output():
+    with mock.patch("hw_tools.subprocess.check_output") as mocked_check_output:
+        yield mocked_check_output
+
+
+@pytest.fixture
+def mock_check_call():
+    with mock.patch("hw_tools.subprocess.check_call") as mocked_check_call:
+        yield mocked_check_call
+
+
+@pytest.fixture
+def mock_apt_lib():
+    with mock.patch("hw_tools.apt") as mocked_apt_lib:
+        yield mocked_apt_lib
+
+
+@pytest.fixture
+def mock_path():
+    with mock.patch("hw_tools.Path") as mocked_path:
+        yield mocked_path
+
+
+@pytest.fixture
+def mock_shutil_copy():
+    with mock.patch("hw_tools.shutil.copy") as mocked_copy:
+        yield mocked_copy
+
+
+@pytest.fixture
+def nvidia_driver_strategy(mock_check_output, mock_apt_lib, mock_path, mock_check_call):
+    strategy = NVIDIADriverStrategy()
+    strategy.installed_pkgs = mock_path
+    yield strategy
+
+
+@pytest.fixture
+def dcgm_exporter_strategy(mock_snap_lib, mock_shutil_copy):
+    yield DCGMExporterStrategy("latest/stable")
+
+
+@mock.patch("hw_tools.DCGMExporterStrategy._create_custom_metrics")
+def test_dcgm_exporter_install(mock_custom_metrics, dcgm_exporter_strategy):
+    assert dcgm_exporter_strategy.install() is None
+    mock_custom_metrics.assert_called_once()
+
+
+def test_dcgm_create_custom_metrics(dcgm_exporter_strategy, mock_shutil_copy, mock_snap_lib):
+    assert dcgm_exporter_strategy._create_custom_metrics() is None
+    mock_shutil_copy.assert_called_once_with(
+        Path.cwd() / "src/gpu_metrics/dcgm_metrics.csv", Path("/var/snap/dcgm/common")
+    )
+    dcgm_exporter_strategy.snap_client.set.assert_called_once_with(
+        {"dcgm-exporter-metrics-file": "dcgm_metrics.csv"}
+    )
+    dcgm_exporter_strategy.snap_client.restart.assert_called_once_with(reload=True)
+
+
+def test_dcgm_create_custom_metrics_copy_fail(
+    dcgm_exporter_strategy, mock_shutil_copy, mock_snap_lib
+):
+    mock_shutil_copy.side_effect = FileNotFoundError
+    with pytest.raises(FileNotFoundError):
+        dcgm_exporter_strategy._create_custom_metrics()
+
+    dcgm_exporter_strategy.snap_client.set.assert_not_called()
+    dcgm_exporter_strategy.snap_client.restart.assert_not_called()
+
+
+def test_nvidia_driver_strategy_install_success(
+    mock_path, mock_check_output, mock_apt_lib, nvidia_driver_strategy
+):
+    nvidia_version = mock.MagicMock()
+    nvidia_version.exists.return_value = False
+    mock_path.return_value = nvidia_version
+
+    nvidia_driver_strategy.install()
+
+    mock_apt_lib.add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
+    mock_check_output.assert_called_once_with("ubuntu-drivers install --gpgpu".split(), text=True)
+
+
+def test_install_nvidia_drivers_already_installed(
+    mock_path, mock_apt_lib, nvidia_driver_strategy, mock_check_output
+):
+    nvidia_version = mock.MagicMock()
+    nvidia_version.exists.return_value = True
+    mock_path.return_value = nvidia_version
+
+    nvidia_driver_strategy.install()
+
+    mock_apt_lib.add_package.assert_not_called()
+    mock_check_output.assert_not_called()
+
+
+def test_install_nvidia_drivers_subprocess_exception(
+    mock_path, mock_check_output, mock_apt_lib, nvidia_driver_strategy
+):
+    nvidia_version = mock.MagicMock()
+    nvidia_version.exists.return_value = False
+    mock_path.return_value = nvidia_version
+    mock_check_output.side_effect = subprocess.CalledProcessError(1, [])
+
+    with pytest.raises(subprocess.CalledProcessError):
+        nvidia_driver_strategy.install()
+
+    mock_apt_lib.add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
+
+
+def test_install_nvidia_drivers_no_drivers_found(
+    mock_path, mock_check_output, mock_apt_lib, nvidia_driver_strategy
+):
+    nvidia_version = mock.MagicMock()
+    nvidia_version.exists.return_value = False
+    mock_path.return_value = nvidia_version
+    mock_check_output.return_value = "No drivers found for installation"
+
+    with pytest.raises(ResourceInstallationError):
+        nvidia_driver_strategy.install()
+
+    mock_apt_lib.add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
+
+
+def test_nvidia_strategy_remove(nvidia_driver_strategy):
+    assert nvidia_driver_strategy.remove() is None
+
+
+@pytest.mark.parametrize("present, expected", [(True, True), (False, False)])
+def test_nvidia_strategy_check(nvidia_driver_strategy, mock_path, present, expected):
+    nvidia_version = mock.MagicMock()
+    nvidia_version.exists.return_value = present
+    mock_path.return_value = nvidia_version
+    assert nvidia_driver_strategy.check() is expected
 
 
 @mock.patch("hw_tools.Path.unlink")

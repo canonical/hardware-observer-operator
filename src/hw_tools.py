@@ -61,6 +61,14 @@ class ResourceFileSizeZeroError(Exception):
         self.message = f"Tool: {tool} path: {path} size is zero"
 
 
+class ResourceInstallationError(Exception):
+    """Exception raised when a hardware tool installation fails."""
+
+    def __init__(self, tool: HWTool):
+        """Init."""
+        super().__init__(f"Installation failed for tool: {tool}")
+
+
 def copy_to_snap_common_bin(source: Path, filename: str) -> None:
     """Copy file to $SNAP_COMMON/bin folder."""
     Path(f"{SNAP_COMMON}/bin").mkdir(parents=False, exist_ok=True)
@@ -184,49 +192,118 @@ class SnapStrategy(StrategyABC):
     channel: str
 
     @property
-    def snap(self) -> str:
+    def snap_name(self) -> str:
         """Snap name."""
         return self._name.value
+
+    @property
+    def snap_common(self) -> Path:
+        """Snap common directory."""
+        return Path(f"/var/snap/{self.snap_name}/common/")
+
+    @property
+    def snap_client(self) -> snap.Snap:
+        """Return the snap client."""
+        return snap.SnapCache()[self.snap_name]
 
     def install(self) -> None:
         """Install the snap from a channel."""
         try:
-            snap.add(self.snap, channel=self.channel)
-            logger.info("Installed %s from channel: %s", self.snap, self.channel)
+            snap.add(self.snap_name, channel=self.channel)
+            logger.info("Installed %s from channel: %s", self.snap_name, self.channel)
 
         # using the snap.SnapError will result into:
         # TypeError: catching classes that do not inherit from BaseException is not allowed
         except Exception as err:  # pylint: disable=broad-except
-            logger.error("Failed to install %s from channel: %s: %s", self.snap, self.channel, err)
+            logger.error(
+                "Failed to install %s from channel: %s: %s", self.snap_name, self.channel, err
+            )
             raise err
 
     def remove(self) -> None:
         """Remove the snap."""
         try:
-            snap.remove([self.snap])
+            snap.remove([self.snap_name])
 
         # using the snap.SnapError will result into:
         # TypeError: catching classes that do not inherit from BaseException is not allowed
         except Exception as err:  # pylint: disable=broad-except
-            logger.error("Failed to remove %s: %s", self.snap, err)
+            logger.error("Failed to remove %s: %s", self.snap_name, err)
             raise err
 
     def check(self) -> bool:
         """Check if all services are active."""
         return all(
             service.get("active", False)
-            for service in snap.SnapCache()[self.snap].services.values()
+            for service in snap.SnapCache()[self.snap_name].services.values()
         )
 
 
 class DCGMExporterStrategy(SnapStrategy):
-    """DCGM strategy class."""
+    """DCGM exporter strategy class."""
 
     _name = HWTool.DCGM
+    metric_file = Path.cwd() / "src/gpu_metrics/dcgm_metrics.csv"
 
     def __init__(self, channel: str) -> None:
         """Init."""
         self.channel = channel
+
+    def install(self) -> None:
+        """Install the snap and the custom metrics."""
+        super().install()
+        self._create_custom_metrics()
+
+    def _create_custom_metrics(self) -> None:
+        logger.info("Creating a custom metrics file and configuring the DCGM snap to use it")
+        try:
+            shutil.copy(self.metric_file, self.snap_common)
+            self.snap_client.set({"dcgm-exporter-metrics-file": self.metric_file.name})
+            self.snap_client.restart(reload=True)
+        except Exception as err:  # pylint: disable=broad-except
+            logger.error("Failed to configure custom DCGM metrics: %s", err)
+            raise err
+
+
+class NVIDIADriverStrategy(APTStrategyABC):
+    """NVIDIA driver strategy class."""
+
+    _name = HWTool.NVIDIA_DRIVER
+    pkg_pattern = r"nvidia(?:-[a-zA-Z-]*)?-(\d+)(?:-[a-zA-Z]*)?"
+
+    def install(self) -> None:
+        """Install the NVIDIA driver if not present."""
+        if Path("/proc/driver/nvidia/version").exists():
+            logger.info("NVIDIA driver already installed in the machine")
+            return
+
+        logger.info("Installing NVIDIA driver")
+        apt.add_package("ubuntu-drivers-common", update_cache=True)
+
+        try:
+            # This can be changed to check_call and not rely in the output if this is fixed
+            # https://github.com/canonical/ubuntu-drivers-common/issues/106
+            result = subprocess.check_output("ubuntu-drivers install --gpgpu".split(), text=True)
+
+        except subprocess.CalledProcessError as err:
+            logger.error("Failed to install the NVIDIA driver: %s", err)
+            raise err
+
+        if "No drivers found for installation" in result:
+            logger.warning(
+                "No drivers for the NVIDIA GPU were found. Manual installation is necessary"
+            )
+            raise ResourceInstallationError(self._name)
+
+        logger.info("NVIDIA driver installed")
+
+    def remove(self) -> None:
+        """Drivers shouldn't be removed by the strategy."""
+        return None
+
+    def check(self) -> bool:
+        """Check if driver was installed."""
+        return Path("/proc/driver/nvidia/version").exists()
 
 
 class SmartCtlExporterStrategy(SnapStrategy):
