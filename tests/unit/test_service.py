@@ -770,9 +770,10 @@ class TestWriteToFile(unittest.TestCase):
     def tearDown(self):
         pathlib.Path(self.temp_file.name).unlink()
 
+    @mock.patch("service.fcntl")
     @mock.patch("builtins.open", new_callable=mock.mock_open)
     @mock.patch("service.os")
-    def test_write_to_file_success(self, mock_os, mock_open):
+    def test_write_to_file_success(self, mock_os, mock_open, mock_fcntl):
         path = pathlib.Path(self.temp_file.name)
         content = "Hello, world!"
 
@@ -783,22 +784,25 @@ class TestWriteToFile(unittest.TestCase):
 
         mock_open.assert_called_with(path, "w", encoding="utf-8")
         mock_file.write.assert_called_with(content)
+        mock_os.chmod.assert_not_called()
+        mock_fcntl.flock.assert_called_once()
 
-    @mock.patch("service.os.open", new_callable=mock.mock_open)
-    @mock.patch("service.os.fdopen", new_callable=mock.mock_open)
+    @mock.patch("service.fcntl")
+    @mock.patch("builtins.open", new_callable=mock.mock_open)
     @mock.patch("service.os")
-    def test_write_to_file_with_mode_success(self, mock_os, mock_fdopen, mock_open):
+    def test_write_to_file_with_mode_success(self, mock_os, mock_open, mock_fcntl):
         path = pathlib.Path(self.temp_file.name)
         content = "Hello, world!"
 
-        mock_file = mock_fdopen.return_value.__enter__.return_value
+        mock_file = mock_open.return_value.__enter__.return_value
 
         result = service.write_to_file(path, content, mode=0o600)
         self.assertTrue(result)
 
-        mock_open.assert_called_with(path, mock_os.O_CREAT | mock_os.O_WRONLY, 0o600)
-        mock_fdopen.assert_called_with(mock_open.return_value, "w", encoding="utf-8")
+        mock_open.assert_called_with(path, "w", encoding="utf-8")
         mock_file.write.assert_called_with(content)
+        mock_os.chmod.assert_called_with(path, 0o600)
+        mock_fcntl.flock.assert_called_once()
 
     @mock.patch("builtins.open", new_callable=mock.mock_open)
     def test_write_to_file_permission_error(self, mock_open):

@@ -1,5 +1,6 @@
 """Exporter service helper."""
 
+import fcntl
 import os
 from abc import ABC, abstractmethod
 from logging import getLogger
@@ -280,16 +281,14 @@ def write_to_file(path: Path, content: str, mode: Optional[int] = None) -> bool:
     """Write to file with provided content."""
     success = True
     try:
-        logger.info("Writing file to %s.", path)
-        fileobj = (
-            os.fdopen(os.open(path, os.O_CREAT | os.O_WRONLY, mode), "w", encoding="utf-8")
-            if mode
-            # create file with default permissions based on default OS umask
-            else open(path, "w", encoding="utf-8")  # pylint: disable=consider-using-with
-        )
-        with fileobj as file:
+        with open(path, "w", encoding="utf-8") as file:
+            # Apply a file lock
+            fcntl.flock(file.fileno(), fcntl.LOCK_EX)
             file.write(content)
-    except (NotADirectoryError, PermissionError) as err:
+
+        if mode:
+            os.chmod(path, mode)
+    except (NotADirectoryError, PermissionError, OSError) as err:
         logger.error(err)
         logger.info("Writing file to %s - Failed.", path)
         success = False
