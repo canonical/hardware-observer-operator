@@ -1,6 +1,5 @@
 """Exporter service helper."""
 
-import fcntl
 import os
 from abc import ABC, abstractmethod
 from logging import getLogger
@@ -282,8 +281,6 @@ def write_to_file(path: Path, content: str, mode: Optional[int] = None) -> bool:
     success = True
     try:
         with open(path, "w", encoding="utf-8") as file:
-            # Apply a file lock
-            fcntl.flock(file.fileno(), fcntl.LOCK_EX)
             file.write(content)
 
         if mode:
