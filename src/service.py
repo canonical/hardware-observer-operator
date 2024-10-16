@@ -277,21 +277,23 @@ class RenderableExporter(BaseExporter):
 
 
 def write_to_file(path: Path, content: str, mode: Optional[int] = None) -> bool:
-    """Write to file with provided content."""
-    success = True
+    """Write to file with provided content.
+    It's important to first set the permissions to then write the content because it might have
+    sensitive information like password.
+    """
+    path.touch()
+    if mode is not None:
+        os.chmod(path, mode)
     try:
         with open(path, "w", encoding="utf-8") as file:
             file.write(content)
-
-        if mode:
-            os.chmod(path, mode)
-    except (NotADirectoryError, PermissionError, OSError) as err:
+    except (NotADirectoryError, PermissionError) as err:
         logger.error(err)
         logger.info("Writing file to %s - Failed.", path)
-        success = False
-    else:
-        logger.info("Writing file to %s - Done.", path)
-    return success
+        return False
+
+    logger.info("Writing file to %s - Done.", path)
+    return True
 
 
 def remove_file(path: Path) -> bool:
