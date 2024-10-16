@@ -785,6 +785,41 @@ class TestWriteToFile(unittest.TestCase):
         mock_file.write.assert_called_with(content)
         mock_os.chmod.assert_not_called()
 
+    def test_write_file_already_exist_changes_permission(self):
+        path = pathlib.Path(self.temp_file.name)
+        prior_permission = path.stat().st_mode & 0o777
+        new_permission = 0o666
+        self.assertNotEqual(prior_permission, new_permission)
+
+        service.write_to_file(path, "", new_permission)
+
+        after_permission = path.stat().st_mode & 0o777
+        self.assertEqual(after_permission, new_permission)
+
+    def test_write_file_changes_content(self):
+        path = pathlib.Path(self.temp_file.name)
+        content_before = (
+            "port: 10200\nlevel: DEBUG\ncollect_timeout: 60\n\nenable_collectors:\n  \n  "
+            "- collector.poweredge_raid\n  \n  - collector.ipmi_dcmi\n  \n  "
+            "- collector.ipmi_sensor\n  \n  - collector.ipmi_sel\n\n  - collector.redfish\n  "
+            "\n\nredfish_host: 'https://10.229.2.8'\nredfish_username: 'root'\n"
+            "redfish_password: '<redacted>'\nredfish_client_timeout: '60'\n"
+        )
+        with open(path, "w", encoding="utf-8") as file:
+            file.write(content_before)
+
+        # simulate the redfish disable option
+        content_after = (
+            "port: 10200\nlevel: DEBUG\ncollect_timeout: 60\n\nenable_collectors:\n  \n"
+            "  - collector.poweredge_raid\n  \n  - collector.ipmi_dcmi\n  "
+            "\n  - collector.ipmi_sensor\n  \n  - collector.ipmi_sel\n"
+        )
+
+        service.write_to_file(path, content_after)
+
+        final_content = path.read_text()
+        self.assertEqual(final_content, content_after)
+
     @mock.patch("builtins.open", new_callable=mock.mock_open)
     @mock.patch("service.os")
     def test_write_to_file_with_mode_success(self, mock_os, mock_open):
