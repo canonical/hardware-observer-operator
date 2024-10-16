@@ -278,6 +278,7 @@ class RenderableExporter(BaseExporter):
 
 def write_to_file(path: Path, content: str, mode: Optional[int] = None) -> bool:
     """Write to file with provided content.
+
     It's important to first set the permissions to then write the content because it might have
     sensitive information like password.
     """
