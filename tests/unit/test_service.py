@@ -817,8 +817,7 @@ class TestWriteToFile(unittest.TestCase):
 
         service.write_to_file(path, content_after)
 
-        final_content = path.read_text()
-        self.assertEqual(final_content, content_after)
+        self.assertEqual(path.read_text(), content_after)
 
     @mock.patch("builtins.open", new_callable=mock.mock_open)
     @mock.patch("service.os")

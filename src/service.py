@@ -282,10 +282,11 @@ def write_to_file(path: Path, content: str, mode: Optional[int] = None) -> bool:
     It's important to first set the permissions to then write the content because it might have
     sensitive information like password.
     """
-    path.touch()
-    if mode is not None:
-        os.chmod(path, mode)
     try:
+        path.touch()
+        if mode is not None:
+            os.chmod(path, mode)
+
         with open(path, "w", encoding="utf-8") as file:
             file.write(content)
     except (NotADirectoryError, PermissionError) as err:
