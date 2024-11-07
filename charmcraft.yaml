@@ -45,6 +45,40 @@ bases:
         channel: "20.04"
         architectures:
           - arm64
+  - build-on:
+    - name: ubuntu
+      channel: "22.04"
+      architectures: ["ppc64el"]
+    run-on:
+      - name: ubuntu
+        channel: "24.04"
+        architectures:
+          - ppc64el
+      - name: ubuntu
+        channel: "22.04"
+        architectures:
+          - ppc64el
+      - name: ubuntu
+        channel: "20.04"
+        architectures:
+          - ppc64el
+  - build-on:
+    - name: ubuntu
+      channel: "22.04"
+      architectures: ["s390x"]
+    run-on:
+      - name: ubuntu
+        channel: "24.04"
+        architectures:
+          - s390x
+      - name: ubuntu
+        channel: "22.04"
+        architectures:
+          - s390x
+      - name: ubuntu
+        channel: "20.04"
+        architectures:
+          - s390x
 
 actions:
   redetect-hardware:
