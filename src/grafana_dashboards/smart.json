@@ -84,71 +84,6 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_devices{instance=~\"$instance\", job=\"$job\"}) - sum(smartctl_device{instance=~\"$instance\", job=\"$job\"})",
-          "range": true,
-          "instant": false,
-          "format": "time_series",
-          "refId": "A"
-        }
-      ],
-      "transformations": [],
-      "transparent": false,
-      "datasource": {
-        "uid": "${prometheusds}"
-      },
-      "type": "stat",
-      "title": "Missing devices",
-      "gridPos": {
-        "x": 3,
-        "y": 1,
-        "w": 3,
-        "h": 3
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "showPercentChange": false,
-        "wideLayout": true,
-        "text": {}
-      }
-    },
-    {
-      "links": [],
-      "repeatDirection": "h",
-      "tags": [],
-      "targets": [
-        {
-          "editorMode": "code",
           "expr": "max(smartctl_device_smartctl_exit_status{instance=~\"$instance\", job=\"$job\"})",
           "range": true,
           "instant": false,
@@ -164,7 +99,7 @@
       "type": "stat",
       "title": "Exit status",
       "gridPos": {
-        "x": 6,
+        "x": 3,
         "y": 1,
         "w": 3,
         "h": 3
@@ -229,7 +164,7 @@
       "type": "stat",
       "title": "Error log entries",
       "gridPos": {
-        "x": 9,
+        "x": 6,
         "y": 1,
         "w": 3,
         "h": 3
@@ -294,7 +229,7 @@
       "type": "stat",
       "title": "Media errors",
       "gridPos": {
-        "x": 12,
+        "x": 9,
         "y": 1,
         "w": 3,
         "h": 3
@@ -359,7 +294,7 @@
       "type": "stat",
       "title": "SMART error log count",
       "gridPos": {
-        "x": 15,
+        "x": 12,
         "y": 1,
         "w": 3,
         "h": 3
@@ -424,7 +359,7 @@
       "type": "stat",
       "title": "Critical warnings",
       "gridPos": {
-        "x": 18,
+        "x": 15,
         "y": 1,
         "w": 3,
         "h": 3
@@ -489,7 +424,7 @@
       "type": "stat",
       "title": "SMART failed",
       "gridPos": {
-        "x": 21,
+        "x": 18,
         "y": 1,
         "w": 3,
         "h": 3
