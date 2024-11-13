@@ -9,7 +9,6 @@ import ops.testing
 import pytest
 import requests
 from charms.operator_libs_linux.v0 import apt
-from charms.operator_libs_linux.v2 import snap
 from ops.model import ModelError
 from parameterized import parameterized
 
@@ -35,7 +34,6 @@ from hw_tools import (
     ResourceInstallationError,
     SAS2IRCUStrategy,
     SAS3IRCUStrategy,
-    SmartCtlExporterStrategy,
     SnapStrategy,
     SSACLIStrategy,
     StorCLIStrategy,
@@ -1284,35 +1282,6 @@ def test_nvidia_strategy_check(nvidia_driver_strategy, mock_path, present, expec
     nvidia_version.exists.return_value = present
     mock_path.return_value = nvidia_version
     assert nvidia_driver_strategy.check() is expected
-
-
-@pytest.fixture
-def smartctl_exporter_strategy(mock_snap_lib, mock_shutil_copy):
-    yield SmartCtlExporterStrategy("latest/stable")
-
-
-@mock.patch("hw_tools.SmartCtlExporterStrategy._configure_include_devices")
-def test_smartctl_exporter_install(_configure_include_devices, smartctl_exporter_strategy):
-    assert smartctl_exporter_strategy.install() is None
-    _configure_include_devices.assert_called_once()
-
-
-def test_configure_include_devices_devices(
-    smartctl_exporter_strategy, mock_shutil_copy, mock_snap_lib
-):
-    assert smartctl_exporter_strategy._configure_include_devices() is None
-    smartctl_exporter_strategy.snap_client.set.assert_called_once_with(
-        {"smartctl.device-include": r"^([fs]d[a-z]|hd[a-z]|nvme\d+)$"}
-    )
-    smartctl_exporter_strategy.snap_client.restart.assert_called_once_with(reload=True)
-
-
-def test_configure_include_devices_fail(smartctl_exporter_strategy, mock_snap_lib):
-    smartctl_exporter_strategy.snap_client.set.side_effect = snap.SnapError
-    with pytest.raises(snap.SnapError):
-        smartctl_exporter_strategy._configure_include_devices()
-
-    smartctl_exporter_strategy.snap_client.restart.assert_not_called()
 
 
 @mock.patch("hw_tools.Path.unlink")

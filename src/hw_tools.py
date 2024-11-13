@@ -315,27 +315,6 @@ class SmartCtlExporterStrategy(SnapStrategy):
         """Init."""
         self.channel = channel
 
-    def install(self) -> None:
-        """Install the snap and the custom metrics."""
-        super().install()
-        self._configure_include_devices()
-
-    def _configure_include_devices(self) -> None:
-        logger.info(
-            "Configuring the smartctl-exporter snap to include only SATA, SCSI, and NVMe devices"
-        )
-        try:
-            # exclude and include regex are mutually exclusive,
-            # so we only include SATA, SCSI, and NVMe devices and exclude megaraid devices
-            include_names_regex = r"^([fs]d[a-z]|hd[a-z]|nvme\d+)$"
-            self.snap_client.set({"smartctl.device-include": include_names_regex})
-            self.snap_client.restart(reload=True)
-        except Exception as err:  # pylint: disable=broad-except
-            logger.error(
-                "Failed to configure smartctl-exporter to exclude megaraid devices: %s", err
-            )
-            raise err
-
 
 class StorCLIStrategy(TPRStrategyABC):
     """Strategy to install storcli."""
