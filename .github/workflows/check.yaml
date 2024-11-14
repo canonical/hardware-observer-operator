@@ -90,6 +90,10 @@ jobs:
         - 'tox -e func -- -v --base ubuntu@22.04 --keep-models'
         - 'tox -e func -- -v --base ubuntu@24.04 --keep-models'
         juju-channel: ["3.4/stable"]
+        exclude:
+        # NOTE(rgildein): The grafana-agent does not support ubuntu@24.04 on arm64.
+        - test-command: 'tox -e func -- -v --base ubuntu@24.04 --keep-models'
+          runs-on: [Ubuntu_ARM64_4C_16G_01]
     steps:
 
       - uses: actions/checkout@v4
