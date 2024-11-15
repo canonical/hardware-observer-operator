@@ -262,7 +262,7 @@ class TestCharmWithHW:
         assert config["redfish_client_timeout"] == int(new_timeout)
 
         await app.reset_config(["collect-timeout"])
-        
+
     async def test_smarctl_exporter_snap_available(self, ops_test, app, unit):
         """Test if smartctl exporter snap is installed and ranning on the unit."""
         snap_name = "smartctl-exporter"
@@ -270,7 +270,7 @@ class TestCharmWithHW:
         results = await run_command_on_unit(ops_test, unit.name, cmd)
         assert results.get("return-code") == 0
         assert snap_name in results.get("stdout").strip()
-        
+
         check_active_cmd = "systemctl is-active snap.smartctl-exporter.smartctl-exporter"
         results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
         assert results.get("return-code") == 0
