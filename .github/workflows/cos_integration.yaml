@@ -6,9 +6,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [main]
-    paths-ignore:
-      - "**.md"
-      - "**.rst"
+    paths:
+      - ".github/workflows/cos_integration.yaml"
 
 jobs:
   integration:
