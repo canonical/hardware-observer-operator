@@ -2,6 +2,8 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+# TEST COMMIT
+
 """Charm the application."""
 
 import logging
