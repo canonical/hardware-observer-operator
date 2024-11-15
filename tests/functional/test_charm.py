@@ -162,7 +162,6 @@ async def test_required_resources(ops_test: OpsTest, provided_collectors, requir
         assert unit.workload_status_message == AppStatus.MISSING_RELATION
 
 
-@pytest.mark.realhw
 @pytest.mark.abort_on_fail
 async def test_cos_agent_relation(ops_test: OpsTest, provided_collectors):
     """Test adding relation with grafana-agent."""
@@ -225,7 +224,6 @@ async def test_redfish_credential_validation(ops_test: OpsTest, provided_collect
         assert unit.workload_status_message == AppStatus.READY
 
 
-@pytest.mark.realhw
 class TestCharmWithHW:
     """Run functional tests that require specific hardware."""
 
