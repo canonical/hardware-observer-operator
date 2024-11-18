@@ -17,7 +17,7 @@ applications:
   grafana-agent:
     charm: grafana-agent
   {% if base == 'ubuntu@24.04' %}
-    channel: latest/candidate  # Note(rgildein): Right now, grafana-agent is not support for Noble on latest/stable.
+    channel: latest/candidate  # Note(rgildein): Right now, grafana-agent is not support for Noble on latest/stable. See #348
   {% else %}
     channel: latest/stable
   {% endif %}
