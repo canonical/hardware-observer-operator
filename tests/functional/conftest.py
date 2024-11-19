@@ -11,11 +11,11 @@ log = logging.getLogger(__name__)
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--series",
+        "--base",
         type=str.lower,
-        default="jammy",
-        choices=["focal", "jammy"],
-        help="Set series for the machine units",
+        default="ubuntu@22.04",
+        choices=["ubuntu@20.04", "ubuntu@22.04", "ubuntu@24.04"],
+        help="Set base for the applications.",
     )
 
     parser.addoption(
@@ -38,8 +38,8 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture(scope="module")
-def series(request):
-    return request.config.getoption("--series")
+def base(request):
+    return request.config.getoption("--base")
 
 
 @pytest.fixture(scope="module")

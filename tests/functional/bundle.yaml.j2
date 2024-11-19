@@ -3,7 +3,7 @@
 # ubuntu:juju-info <-> hardware-observer:general-info
 # grafana-agent:cos-agent <-> hardware-observer:cos-agent
 
-series: {{ series }}
+default-base: {{ base }}
 
 machines:
   "0":
@@ -16,7 +16,11 @@ applications:
       - "0"
   grafana-agent:
     charm: grafana-agent
-    channel: stable
+  {% if base == 'ubuntu@24.04' %}
+    channel: latest/candidate  # Note(rgildein): Right now, grafana-agent is not support for Noble on latest/stable. See #348
+  {% else %}
+    channel: latest/stable
+  {% endif %}
   hardware-observer:
     charm: {{ charm }}
 
@@ -25,4 +29,3 @@ relations:
   - ubuntu:juju-info
 - - hardware-observer:general-info
   - ubuntu:juju-info
-
