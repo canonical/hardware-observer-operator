@@ -469,8 +469,10 @@ class TestCharmWithHW:
             results = await run_command_on_unit(ops_test, unit.name, check_resource_cmd)
             assert results.get("return-code") == 0, f"{symlink_bin} resource doesn't exist"
 
-    async def test_redfish_config(self, app, unit, ops_test):
+    async def test_redfish_config(self, ops_test, app, unit, provided_collectors):
         """Test Redfish options."""
+        if "redfish" not in provided_collectors:
+            pytest.skip("redfish not in provided collectors, skipping test")
         # initially Redfish is available and enabled
         cmd = "cat /etc/hardware-exporter-config.yaml"
         results_before = await run_command_on_unit(ops_test, unit.name, cmd)
@@ -584,7 +586,6 @@ class TestCharmWithHW:
         )
 
 
-@pytest.mark.realhw
 class TestCharm:
     """Perform tests that require one or more exporters to be present."""
 
