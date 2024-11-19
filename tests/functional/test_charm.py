@@ -56,7 +56,7 @@ class AppStatus(str, Enum):
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
 async def test_build_and_deploy(  # noqa: C901, function is too complex
-    ops_test: OpsTest, series, architecture, provided_collectors, required_resources
+    ops_test: OpsTest, base, architecture, provided_collectors, required_resources
 ):
     """Build the charm-under-test and deploy it together with related charms.
 
@@ -78,7 +78,7 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
     bundle = ops_test.render_bundle(
         bundle_template_path,
         charm=charm,
-        series=series,
+        base=base,
         resources={
             "storcli-deb": "empty-resource",
             "perccli-deb": "empty-resource",
