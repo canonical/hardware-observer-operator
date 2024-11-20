@@ -21,7 +21,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--base",
         type=str.lower,
-        default="ubuntu@20.04",
+        default="ubuntu@22.04",
         choices=BASES.keys(),
         help="Set base for the applications.",
     )
