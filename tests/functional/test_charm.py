@@ -56,17 +56,13 @@ class AppStatus(str, Enum):
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
 async def test_build_and_deploy(  # noqa: C901, function is too complex
-    ops_test: OpsTest, base, architecture, provided_collectors, required_resources
+    ops_test: OpsTest, base, architecture, provided_collectors, required_resources, charm_path
 ):
-    """Build the charm-under-test and deploy it together with related charms.
+    """Deploy the charm together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
     Optionally attach required resources when testing with real hardware.
     """
-    # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
-    assert charm, "Charm was not built successfully."
-
     # This is required for subordinate appliation to choose right revison
     # on different architecture.
     # See issue: https://bugs.launchpad.net/juju/+bug/2067749
@@ -77,7 +73,7 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
     logger.info("Rendering bundle %s", bundle_template_path)
     bundle = ops_test.render_bundle(
         bundle_template_path,
-        charm=charm,
+        charm=charm_path,
         base=base,
         resources={
             "storcli-deb": "empty-resource",

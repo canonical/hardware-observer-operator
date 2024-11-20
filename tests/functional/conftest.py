@@ -1,5 +1,7 @@
 import logging
+import os
 import platform
+from pathlib import Path
 
 import pytest
 from utils import RESOURCES_DIR, Resource
@@ -8,13 +10,19 @@ from config import HARDWARE_EXPORTER_COLLECTOR_MAPPING, TPR_RESOURCES, HWTool
 
 log = logging.getLogger(__name__)
 
+BASES = {
+    "ubuntu@20.04": "focal",
+    "ubuntu@22.04": "jammy",
+    "ubuntu@24.04": "noble",
+}
+
 
 def pytest_addoption(parser):
     parser.addoption(
         "--base",
         type=str.lower,
-        default="ubuntu@22.04",
-        choices=["ubuntu@20.04", "ubuntu@22.04", "ubuntu@24.04"],
+        default="ubuntu@20.04",
+        choices=BASES.keys(),
         help="Set base for the applications.",
     )
 
@@ -146,3 +154,21 @@ def required_resources(resources: list[Resource], provided_collectors: set) -> l
             required_resources.append(resource)
 
     return required_resources
+
+
+@pytest.fixture()
+def charm_path(base: str) -> Path:
+    """Fixture to determine the charm path based on the base."""
+    env_charm_path = f"CHARM_PATH_{BASES[base].upper()}"
+    path = os.getenv(env_charm_path)
+
+    if not path:
+        raise EnvironmentError(
+            f"Environment variable '{env_charm_path}' is not set for base '{base}'."
+        )
+    if not Path(path).exists():
+        raise FileNotFoundError(
+            f"The path specified in '{env_charm_path}' ({path}) does not exist."
+        )
+
+    return Path(path)
