@@ -188,9 +188,10 @@ async def test_cos_agent_relation(ops_test: OpsTest, provided_collectors):
     # Test with cos-agent relation
     logging.info("Check whether hardware-exporter is active after creating relation.")
     for unit in ops_test.model.applications[APP_NAME].units:
-        results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
-        assert results.get("return-code") == 0
-        assert results.get("stdout").strip() == "active"
+        if provided_collectors:
+            results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
+            assert results.get("return-code") == 0
+            assert results.get("stdout").strip() == "active"
         if redfish_present:
             assert unit.workload_status_message == AppStatus.INVALID_REDFISH_CREDS
         else:
@@ -220,8 +221,103 @@ async def test_redfish_credential_validation(ops_test: OpsTest, provided_collect
         assert unit.workload_status_message == AppStatus.READY
 
 
+@pytest.mark.realhw
 class TestCharmWithHW:
     """Run functional tests that require specific hardware."""
+
+    async def test_config_file_permissions(self, unit, ops_test):
+        """Check config file permissions are set correctly."""
+        expected_file_mode = "600"
+        cmd = "stat -c '%a' /etc/hardware-exporter-config.yaml"
+        results = await run_command_on_unit(ops_test, unit.name, cmd)
+        assert results.get("return-code") == 0
+        assert results.get("stdout").rstrip("\n") == expected_file_mode
+
+    async def test_config_changed_port(self, app, unit, ops_test):
+        """Test changing the config option: hardware-exporter-port."""
+        new_port = "10001"
+        await asyncio.gather(
+            app.set_config({"hardware-exporter-port": new_port}),
+            ops_test.model.wait_for_idle(apps=[APP_NAME]),
+        )
+
+        cmd = "cat /etc/hardware-exporter-config.yaml"
+        results = await run_command_on_unit(ops_test, unit.name, cmd)
+        assert results.get("return-code") == 0
+        config = yaml.safe_load(results.get("stdout").strip())
+        assert config["port"] == int(new_port)
+
+        await app.reset_config(["hardware-exporter-port"])
+
+    async def test_no_redfish_config(self, unit, ops_test):
+        """Test that there is no Redfish options because it's not available on lxd machines."""
+        cmd = "cat /etc/hardware-exporter-config.yaml"
+        results = await run_command_on_unit(ops_test, unit.name, cmd)
+        assert results.get("return-code") == 0
+        config = yaml.safe_load(results.get("stdout").strip())
+        assert config.get("redfish_host") is None
+        assert config.get("redfish_username") is None
+        assert config.get("redfish_client_timeout") is None
+
+    async def test_config_changed_log_level(self, app, unit, ops_test):
+        """Test changing the config option: exporter-log-level."""
+        new_log_level = "DEBUG"
+        await asyncio.gather(
+            app.set_config({"exporter-log-level": new_log_level}),
+            ops_test.model.wait_for_idle(apps=[APP_NAME]),
+        )
+
+        cmd = "cat /etc/hardware-exporter-config.yaml"
+        results = await run_command_on_unit(ops_test, unit.name, cmd)
+        assert results.get("return-code") == 0
+        config = yaml.safe_load(results.get("stdout").strip())
+        assert config["level"] == new_log_level
+
+        await app.reset_config(["exporter-log-level"])
+
+    async def test_config_changed_collect_timeout(self, app, unit, ops_test):
+        """Test changing the config option: collect-timeout."""
+        new_collect_timeout = "20"
+        await asyncio.gather(
+            app.set_config({"collect-timeout": new_collect_timeout}),
+            ops_test.model.wait_for_idle(apps=[APP_NAME]),
+        )
+
+        cmd = "cat /etc/hardware-exporter-config.yaml"
+        results = await run_command_on_unit(ops_test, unit.name, cmd)
+        assert results.get("return-code") == 0
+        config = yaml.safe_load(results.get("stdout").strip())
+        assert config["collect_timeout"] == int(new_collect_timeout)
+
+        await app.reset_config(["collect-timeout"])
+
+    async def test_start_and_stop_exporter(self, app, unit, ops_test):
+        """Test starting and stopping the exporter results in correct charm status."""
+        # Stop the exporter, and the exporter should auto-restart after update status fire.
+        stop_cmd = "systemctl stop hardware-exporter"
+        async with ops_test.fast_forward():
+            await asyncio.gather(
+                unit.run(stop_cmd),
+                ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=TIMEOUT),
+            )
+            assert unit.workload_status_message == AppStatus.READY
+
+    async def test_exporter_failed(self, app, unit, ops_test):
+        """Test failure in the exporter results in correct charm status."""
+        # Setting incorrect log level will crash the exporter
+        async with ops_test.fast_forward():
+            await asyncio.gather(
+                app.set_config({"exporter-log-level": "RANDOM_LEVEL"}),
+                ops_test.model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=TIMEOUT),
+            )
+            assert unit.workload_status_message == AppStatus.INVALID_CONFIG_EXPORTER_LOG_LEVEL
+
+        async with ops_test.fast_forward():
+            await asyncio.gather(
+                app.reset_config(["exporter-log-level"]),
+                ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=TIMEOUT),
+            )
+            assert unit.workload_status_message == AppStatus.READY
 
     async def test_config_collector_enabled(self, app, unit, ops_test, provided_collectors):
         """Test whether provided collectors are present in exporter config."""
@@ -582,131 +678,29 @@ class TestCharmWithHW:
         )
 
 
-class TestCharm:
-    """Perform tests that require one or more exporters to be present."""
+@pytest.mark.abort_on_fail
+async def test_on_remove_event(app, ops_test):
+    """Test _on_remove event cleans up the service on the host machine."""
+    await asyncio.gather(
+        app.remove_relation(f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"),
+        ops_test.model.wait_for_idle(apps=[PRINCIPAL_APP_NAME], status="active", timeout=TIMEOUT),
+    )
+    principal_unit = ops_test.model.applications[PRINCIPAL_APP_NAME].units[0]
 
-    async def test_config_file_permissions(self, unit, ops_test):
-        """Check config file permissions are set correctly."""
-        expected_file_mode = "600"
-        cmd = "stat -c '%a' /etc/hardware-exporter-config.yaml"
-        results = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results.get("return-code") == 0
-        assert results.get("stdout").rstrip("\n") == expected_file_mode
+    # Wait for cleanup activities to finish
+    await ops_test.model.block_until(
+        lambda: ops_test.model.applications[APP_NAME].status == "unknown"
+    )
 
-    async def test_config_changed_port(self, app, unit, ops_test):
-        """Test changing the config option: hardware-exporter-port."""
-        new_port = "10001"
-        await asyncio.gather(
-            app.set_config({"hardware-exporter-port": new_port}),
-            ops_test.model.wait_for_idle(apps=[APP_NAME]),
-        )
+    cmd = "ls /etc/hardware-exporter-config.yaml"
+    results = await run_command_on_unit(ops_test, principal_unit.name, cmd)
+    assert results.get("return-code") > 0
 
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
-        assert config["port"] == int(new_port)
+    cmd = "ls /etc/systemd/system/hardware-exporter.service"
+    results = await run_command_on_unit(ops_test, principal_unit.name, cmd)
+    assert results.get("return-code") > 0
 
-        await app.reset_config(["hardware-exporter-port"])
-
-    async def test_no_redfish_config(self, unit, ops_test):
-        """Test that there is no Redfish options because it's not available on lxd machines."""
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
-        assert config.get("redfish_host") is None
-        assert config.get("redfish_username") is None
-        assert config.get("redfish_client_timeout") is None
-
-    async def test_config_changed_log_level(self, app, unit, ops_test):
-        """Test changing the config option: exporter-log-level."""
-        new_log_level = "DEBUG"
-        await asyncio.gather(
-            app.set_config({"exporter-log-level": new_log_level}),
-            ops_test.model.wait_for_idle(apps=[APP_NAME]),
-        )
-
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
-        assert config["level"] == new_log_level
-
-        await app.reset_config(["exporter-log-level"])
-
-    async def test_config_changed_collect_timeout(self, app, unit, ops_test):
-        """Test changing the config option: collect-timeout."""
-        new_collect_timeout = "20"
-        await asyncio.gather(
-            app.set_config({"collect-timeout": new_collect_timeout}),
-            ops_test.model.wait_for_idle(apps=[APP_NAME]),
-        )
-
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
-        assert config["collect_timeout"] == int(new_collect_timeout)
-
-        await app.reset_config(["collect-timeout"])
-
-    async def test_start_and_stop_exporter(self, app, unit, ops_test):
-        """Test starting and stopping the exporter results in correct charm status."""
-        # Stop the exporter, and the exporter should auto-restart after update status fire.
-        stop_cmd = "systemctl stop hardware-exporter"
-        async with ops_test.fast_forward():
-            await asyncio.gather(
-                unit.run(stop_cmd),
-                ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=TIMEOUT),
-            )
-            assert unit.workload_status_message == AppStatus.READY
-
-    async def test_exporter_failed(self, app, unit, ops_test):
-        """Test failure in the exporter results in correct charm status."""
-        # Setting incorrect log level will crash the exporter
-        async with ops_test.fast_forward():
-            await asyncio.gather(
-                app.set_config({"exporter-log-level": "RANDOM_LEVEL"}),
-                ops_test.model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=TIMEOUT),
-            )
-            assert unit.workload_status_message == AppStatus.INVALID_CONFIG_EXPORTER_LOG_LEVEL
-
-        async with ops_test.fast_forward():
-            await asyncio.gather(
-                app.reset_config(["exporter-log-level"]),
-                ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=TIMEOUT),
-            )
-            assert unit.workload_status_message == AppStatus.READY
-
-    async def test_on_remove_event(self, app, ops_test):
-        """Test _on_remove event cleans up the service on the host machine."""
-        await asyncio.gather(
-            app.remove_relation(f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"),
-            ops_test.model.wait_for_idle(
-                apps=[PRINCIPAL_APP_NAME], status="active", timeout=TIMEOUT
-            ),
-        )
-        principal_unit = ops_test.model.applications[PRINCIPAL_APP_NAME].units[0]
-
-        # Wait for cleanup activities to finish
-        await ops_test.model.block_until(
-            lambda: ops_test.model.applications[APP_NAME].status == "unknown"
-        )
-
-        cmd = "ls /etc/hardware-exporter-config.yaml"
-        results = await run_command_on_unit(ops_test, principal_unit.name, cmd)
-        assert results.get("return-code") > 0
-
-        cmd = "ls /etc/systemd/system/hardware-exporter.service"
-        results = await run_command_on_unit(ops_test, principal_unit.name, cmd)
-        assert results.get("return-code") > 0
-
-        await asyncio.gather(
-            ops_test.model.add_relation(
-                f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"
-            ),
-            ops_test.model.wait_for_idle(
-                apps=[PRINCIPAL_APP_NAME], status="active", timeout=TIMEOUT
-            ),
-        )
+    await asyncio.gather(
+        ops_test.model.add_relation(f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"),
+        ops_test.model.wait_for_idle(apps=[PRINCIPAL_APP_NAME], status="active", timeout=TIMEOUT),
+    )
