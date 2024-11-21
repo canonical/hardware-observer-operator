@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+import yaml
 from async_lru import alru_cache
 
 RESOURCES_DIR = Path("./resources/")
@@ -44,6 +45,12 @@ class MetricsFetchError(Exception):
     pass
 
 
+class HardwareExporterConfigError(Exception):
+    """Raise if something goes wrong when getting hardware-exporter config."""
+
+    pass
+
+
 async def run_command_on_unit(ops_test, unit_name, command):
     complete_command = ["exec", "--unit", unit_name, "--", *command.split()]
     return_code, stdout, _ = await ops_test.juju(*complete_command)
@@ -52,6 +59,15 @@ async def run_command_on_unit(ops_test, unit_name, command):
         "stdout": stdout,
     }
     return results
+
+
+async def get_hardware_exporter_config(ops_test, unit_name) -> dict:
+    """Return hardware-exporter config from endpoint on unit."""
+    command = "cat /etc/hardware-exporter/config.yaml"
+    results = await run_command_on_unit(ops_test, unit_name, command)
+    if results.get("return-code") > 0:
+        raise HardwareExporterConfigError
+    return yaml.safe_load(results.get("stdout"))
 
 
 @alru_cache

@@ -16,8 +16,10 @@ from pytest_operator.plugin import OpsTest
 from tenacity import AsyncRetrying, RetryError, stop_after_attempt, wait_fixed
 from utils import (
     RESOURCES_DIR,
+    HardwareExporterConfigError,
     MetricsFetchError,
     assert_metrics,
+    get_hardware_exporter_config,
     get_metrics_output,
     run_command_on_unit,
 )
@@ -241,20 +243,20 @@ class TestCharmWithHW:
             ops_test.model.wait_for_idle(apps=[APP_NAME]),
         )
 
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
+        try:
+            config = await get_hardware_exporter_config(ops_test, unit.name)
+        except HardwareExporterConfigError:
+            pytest.fail("Not able to obtain hardware-exporter config!")
         assert config["port"] == int(new_port)
 
         await app.reset_config(["hardware-exporter-port"])
 
     async def test_no_redfish_config(self, unit, ops_test):
         """Test that there is no Redfish options because it's not available on lxd machines."""
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
+        try:
+            config = await get_hardware_exporter_config(ops_test, unit.name)
+        except HardwareExporterConfigError:
+            pytest.fail("Not able to obtain hardware-exporter config!")
         assert config.get("redfish_host") is None
         assert config.get("redfish_username") is None
         assert config.get("redfish_client_timeout") is None
@@ -267,10 +269,10 @@ class TestCharmWithHW:
             ops_test.model.wait_for_idle(apps=[APP_NAME]),
         )
 
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
+        try:
+            config = await get_hardware_exporter_config(ops_test, unit.name)
+        except HardwareExporterConfigError:
+            pytest.fail("Not able to obtain hardware-exporter config!")
         assert config["level"] == new_log_level
 
         await app.reset_config(["exporter-log-level"])
@@ -283,10 +285,10 @@ class TestCharmWithHW:
             ops_test.model.wait_for_idle(apps=[APP_NAME]),
         )
 
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
+        try:
+            config = await get_hardware_exporter_config(ops_test, unit.name)
+        except HardwareExporterConfigError:
+            pytest.fail("Not able to obtain hardware-exporter config!")
         assert config["collect_timeout"] == int(new_collect_timeout)
 
         await app.reset_config(["collect-timeout"])
@@ -321,10 +323,10 @@ class TestCharmWithHW:
 
     async def test_config_collector_enabled(self, app, unit, ops_test, provided_collectors):
         """Test whether provided collectors are present in exporter config."""
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
+        try:
+            config = await get_hardware_exporter_config(ops_test, unit.name)
+        except HardwareExporterConfigError:
+            pytest.fail("Not able to obtain hardware-exporter config!")
         collectors_in_config = {
             collector.replace("collector.", "") for collector in config.get("enable_collectors")
         }
@@ -345,10 +347,10 @@ class TestCharmWithHW:
             ops_test.model.wait_for_idle(apps=[APP_NAME]),
         )
 
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results.get("return-code") == 0
-        config = yaml.safe_load(results.get("stdout").strip())
+        try:
+            config = await get_hardware_exporter_config(ops_test, unit.name)
+        except HardwareExporterConfigError:
+            pytest.fail("Not able to obtain hardware-exporter config!")
         assert config["redfish_client_timeout"] == int(new_timeout)
 
         await app.reset_config(["collect-timeout"])
@@ -566,13 +568,13 @@ class TestCharmWithHW:
         if "redfish" not in provided_collectors:
             pytest.skip("redfish not in provided collectors, skipping test")
         # initially Redfish is available and enabled
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results_before = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results_before.get("return-code") == 0
-        config = yaml.safe_load(results_before.get("stdout").strip())
-        assert config.get("redfish_host") is not None
-        assert config.get("redfish_username") is not None
-        assert config.get("redfish_client_timeout") is not None
+        try:
+            config_before = await get_hardware_exporter_config(ops_test, unit.name)
+        except HardwareExporterConfigError:
+            pytest.fail("Not able to obtain hardware-exporter config!")
+        assert config_before.get("redfish_host") is not None
+        assert config_before.get("redfish_username") is not None
+        assert config_before.get("redfish_client_timeout") is not None
 
         # Disable Redfish and see if the config is not present
         await asyncio.gather(
@@ -580,13 +582,13 @@ class TestCharmWithHW:
             ops_test.model.wait_for_idle(apps=[APP_NAME]),
         )
 
-        cmd = "cat /etc/hardware-exporter-config.yaml"
-        results_after = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results_before.get("return-code") == 0
-        config = yaml.safe_load(results_after.get("stdout").strip())
-        assert config.get("redfish_host") is None
-        assert config.get("redfish_username") is None
-        assert config.get("redfish_client_timeout") is None
+        try:
+            config_after = await get_hardware_exporter_config(ops_test, unit.name)
+        except HardwareExporterConfigError:
+            pytest.fail("Not able to obtain hardware-exporter config!")
+        assert config_after.get("redfish_host") is None
+        assert config_after.get("redfish_username") is None
+        assert config_after.get("redfish_client_timeout") is None
 
         await app.reset_config(["redfish-disable"])
 
