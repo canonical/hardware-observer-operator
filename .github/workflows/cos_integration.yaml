@@ -1,3 +1,7 @@
+# This workflow runs a set of integration tests,
+# using hardware-observer-operator *from charmhub* (not locally built).
+# It is designed to be run periodically to catch potential issues
+# from recent changes to either hardware-observer-operator or COS.
 name: COS Integration tests
 
 on:
