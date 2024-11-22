@@ -84,6 +84,15 @@ async def get_metrics_output(ops_test, unit_name) -> Optional[dict[str, list[Met
     return parsed_metrics
 
 
+async def assert_snap_installed(ops_test, unit_name: str, snap_name: str) -> bool:
+    """Assert whether snap is installed on the model."""
+    cmd = f"snap list {snap_name}"
+    results = await run_command_on_unit(ops_test, unit_name, cmd)
+    if results.get("return-code") > 0 or snap_name not in results.get("stdout"):
+        return False
+    return True
+
+
 def assert_metrics(metrics: list[Metric], expected_metric_values_map: dict[str, float]) -> bool:
     """Assert whether values in obtained list of metrics for a collector are as expected.
 

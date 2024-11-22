@@ -19,6 +19,7 @@ from utils import (
     HardwareExporterConfigError,
     MetricsFetchError,
     assert_metrics,
+    assert_snap_installed,
     get_hardware_exporter_config,
     get_metrics_output,
     run_command_on_unit,
@@ -53,6 +54,12 @@ class AppStatus(str, Enum):
     CHECKSUM_ERROR = "Fail strategies: "
     INVALID_CONFIG_EXPORTER_LOG_LEVEL = "Invalid config: 'exporter-log-level'"
     INVALID_REDFISH_CREDS = "Invalid config: 'redfish-username' or 'redfish-password'"
+    NO_NVIDIA_DRIVER_DETECTED = (
+        "Failed to communicate with NVIDIA driver. See more details in the logs"
+    )
+    MANUAL_NVIDIA_DRIVER_INSTALL = (
+        "No drivers for the NVIDIA GPU were found. Manual installation is necessary"
+    )
 
 
 @pytest.mark.abort_on_fail
@@ -158,6 +165,25 @@ async def test_required_resources(ops_test: OpsTest, provided_collectors, requir
     )
     for unit in ops_test.model.applications[APP_NAME].units:
         assert unit.workload_status_message == AppStatus.MISSING_RELATION
+
+
+@pytest.mark.abort_on_fail
+async def test_nvidia_driver_installation(ops_test: OpsTest, provided_collectors, unit):
+    """Test nvidia driver installation."""
+    if "dcgm" not in provided_collectors:
+        pytest.skip("dcgm not in provided collectors, skipping test")
+
+    check_nvidia_driver_cmd = "cat /proc/driver/nvidia/version"
+    results = await run_command_on_unit(ops_test, unit.name, check_nvidia_driver_cmd)
+    exists = results.get("return-code") == 0
+
+    if not exists:
+        if unit.workload_status_message == AppStatus.MANUAL_NVIDIA_DRIVER_INSTALL:
+            pytest.fail("This machine requires manual installation of NVIDIA driver.")
+        elif unit.workload_status_message == AppStatus.NO_NVIDIA_DRIVER_DETECTED:
+            pytest.fail("Nvidia GPU detected, the tests should be run on the real hardware.")
+        else:
+            pytest.fail("Error occured during the driver installation.")
 
 
 @pytest.mark.abort_on_fail
@@ -358,12 +384,24 @@ class TestCharmWithHW:
     async def test_smarctl_exporter_snap_available(self, ops_test, app, unit):
         """Test if smartctl exporter snap is installed and ranning on the unit."""
         snap_name = "smartctl-exporter"
-        cmd = f"snap list {snap_name}"
-        results = await run_command_on_unit(ops_test, unit.name, cmd)
-        assert results.get("return-code") == 0
-        assert snap_name in results.get("stdout").strip()
+        if not assert_snap_installed(ops_test, unit.name, snap_name):
+            pytest.fail(f"{snap_name} snap is not installed on the unit.")
 
         check_active_cmd = "systemctl is-active snap.smartctl-exporter.smartctl-exporter"
+        results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
+        assert results.get("return-code") == 0
+        assert results.get("stdout").strip() == "active"
+
+    async def test_dcgm_exporter_snap_available(self, ops_test, app, unit, provided_collectors):
+        """Test if dcgm exporter snap is installed and ranning on the unit."""
+        if "dcgm" not in provided_collectors:
+            pytest.skip("dcgm not in provided collectors, skipping test")
+
+        snap_name = "dcgm"
+        if not assert_snap_installed(ops_test, unit.name, snap_name):
+            pytest.fail(f"{snap_name} snap is not installed on the unit.")
+
+        check_active_cmd = "systemctl is-active snap.dcgm.dcgm-exporter"
         results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
         assert results.get("return-code") == 0
         assert results.get("stdout").strip() == "active"

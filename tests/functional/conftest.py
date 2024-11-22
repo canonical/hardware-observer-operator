@@ -33,6 +33,7 @@ def pytest_addoption(parser):
             "poweredge_raid",
             "lsi_sas_2",
             "lsi_sas_3",
+            "dcgm",
         ],
         help="Provide space-separated list of collectors for testing with real hardware.",
     )
