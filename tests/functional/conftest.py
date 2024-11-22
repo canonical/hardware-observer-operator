@@ -1,5 +1,4 @@
 import logging
-import os
 import platform
 from pathlib import Path
 
@@ -152,11 +151,19 @@ def required_resources(resources: list[Resource], provided_collectors: set) -> l
 
 @pytest.fixture()
 def charm_path(base: str, architecture: str) -> Path:
-    """Fixture to determine the charm path based on the base."""
+    """Fixture to determine the charm path based on the base and architecture."""
     glob_path = f"hardware-observer_*{base.replace('@', '-')}-{architecture}*.charm"
     paths = list(Path(".").glob(glob_path))
 
     if not paths:
         raise FileNotFoundError(f"The path for the charm for {base}-{architecture} is not found.")
 
-    return os.getcwd() / paths[0]
+    if len(paths) > 1:
+        raise FileNotFoundError(
+            f"Multiple charms found for {base}-{architecture}. Please provide only one."
+        )
+
+    # The bundle will need the full path to the charm
+    path = paths[0].absolute()
+    log.info(f"Using charm path: {path}")
+    return path
