@@ -20,6 +20,12 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
+        "--nvidia",
+        action="store_true",
+        help="Enable NVIDIA GPU support for testing with real hardware.",
+    )
+
+    parser.addoption(
         "--collectors",
         nargs="+",
         type=str.lower,
@@ -33,7 +39,6 @@ def pytest_addoption(parser):
             "poweredge_raid",
             "lsi_sas_2",
             "lsi_sas_3",
-            "dcgm",
         ],
         help="Provide space-separated list of collectors for testing with real hardware.",
     )
@@ -42,6 +47,11 @@ def pytest_addoption(parser):
 @pytest.fixture(scope="module")
 def base(request):
     return request.config.getoption("--base")
+
+
+@pytest.fixture(scope="module")
+def nvidia_present(request):
+    return request.config.getoption("--nvidia")
 
 
 @pytest.fixture(scope="module")

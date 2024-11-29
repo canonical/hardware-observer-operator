@@ -168,9 +168,9 @@ async def test_required_resources(ops_test: OpsTest, provided_collectors, requir
 
 
 @pytest.mark.abort_on_fail
-async def test_nvidia_driver_installation(ops_test: OpsTest, provided_collectors, unit):
+async def test_nvidia_driver_installation(ops_test: OpsTest, nvidia_present, unit):
     """Test nvidia driver installation."""
-    if "dcgm" not in provided_collectors:
+    if not nvidia_present:
         pytest.skip("dcgm not in provided collectors, skipping test")
 
     check_nvidia_driver_cmd = "cat /proc/driver/nvidia/version"
@@ -392,9 +392,9 @@ class TestCharmWithHW:
         assert results.get("return-code") == 0
         assert results.get("stdout").strip() == "active"
 
-    async def test_dcgm_exporter_snap_available(self, ops_test, app, unit, provided_collectors):
+    async def test_dcgm_exporter_snap_available(self, ops_test, app, unit, nvidia_present):
         """Test if dcgm exporter snap is installed and ranning on the unit."""
-        if "dcgm" not in provided_collectors:
+        if not nvidia_present:
             pytest.skip("dcgm not in provided collectors, skipping test")
 
         snap_name = "dcgm"
