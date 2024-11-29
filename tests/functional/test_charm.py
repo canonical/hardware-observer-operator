@@ -65,7 +65,7 @@ class AppStatus(str, Enum):
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
 async def test_build_and_deploy(  # noqa: C901, function is too complex
-    ops_test: OpsTest, base, architecture, provided_collectors, required_resources, charm_path
+    ops_test: OpsTest, base, architecture, realhw, required_resources, charm_path
 ):
     """Deploy the charm together with related charms.
 
@@ -96,7 +96,7 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
 
     # deploy bundle to already added machine instead of provisioning new one
     # when testing with real hardware
-    if provided_collectors:
+    if realhw:
         juju_cmd.append("--map-machines=existing")
 
     logging.info("Deploying bundle...")
@@ -168,6 +168,7 @@ async def test_required_resources(ops_test: OpsTest, provided_collectors, requir
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.realhw
 async def test_nvidia_driver_installation(ops_test: OpsTest, nvidia_present, unit):
     """Test nvidia driver installation."""
     if not nvidia_present:

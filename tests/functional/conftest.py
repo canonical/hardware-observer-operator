@@ -20,6 +20,12 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
+        "--realhw",
+        action="store_true",
+        help="Enable real hardware testing.",
+    )
+
+    parser.addoption(
         "--nvidia",
         action="store_true",
         help="Enable NVIDIA GPU support for testing with real hardware.",
@@ -55,6 +61,11 @@ def nvidia_present(request):
 
 
 @pytest.fixture(scope="module")
+def realhw(request):
+    return request.config.getoption("--realhw")
+
+
+@pytest.fixture(scope="module")
 def architecture():
     machine = platform.machine()
     if machine == "aarch64":
@@ -72,20 +83,7 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    if config.getoption("collectors"):
-        # --collectors provided, skip hw independent tests
-        skip_hw_independent = pytest.mark.skip(
-            reason="Hardware independent tests are skipped since --collectors was provided."
-        )
-        for item in items:
-            # skip TestCharm tests where "realhw" marker is not present
-            # we don't want to skip test_setup_and_build, test_required_resources,
-            # test_cos_agent_relation and test_redfish_credential_validation
-            # even for hw independent tests
-            # so we also check for the abort_on_fail marker
-            if "realhw" not in item.keywords and "abort_on_fail" not in item.keywords:
-                item.add_marker(skip_hw_independent)
-    else:
+    if not config.getoption("--realhw"):
         # skip hw dependent tests in TestCharmWithHW marked with "realhw"
         skip_hw_dependent = pytest.mark.skip(
             reason="Hardware dependent test. Provide collectors with the --collectors option."
