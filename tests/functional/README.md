@@ -3,33 +3,33 @@ There are 2 main types of functional tests for the Hardware Observer charm - tho
 
 Here, "real hardware" refers to machines that are not VMs or containers and have access to real hardware resources like RAID cards and BMC management tools.
 
+Note: the built charm must be present in the root of the project's directory for the tests to run.
+
 ## Hardware Independent Tests
 These are the tests for hardware observer that do not require any real hardware.
 
-Hardware independent tests are run on every PR / weekly scheduled test run. They belong to the `TestCharm` class in the `test_charm.py` module.
+Hardware independent tests are run on every PR / weekly scheduled test run.
 
 These include:
 * Testing whether juju config changes produce the required results
-* Check whether the exporter systemd service starts and stops correctly
-* Test exporter is stopped and related files removed on removal of charm
 
-and more.
-
-Running these tests is as simple as executing the `make functional` command.
+Running these tests is as simple as executing the `tox -e func -- -v`
 
 ## Hardware Dependent Tests
 These are the tests that depend on real hardware to be executed. This is performed manually when required, for example - validating the charm's full functionality before a new release.
 
 Hardware dependent tests are present in the `TestCharmWithHW` class in the `test_charm.py` module. The pytest marker `realhw` has been added to this class (which would include all the tests in this class).
 
-These tests will only be executed if the `--collectors` option for pytest is provided some value. Otherwise, all these tests are skipped (this is done by checking for the presence of the `realhw` marker mentioned earlier.)
+These tests will only be executed if the `--realhw` option for pytest is provided. Additionally, the `--collectors` option with space separated values can be provided, if specific hardware is present. Check the `conftest.py` for options. Otherwise, all these tests are skipped (this is done by checking for the presence of the `realhw` marker mentioned earlier.)
 
-Note: The `test_build_and_deploy` function sets up the test environment for both types of tests.
+Note: The operator must set up a test model with the machine added beforehand. The machine must be an actual host, containers or VMs won't work.
 
 Some of these tests include:
 * Check if all collectors are detected in the exporter config file
 * Test if metrics are available at the expected endpoint
 * Test if metrics specific to the collectors being tested are available
+* Test if smarctl-exporter snap is installed and running
+* Test if Nvidia drivers and dcgm-exporter snap are installed
 
 and more.
 
@@ -37,7 +37,8 @@ In order to run these tests, a couple of prerequisite steps need to be completed
 1. Setup test environment
 2. Add environment variables for Redfish credentials.
 3. Setup required resource files
-4. Find supported collectors
+4. Determine if the machine has Nvidia GPUs and add the `--nvidia` flag is present.
+5. Find supported collectors
 
 ### 1. Setup test environment
 For the hardware dependent tests, we add the test machine beforehand and the bundle only handles deploying the applications to this machine.
@@ -82,7 +83,7 @@ Note: The tests expect these resources to be named exactly in the manner provide
 ### 4. Find supported collectors
 Note down all the collectors supported by the machine as they need to be provided to pytest as part of its CLI arguments.
 
-This is done by passing the required collectors in a space-separated manner via the `FUNC_ARGS` environment variable to the make target.
+This is done by passing the required collectors in a space-separated manner via `--collector` option to the tox target.
 
 The supported collectors can be found by checking the output of the `lshw` command (for RAID cards) or checking availability of Redfish and IPMI on the BMC.
 
@@ -92,7 +93,7 @@ The supported collectors can be found by checking the output of the `lshw` comma
 
 After ensuring the prerequisite steps are complete, the final command to run the tests would look something like this:
 ```
-FUNC_ARGS="--model test --collectors ipmi_dcmi ipmi_sel ipmi_sensor redfish mega_raid" make functional
+tox -e func -- -v --realhw --model test --collectors ipmi_dcmi ipmi_sel ipmi_sensor redfish mega_raid --keep-models
 ```
 
 This would pass the required collectors to tox which then sends it to the pytest command and starts the hardware dependent tests.

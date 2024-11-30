@@ -54,12 +54,6 @@ class AppStatus(str, Enum):
     CHECKSUM_ERROR = "Fail strategies: "
     INVALID_CONFIG_EXPORTER_LOG_LEVEL = "Invalid config: 'exporter-log-level'"
     INVALID_REDFISH_CREDS = "Invalid config: 'redfish-username' or 'redfish-password'"
-    NO_NVIDIA_DRIVER_DETECTED = (
-        "Failed to communicate with NVIDIA driver. See more details in the logs"
-    )
-    MANUAL_NVIDIA_DRIVER_INSTALL = (
-        "No drivers for the NVIDIA GPU were found. Manual installation is necessary"
-    )
 
 
 @pytest.mark.abort_on_fail
@@ -133,7 +127,7 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
 
 
 @pytest.mark.abort_on_fail
-async def test_required_resources(ops_test: OpsTest, provided_collectors, required_resources):
+async def test_required_resources(ops_test: OpsTest, required_resources):
     if not required_resources:
         pytest.skip("No required resources to be attached, skipping test")
 
@@ -179,12 +173,7 @@ async def test_nvidia_driver_installation(ops_test: OpsTest, nvidia_present, uni
     exists = results.get("return-code") == 0
 
     if not exists:
-        if unit.workload_status_message == AppStatus.MANUAL_NVIDIA_DRIVER_INSTALL:
-            pytest.fail("This machine requires manual installation of NVIDIA driver.")
-        elif unit.workload_status_message == AppStatus.NO_NVIDIA_DRIVER_DETECTED:
-            pytest.fail("Nvidia GPU detected, the tests should be run on the real hardware.")
-        else:
-            pytest.fail("Error occured during the driver installation.")
+        pytest.fail("Error occured during the driver installation. Check the logs.")
 
 
 @pytest.mark.abort_on_fail
@@ -254,16 +243,22 @@ async def test_redfish_credential_validation(ops_test: OpsTest, provided_collect
 class TestCharmWithHW:
     """Run functional tests that require specific hardware."""
 
-    async def test_config_file_permissions(self, unit, ops_test):
+    async def test_config_file_permissions(self, unit, ops_test, provided_collectors):
         """Check config file permissions are set correctly."""
+        if not provided_collectors:
+            pytest.skip("No collectors provided, skipping test")
+
         expected_file_mode = "600"
         cmd = "stat -c '%a' /etc/hardware-exporter-config.yaml"
         results = await run_command_on_unit(ops_test, unit.name, cmd)
         assert results.get("return-code") == 0
         assert results.get("stdout").rstrip("\n") == expected_file_mode
 
-    async def test_config_changed_port(self, app, unit, ops_test):
+    async def test_config_changed_port(self, app, unit, ops_test, provided_collectors):
         """Test changing the config option: hardware-exporter-port."""
+        if not provided_collectors:
+            pytest.skip("No collectors provided, skipping test")
+
         new_port = "10001"
         await asyncio.gather(
             app.set_config({"hardware-exporter-port": new_port}),
@@ -278,8 +273,11 @@ class TestCharmWithHW:
 
         await app.reset_config(["hardware-exporter-port"])
 
-    async def test_no_redfish_config(self, unit, ops_test):
+    async def test_no_redfish_config(self, unit, ops_test, provided_collectors):
         """Test that there is no Redfish options because it's not available on lxd machines."""
+        if not provided_collectors:
+            pytest.skip("No collectors provided, skipping test")
+
         try:
             config = await get_hardware_exporter_config(ops_test, unit.name)
         except HardwareExporterConfigError:
@@ -288,8 +286,11 @@ class TestCharmWithHW:
         assert config.get("redfish_username") is None
         assert config.get("redfish_client_timeout") is None
 
-    async def test_config_changed_log_level(self, app, unit, ops_test):
+    async def test_config_changed_log_level(self, app, unit, ops_test, provided_collectors):
         """Test changing the config option: exporter-log-level."""
+        if not provided_collectors:
+            pytest.skip("No collectors provided, skipping test")
+
         new_log_level = "DEBUG"
         await asyncio.gather(
             app.set_config({"exporter-log-level": new_log_level}),
@@ -304,8 +305,11 @@ class TestCharmWithHW:
 
         await app.reset_config(["exporter-log-level"])
 
-    async def test_config_changed_collect_timeout(self, app, unit, ops_test):
+    async def test_config_changed_collect_timeout(self, app, unit, ops_test, provided_collectors):
         """Test changing the config option: collect-timeout."""
+        if not provided_collectors:
+            pytest.skip("No collectors provided, skipping test")
+
         new_collect_timeout = "20"
         await asyncio.gather(
             app.set_config({"collect-timeout": new_collect_timeout}),
@@ -320,8 +324,11 @@ class TestCharmWithHW:
 
         await app.reset_config(["collect-timeout"])
 
-    async def test_start_and_stop_exporter(self, app, unit, ops_test):
+    async def test_start_and_stop_exporter(self, app, unit, ops_test, provided_collectors):
         """Test starting and stopping the exporter results in correct charm status."""
+        if not provided_collectors:
+            pytest.skip("No collectors provided, skipping test")
+
         # Stop the exporter, and the exporter should auto-restart after update status fire.
         stop_cmd = "systemctl stop hardware-exporter"
         async with ops_test.fast_forward():
@@ -331,8 +338,11 @@ class TestCharmWithHW:
             )
             assert unit.workload_status_message == AppStatus.READY
 
-    async def test_exporter_failed(self, app, unit, ops_test):
+    async def test_exporter_failed(self, app, unit, ops_test, provided_collectors):
         """Test failure in the exporter results in correct charm status."""
+        if not provided_collectors:
+            pytest.skip("No collectors provided, skipping test")
+
         # Setting incorrect log level will crash the exporter
         async with ops_test.fast_forward():
             await asyncio.gather(
@@ -350,6 +360,9 @@ class TestCharmWithHW:
 
     async def test_config_collector_enabled(self, app, unit, ops_test, provided_collectors):
         """Test whether provided collectors are present in exporter config."""
+        if not provided_collectors:
+            pytest.skip("No collectors provided, skipping test")
+
         try:
             config = await get_hardware_exporter_config(ops_test, unit.name)
         except HardwareExporterConfigError:
@@ -362,6 +375,27 @@ class TestCharmWithHW:
             f" enabled collectors in config {collectors_in_config}"
         )
         assert provided_collectors == collectors_in_config, error_msg
+
+    async def test_metrics_available(self, app, unit, ops_test, provided_collectors):
+        """Test if metrics are available at the expected endpoint on unit."""
+        if not provided_collectors:
+            pytest.skip("No collectors provided, skipping test")
+
+        # takes some time for exporter to start and metrics to be available
+        try:
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(5),
+                wait=wait_fixed(10),
+            ):
+                with attempt:
+                    logging.info(f"Fetching metrics attempt #{attempt.retry_state.attempt_number}")
+                    get_metrics_output.cache_clear()  # clear empty metrics from cache
+                    metrics = await get_metrics_output(ops_test, unit.name)
+                    await ops_test.model.wait_for_idle(apps=[APP_NAME])
+        except RetryError:
+            pytest.fail("Not able to obtain metrics!")
+
+        assert metrics, "Metrics result should not be empty"
 
     async def test_redfish_client_timeout_config(self, app, unit, ops_test, provided_collectors):
         """Test whether the redfish client's timeout depends on collect-timeout charm config."""
@@ -406,24 +440,6 @@ class TestCharmWithHW:
         results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
         assert results.get("return-code") == 0
         assert results.get("stdout").strip() == "active"
-
-    async def test_metrics_available(self, app, unit, ops_test):
-        """Test if metrics are available at the expected endpoint on unit."""
-        # takes some time for exporter to start and metrics to be available
-        try:
-            async for attempt in AsyncRetrying(
-                stop=stop_after_attempt(5),
-                wait=wait_fixed(10),
-            ):
-                with attempt:
-                    logging.info(f"Fetching metrics attempt #{attempt.retry_state.attempt_number}")
-                    get_metrics_output.cache_clear()  # clear empty metrics from cache
-                    metrics = await get_metrics_output(ops_test, unit.name)
-                    await ops_test.model.wait_for_idle(apps=[APP_NAME])
-        except RetryError:
-            pytest.fail("Not able to obtain metrics!")
-
-        assert metrics, "Metrics result should not be empty"
 
     @pytest.mark.parametrize(
         "collector",
