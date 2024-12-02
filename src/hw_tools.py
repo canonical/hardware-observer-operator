@@ -277,9 +277,10 @@ class NVIDIADriverStrategy(APTStrategyABC):
             logger.info("NVIDIA driver already installed in the machine")
             return
 
-        if 0 == subprocess.call("lsmod | grep nouveau", shell=True):
-            logger.error("Nouveau driver is loaded. Unload it before installing NVIDIA driver")
-            raise ResourceInstallationError(self._name)
+        with open("/proc/modules", encoding="utf-8") as modules:
+            if "nouveau" in modules.read():
+                logger.error("Nouveau driver is loaded. Unload it before installing NVIDIA driver")
+                raise ResourceInstallationError(self._name)
 
         logger.info("Installing NVIDIA driver")
         apt.add_package("ubuntu-drivers-common", update_cache=True)
@@ -289,7 +290,7 @@ class NVIDIADriverStrategy(APTStrategyABC):
             # https://github.com/canonical/ubuntu-drivers-common/issues/106
             # https://bugs.launchpad.net/ubuntu/+source/ubuntu-drivers-common/+bug/2090502
             result = subprocess.check_output("ubuntu-drivers --gpgpu install".split(), text=True)
-            subprocess.call("modprobe nvidia".split())
+            subprocess.check_call("modprobe nvidia".split())
 
         except subprocess.CalledProcessError as err:
             logger.error("Failed to install the NVIDIA driver: %s", err)
