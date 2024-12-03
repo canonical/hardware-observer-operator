@@ -1219,7 +1219,7 @@ def test_dcgm_create_custom_metrics_copy_fail(
 
 
 def test_nvidia_driver_strategy_install_success(
-    mock_path, mock_check_output, mock_apt_lib, nvidia_driver_strategy
+    mock_path, mock_check_output, mock_apt_lib, mock_check_call, nvidia_driver_strategy
 ):
     nvidia_version = mock.MagicMock()
     nvidia_version.exists.return_value = False
@@ -1228,7 +1228,8 @@ def test_nvidia_driver_strategy_install_success(
     nvidia_driver_strategy.install()
 
     mock_apt_lib.add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
-    mock_check_output.assert_called_once_with("ubuntu-drivers install --gpgpu".split(), text=True)
+    mock_check_output.assert_called_once_with("ubuntu-drivers --gpgpu install".split(), text=True)
+    mock_check_call.assert_called_once_with("modprobe nvidia".split())
 
 
 def test_install_nvidia_drivers_already_installed(
@@ -1242,6 +1243,20 @@ def test_install_nvidia_drivers_already_installed(
 
     mock_apt_lib.add_package.assert_not_called()
     mock_check_output.assert_not_called()
+
+
+def test_install_nvidia_drivers_nouveau_installed(mock_path, nvidia_driver_strategy, mock_apt_lib):
+    nvidia_version = mock.MagicMock()
+    nvidia_version.exists.return_value = False
+    mock_path.return_value = nvidia_version
+    mocked_open = mock.mock_open(read_data="nouveau")
+
+    with mock.patch("builtins.open", mocked_open):
+        with pytest.raises(ResourceInstallationError):
+            nvidia_driver_strategy.install()
+
+    mock_apt_lib.add_package.assert_not_called()
+    mocked_open.assert_called_once_with("/proc/modules", encoding="utf-8")
 
 
 def test_install_nvidia_drivers_subprocess_exception(
