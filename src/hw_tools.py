@@ -5,10 +5,13 @@ Define strategy for install, remove and verifier for different hardware.
 
 import logging
 import os
+import re
 import shutil
 import stat
 import subprocess
 from abc import ABCMeta, abstractmethod
+from glob import iglob
+from itertools import chain
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
@@ -669,9 +672,31 @@ def disk_hw_verifier() -> Set[HWTool]:
 
 
 def nvidia_gpu_verifier() -> Set[HWTool]:
-    """Verify if the hardware has NVIDIA gpu."""
+    """Verify if the hardware has NVIDIA gpu and the driver is not blacklisted.
+
+    If the sysadmin has blacklisted the nvidia driver (e.g. to configure pci passthrough)
+    DCGM won't be able to manage the GPU
+    """
     gpus = lshw(class_filter="display")
-    return {HWTool.DCGM for gpu in gpus if "nvidia" in gpu.get("vendor", "").lower()}
+    return {
+        HWTool.DCGM
+        for gpu in gpus
+        if "nvidia" in gpu.get("vendor", "").lower() and not _is_nvidia_module_blacklisted()
+    }
+
+
+def _is_nvidia_module_blacklisted() -> bool:
+    module_re = re.compile(r"blacklist\s+nvidia")
+    for conffile in chain(iglob("/etc/modprobe.d/*.conf"), "/etc/modprobe.conf"):
+        try:
+            with open(conffile, "r", encoding="utf-8") as fd:
+                for line in fd.readline():
+                    if module_re.match(line):
+                        return True
+        except (IsADirectoryError, FileNotFoundError):
+            # glob may match directories, and modprobe.conf may or may not exist
+            continue
+    return False
 
 
 def detect_available_tools() -> Set[HWTool]:
