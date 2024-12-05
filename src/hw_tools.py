@@ -687,12 +687,11 @@ def nvidia_gpu_verifier() -> Set[HWTool]:
 
 def _is_nvidia_module_blacklisted() -> bool:
     module_re = re.compile(r"blacklist\s+nvidia")
-    for conffile in chain(iglob("/etc/modprobe.d/*.conf"), "/etc/modprobe.conf"):
+    for conffile in chain(iglob("/etc/modprobe.d/*.conf"), ["/etc/modprobe.conf"]):
         try:
             with open(conffile, "r", encoding="utf-8") as fd:
-                for line in fd.readline():
-                    if module_re.match(line):
-                        return True
+                if any(module_re.match(line) for line in fd.readline()):
+                    return True
         except (IsADirectoryError, FileNotFoundError):
             # glob may match directories, and modprobe.conf may or may not exist
             continue
