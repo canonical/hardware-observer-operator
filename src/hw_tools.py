@@ -10,8 +10,6 @@ import shutil
 import stat
 import subprocess
 from abc import ABCMeta, abstractmethod
-from glob import iglob
-from itertools import chain
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
@@ -686,16 +684,46 @@ def nvidia_gpu_verifier() -> Set[HWTool]:
 
 
 def _is_nvidia_module_blacklisted() -> bool:
-    module_re = re.compile(r"blacklist\s+nvidia")
-    for conffile in chain(iglob("/etc/modprobe.d/*.conf"), ["/etc/modprobe.conf"]):
-        try:
-            with open(conffile, "r", encoding="utf-8") as fd:
-                if any(module_re.match(line) for line in fd.readline()):
-                    return True
-        except (IsADirectoryError, FileNotFoundError):
-            # glob may match directories, and modprobe.conf may or may not exist
-            continue
-    return False
+    # we can't simply try loading the module with `modprobe -n <module>`
+    # because:
+    # * the driver may not be installed
+    # * we don't know the full name of the module
+    return (
+        _is_nvidia_module_blacklisted_via_modprobe() or _is_nvidia_module_blacklisted_via_cmdline()
+    )
+
+
+def _is_nvidia_module_blacklisted_via_modprobe() -> bool:
+    # check if blacklisting is configured in any of the modprobe.d conf files
+    # see `man modprobe.d`
+    try:
+        modprobe_config = subprocess.check_output(["modprobe", "-c"], text=True).split("\n")
+    except subprocess.CalledProcessError:
+        # This really shouldn't be possible
+        logger.error("Cannot execute modprobe")
+        raise
+
+    # modprobe normalizes config options to "blacklist MODULE" so no need to
+    # worry about extra whitespace
+    return any(opt.startswith("blacklist nvidia") for opt in modprobe_config)
+
+
+def _is_nvidia_module_blacklisted_via_cmdline() -> bool:
+    # check if blacklisting is done via kernel cmdline
+    try:
+        cmdline = Path("/proc/cmdline").read_text(encoding="utf-8")
+    except FileNotFoundError:
+        # This really shouldn't be possible
+        logger.error("/proc/cmdline is not available")
+        raise
+
+    # possible formats:
+    # module_blacklist= or modprobe.blacklist= followed by a comma-separated
+    # list of modules
+    # see https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
+    return bool(
+        re.search(r"((?<=module_blacklist)|(?<=modprobe\.blacklist))=[\w,]*nvidia", cmdline)
+    )
 
 
 def detect_available_tools() -> Set[HWTool]:
