@@ -30,11 +30,10 @@ jobs:
           destination=$(echo "$channel_promotion" | sed 's/.*->\s*//')
           echo "destination-channel=$destination" >> $GITHUB_OUTPUT
           echo "origin-channel=$origin" >> $GITHUB_OUTPUT
-      - name: Release charm to channel
-        uses: canonical/charming-actions/release-charm@2.6.2
+      - name: Promote charm to channel
+        uses: canonical/charming-actions/promote-charm@2.6.3
         with:
           credentials: ${{ secrets.CHARMHUB_TOKEN }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           destination-channel: ${{ steps.set-channels.outputs.destination-channel }}
           origin-channel: ${{ steps.set-channels.outputs.origin-channel }}
           charmcraft-channel: "2.x/stable"
