@@ -1,5 +1,6 @@
 import logging
 import platform
+from pathlib import Path
 
 import pytest
 from utils import RESOURCES_DIR, Resource
@@ -16,6 +17,18 @@ def pytest_addoption(parser):
         default="ubuntu@22.04",
         choices=["ubuntu@20.04", "ubuntu@22.04", "ubuntu@24.04"],
         help="Set base for the applications.",
+    )
+
+    parser.addoption(
+        "--realhw",
+        action="store_true",
+        help="Enable real hardware testing.",
+    )
+
+    parser.addoption(
+        "--nvidia",
+        action="store_true",
+        help="Enable NVIDIA GPU support for testing with real hardware.",
     )
 
     parser.addoption(
@@ -43,6 +56,16 @@ def base(request):
 
 
 @pytest.fixture(scope="module")
+def nvidia_present(request):
+    return request.config.getoption("--nvidia")
+
+
+@pytest.fixture(scope="module")
+def realhw(request):
+    return request.config.getoption("--realhw")
+
+
+@pytest.fixture(scope="module")
 def architecture():
     machine = platform.machine()
     if machine == "aarch64":
@@ -60,20 +83,7 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    if config.getoption("collectors"):
-        # --collectors provided, skip hw independent tests
-        skip_hw_independent = pytest.mark.skip(
-            reason="Hardware independent tests are skipped since --collectors was provided."
-        )
-        for item in items:
-            # skip TestCharm tests where "realhw" marker is not present
-            # we don't want to skip test_setup_and_build, test_required_resources,
-            # test_cos_agent_relation and test_redfish_credential_validation
-            # even for hw independent tests
-            # so we also check for the abort_on_fail marker
-            if "realhw" not in item.keywords and "abort_on_fail" not in item.keywords:
-                item.add_marker(skip_hw_independent)
-    else:
+    if not config.getoption("--realhw"):
         # skip hw dependent tests in TestCharmWithHW marked with "realhw"
         skip_hw_dependent = pytest.mark.skip(
             reason="Hardware dependent test. Provide collectors with the --collectors option."
@@ -100,7 +110,7 @@ def resources() -> list[Resource]:
         Resource(
             resource_name=TPR_RESOURCES.get(HWTool.STORCLI),
             file_name="storcli.deb",
-            collector_name=HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(HWTool.STORCLI)[0].replace(
+            collector_name=HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(HWTool.STORCLI).replace(
                 "collector.", ""
             ),
             bin_name=HWTool.STORCLI.value,
@@ -108,7 +118,7 @@ def resources() -> list[Resource]:
         Resource(
             resource_name=TPR_RESOURCES.get(HWTool.PERCCLI),
             file_name="perccli.deb",
-            collector_name=HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(HWTool.PERCCLI)[0].replace(
+            collector_name=HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(HWTool.PERCCLI).replace(
                 "collector.", ""
             ),
             bin_name=HWTool.PERCCLI.value,
@@ -116,7 +126,7 @@ def resources() -> list[Resource]:
         Resource(
             resource_name=TPR_RESOURCES.get(HWTool.SAS2IRCU),
             file_name="sas2ircu",
-            collector_name=HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(HWTool.SAS2IRCU)[0].replace(
+            collector_name=HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(HWTool.SAS2IRCU).replace(
                 "collector.", ""
             ),
             bin_name=HWTool.SAS2IRCU.value,
@@ -124,7 +134,7 @@ def resources() -> list[Resource]:
         Resource(
             resource_name=TPR_RESOURCES.get(HWTool.SAS3IRCU),
             file_name="sas3ircu",
-            collector_name=HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(HWTool.SAS3IRCU)[0].replace(
+            collector_name=HARDWARE_EXPORTER_COLLECTOR_MAPPING.get(HWTool.SAS3IRCU).replace(
                 "collector.", ""
             ),
             bin_name=HWTool.SAS3IRCU.value,
@@ -146,3 +156,23 @@ def required_resources(resources: list[Resource], provided_collectors: set) -> l
             required_resources.append(resource)
 
     return required_resources
+
+
+@pytest.fixture()
+def charm_path(base: str, architecture: str) -> Path:
+    """Fixture to determine the charm path based on the base and architecture."""
+    glob_path = f"hardware-observer_*{base.replace('@', '-')}-{architecture}*.charm"
+    paths = list(Path(".").glob(glob_path))
+
+    if not paths:
+        raise FileNotFoundError(f"The path for the charm for {base}-{architecture} is not found.")
+
+    if len(paths) > 1:
+        raise FileNotFoundError(
+            f"Multiple charms found for {base}-{architecture}. Please provide only one."
+        )
+
+    # The bundle will need the full path to the charm
+    path = paths[0].absolute()
+    log.info(f"Using charm path: {path}")
+    return path
