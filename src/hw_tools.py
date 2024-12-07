@@ -676,32 +676,35 @@ def nvidia_gpu_verifier() -> Set[HWTool]:
     DCGM won't be able to manage the GPU
     """
     gpus = lshw(class_filter="display")
-    return {
-        HWTool.DCGM
-        for gpu in gpus
-        if "nvidia" in gpu.get("vendor", "").lower() and not _is_nvidia_module_blacklisted()
-    }
+    if any("nvidia" in gpu.get("vendor", "").lower() for gpu in gpus):
+        logger.debug("NVIDIA GPU(s) detected")
+        if not _is_nvidia_module_blacklisted():
+            logger.debug("Enabling DCGM.")
+            return {HWTool.DCGM}
+
+        logger.debug("the NVIDIA driver has been blacklisted. Not enabling DCGM.")
+    return set()
 
 
 def _is_nvidia_module_blacklisted() -> bool:
-    # we can't simply try loading the module with `modprobe -n <module>`
-    # because:
-    # * the driver may not be installed
-    # * we don't know the full name of the module
+    """Verify if the NVIDIA driver has been blacklisted.
+
+    This is currently done by looking into modprobe config and kernel parameters
+    NOTE: we can't simply try loading the module with `modprobe -n <module>` because:
+    * the driver may not be installed
+    * we don't know the full name of the module
+    """
     return (
         _is_nvidia_module_blacklisted_via_modprobe() or _is_nvidia_module_blacklisted_via_cmdline()
     )
 
 
 def _is_nvidia_module_blacklisted_via_modprobe() -> bool:
-    # check if blacklisting is configured in any of the modprobe.d conf files
-    # see `man modprobe.d`
-    try:
-        modprobe_config = subprocess.check_output(["modprobe", "-c"], text=True).split("\n")
-    except subprocess.CalledProcessError:
-        # This really shouldn't be possible
-        logger.error("Cannot execute modprobe")
-        raise
+    """Verify if the NVIDIA driver has been blacklisted via modprobe config.
+
+    see the manpages of modprobe and modprobe.d for more details
+    """
+    modprobe_config = subprocess.check_output(["modprobe", "-c"], text=True).split("\n")
 
     # modprobe normalizes config options to "blacklist MODULE" so no need to
     # worry about extra whitespace
@@ -709,18 +712,14 @@ def _is_nvidia_module_blacklisted_via_modprobe() -> bool:
 
 
 def _is_nvidia_module_blacklisted_via_cmdline() -> bool:
-    # check if blacklisting is done via kernel cmdline
-    try:
-        cmdline = Path("/proc/cmdline").read_text(encoding="utf-8")
-    except FileNotFoundError:
-        # This really shouldn't be possible
-        logger.error("/proc/cmdline is not available")
-        raise
+    """Verify if the NVIDIA driver has been blacklisted via kernel parameters.
 
-    # possible formats:
-    # module_blacklist= or modprobe.blacklist= followed by a comma-separated
-    # list of modules
-    # see https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
+    possible formats: module_blacklist= or modprobe.blacklist= followed by a
+    comma-separated list of modules. See:
+    https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
+    """
+    cmdline = Path("/proc/cmdline").read_text(encoding="utf-8")
+
     return bool(
         re.search(r"((?<=module_blacklist)|(?<=modprobe\.blacklist))=[\w,]*nvidia", cmdline)
     )

@@ -39,6 +39,9 @@ from hw_tools import (
     StorCLIStrategy,
     StrategyABC,
     TPRStrategyABC,
+    _is_nvidia_module_blacklisted,
+    _is_nvidia_module_blacklisted_via_cmdline,
+    _is_nvidia_module_blacklisted_via_modprobe,
     _raid_hw_verifier_hwinfo,
     _raid_hw_verifier_lshw,
     bmc_hw_verifier,
@@ -870,9 +873,9 @@ class TestDiskHWVerifier(unittest.TestCase):
 
 
 @pytest.mark.parametrize(
-    "lshw_output, expect",
+    "lshw_output, blacklist_output, expect",
     [
-        ([], set()),
+        ([], False, set()),
         (
             [
                 {
@@ -884,6 +887,7 @@ class TestDiskHWVerifier(unittest.TestCase):
                     "vendor": "Intel Corporation",
                 },
             ],
+            False,
             set(),
         ),
         (
@@ -905,6 +909,7 @@ class TestDiskHWVerifier(unittest.TestCase):
                     "vendor": "Intel Corporation",
                 },
             ],
+            False,
             {HWTool.DCGM},
         ),
         (
@@ -926,14 +931,85 @@ class TestDiskHWVerifier(unittest.TestCase):
                     "vendor": "NVIDIA Corporation",
                 },
             ],
+            False,
             {HWTool.DCGM},
+        ),
+        (
+            [
+                {
+                    "id": "display",
+                    "class": "display",
+                    "handle": "PCI:0000:01:00.0",
+                    "description": "VGA compatible controller",
+                    "product": "GA107M [GeForce RTX 3050 Mobile]",
+                    "vendor": "NVIDIA Corporation",
+                },
+            ],
+            True,
+            set(),
         ),
     ],
 )
+@mock.patch("hw_tools._is_nvidia_module_blacklisted")
 @mock.patch("hw_tools.lshw")
-def test_nvidia_gpu_verifier(mock_lshw, lshw_output, expect):
+def test_nvidia_gpu_verifier(
+    mock_lshw, mock_is_nvidia_blacklisted, lshw_output, blacklist_output, expect
+):
     mock_lshw.return_value = lshw_output
+    mock_is_nvidia_blacklisted.return_value = blacklist_output
     assert nvidia_gpu_verifier() == expect
+
+
+@pytest.mark.parametrize("modprobe_bool", [True, False])
+@pytest.mark.parametrize("cmdline_bool", [True, False])
+@mock.patch("hw_tools._is_nvidia_module_blacklisted_via_modprobe")
+@mock.patch("hw_tools._is_nvidia_module_blacklisted_via_cmdline")
+def test_is_nvidia_module_blacklisted(
+    mock_cmdline_blacklisting, mock_modprobe_blacklisting, cmdline_bool, modprobe_bool
+):
+    mock_cmdline_blacklisting.return_value = cmdline_bool
+    mock_modprobe_blacklisting.return_value = modprobe_bool
+    assert _is_nvidia_module_blacklisted() == (
+        mock_cmdline_blacklisting() or mock_modprobe_blacklisting()
+    )
+
+
+@pytest.mark.parametrize(
+    "modprobe_config, expect",
+    [
+        ("", False),
+        ("blacklist nvidia", True),
+        ("blacklist foo", False),
+        ("foo bar", False),
+        ("foo bar\nblacklist nvidiadriver", True),
+        ("blacklist foo\nblacklist bar", False),
+    ],
+)
+@mock.patch("hw_tools.subprocess.check_output")
+def test_is_nvidia_module_blacklisted_via_modprobe(mock_modprobe, modprobe_config, expect):
+    mock_modprobe.return_value = modprobe_config
+    assert _is_nvidia_module_blacklisted_via_modprobe() == expect
+
+
+@pytest.mark.parametrize(
+    "cmdline_data, expect",
+    [
+        ("", False),
+        ("foo bar baz", False),
+        ("module_blacklist=nvidia", True),
+        ("module_blacklist=nvidiaaaaa", True),
+        ("module_blacklist=foo,bar,nvidiaaaaa", True),
+        ("module_blacklist=foo,bar,baz", False),
+        ("modprobe.blacklist=nvidia", True),
+        ("modprobe.blacklist=nvidiaaaaa", True),
+        ("modprobe.blacklist=foo,bar,nvidiaaaaa", True),
+        ("modprobe.blacklist=foo,bar,baz", False),
+    ],
+)
+@mock.patch("hw_tools.Path.read_text")
+def test_is_nvidia_module_blacklisted_via_cmdline(mock_cmdline, cmdline_data, expect):
+    mock_cmdline.return_value = cmdline_data
+    assert _is_nvidia_module_blacklisted_via_cmdline() == expect
 
 
 class TestIPMIHWVerifier(unittest.TestCase):
