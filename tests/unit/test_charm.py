@@ -170,19 +170,16 @@ class TestCharm(unittest.TestCase):
         mock_exporters,
         mock_exporter_install_returns,
     ) -> None:
-        with (
-            mock.patch(
-                "charm.HardwareObserverCharm.exporters",
-                new_callable=mock.PropertyMock(
-                    return_value=mock_exporters,
-                ),
-            ) as mock_exporters,
-            mock.patch(
-                "charm.HardwareObserverCharm.stored_tools",
-                new_callable=mock.PropertyMock(
-                    return_value=stored_tools,
-                ),
-            ) as mock_stored_tools,  # noqa: F841
+        with mock.patch(
+            "charm.HardwareObserverCharm.exporters",
+            new_callable=mock.PropertyMock(
+                return_value=mock_exporters,
+            ),
+        ) as mock_exporters, mock.patch(
+            "charm.HardwareObserverCharm.stored_tools",
+            new_callable=mock.PropertyMock(
+                return_value=stored_tools,
+            ),
         ):
             self.harness.begin()
             self.harness.charm.hw_tool_helper = mock.MagicMock()
@@ -218,20 +215,17 @@ class TestCharm(unittest.TestCase):
     def test_remove(self):
         mock_exporters = {mock.MagicMock(), mock.MagicMock()}
         mock_stored_tools = {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL_EXPORTER}
-        with (
-            mock.patch(
-                "charm.HardwareObserverCharm.exporters",
-                new_callable=mock.PropertyMock(
-                    return_value=mock_exporters,
-                ),
-            ) as mock_exporters,
-            mock.patch(
-                "charm.HardwareObserverCharm.stored_tools",
-                new_callable=mock.PropertyMock(
-                    return_value=mock_stored_tools,
-                ),
-            ) as mock_stored_tools,
-        ):
+        with mock.patch(
+            "charm.HardwareObserverCharm.exporters",
+            new_callable=mock.PropertyMock(
+                return_value=mock_exporters,
+            ),
+        ) as mock_exporters, mock.patch(
+            "charm.HardwareObserverCharm.stored_tools",
+            new_callable=mock.PropertyMock(
+                return_value=mock_stored_tools,
+            ),
+        ) as mock_stored_tools:
             self.harness.begin()
             self.harness.charm.hw_tool_helper = mock.MagicMock()
 
@@ -611,18 +605,15 @@ class TestCharm(unittest.TestCase):
         mock_exporters = [mock_exporter]
         mock_stored_tools = {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI}
 
-        with (
-            mock.patch(
-                "charm.HardwareObserverCharm.exporters",
-                new_callable=mock.PropertyMock(
-                    return_value=mock_exporters,
-                ),
+        with mock.patch(
+            "charm.HardwareObserverCharm.exporters",
+            new_callable=mock.PropertyMock(
+                return_value=mock_exporters,
             ),
-            mock.patch(
-                "charm.HardwareObserverCharm.stored_tools",
-                new_callable=mock.PropertyMock(
-                    return_value=mock_stored_tools,
-                ),
+        ), mock.patch(
+            "charm.HardwareObserverCharm.stored_tools",
+            new_callable=mock.PropertyMock(
+                return_value=mock_stored_tools,
             ),
         ):
             rid = self.harness.add_relation("cos-agent", "grafana-agent")
