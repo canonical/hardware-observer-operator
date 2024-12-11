@@ -115,7 +115,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
         if event.params["apply"] and hw_change_detected:
             # Update the value in local Store
-            self._stored.stored_tools = available_tools
+            self._stored.stored_tools = {tool.value for tool in available_tools}
             event.log(f"Run install hook with enable tools: {sorted_available_tools}")
             self._on_install_or_upgrade(event=event)
 
