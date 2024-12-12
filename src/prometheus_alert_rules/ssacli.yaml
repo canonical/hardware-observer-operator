@@ -27,7 +27,7 @@ groups:
           LABELS = {{ $labels }}
 
   - alert: SsaCLIControllerNotOK
-    expr: ssacli_controller_info{status != "OK"} == 1
+    expr: ssacli_controller_info{status != "OK", status!="NOT_CONFIGURED"} == 1
     for: 0m
     labels:
       severity: critical
