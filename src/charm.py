@@ -76,7 +76,7 @@ class HardwareObserverCharm(ops.CharmBase):
                 HardwareExporter(
                     self.charm_dir,
                     self.model.config,
-                    self.stored_tools,
+                    stored_tools,
                 )
             )
 
