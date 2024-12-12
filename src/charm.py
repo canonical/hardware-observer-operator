@@ -70,7 +70,8 @@ class HardwareObserverCharm(ops.CharmBase):
     def exporters(self) -> List[BaseExporter]:
         """Return list of exporters based on detected hardware."""
         exporters: List[BaseExporter] = []
-        if self.stored_tools & HardwareExporter.hw_tools():
+        stored_tools = self.stored_tools
+        if stored_tools & HardwareExporter.hw_tools():
             exporters.append(
                 HardwareExporter(
                     self.charm_dir,
@@ -79,10 +80,10 @@ class HardwareObserverCharm(ops.CharmBase):
                 )
             )
 
-        if self.stored_tools & SmartCtlExporter.hw_tools():
+        if stored_tools & SmartCtlExporter.hw_tools():
             exporters.append(SmartCtlExporter(self.model.config))
 
-        if self.stored_tools & DCGMExporter.hw_tools():
+        if stored_tools & DCGMExporter.hw_tools():
             exporters.append(DCGMExporter(self.model.config))
 
         return exporters
