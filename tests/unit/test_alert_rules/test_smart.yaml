@@ -168,7 +168,7 @@ tests:
 
   - interval: 1m
     input_series:
-      - series: 'smartctl_device_attribute{device="sda", attribute_id="5", attribute_name="Reallocated_Sectors_Count", instance="ubuntu-2"}'
+      - series: 'smartctl_device_attribute{device="sda", attribute_id="5", attribute_name="Reallocated_Sectors_Count", instance="ubuntu-2", attribute_value_type="raw"}'
         values: '2x10'
 
     alert_rule_test:
@@ -181,13 +181,14 @@ tests:
               device: sda
               attribute_id: 5
               attribute_name: Reallocated_Sectors_Count
+              attribute_value_type: raw
             exp_annotations:
               summary: SMART device attribute correlating with drive failure has its raw value greater than zero. (instance ubuntu-2)
               description: |
                 SMART raw value for attribute "Reallocated_Sectors_Count" with id "5"
                 on device "sda" is greater than 0.
                   VALUE = 2
-                  LABELS = map[__name__:smartctl_device_attribute attribute_id:5 attribute_name:Reallocated_Sectors_Count device:sda instance:ubuntu-2]
+                  LABELS = map[__name__:smartctl_device_attribute attribute_id:5 attribute_name:Reallocated_Sectors_Count attribute_value_type:raw device:sda instance:ubuntu-2]
 
   - interval: 1m
     input_series:
