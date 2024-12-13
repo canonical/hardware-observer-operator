@@ -28,7 +28,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${prometheusds}"
       },
       "fieldConfig": {
         "defaults": {
@@ -114,7 +114,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$instance\", gpu=~\"$nvidia_gpu\"}",
@@ -126,7 +126,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "label_replace(node_hwmon_temp_celsius{instance=~\"^$instance.*\", chip=~\"$amd_gpu\"} * on(chip) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}, \"gpu\", \"$1\", \"card\", \"card([0-9]+)\")\n",
@@ -144,7 +144,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${prometheusds}"
       },
       "fieldConfig": {
         "defaults": {
@@ -198,7 +198,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "avg(DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$instance\", gpu=~\"$nvidia_gpu\"})",
@@ -210,7 +210,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "avg(node_hwmon_temp_celsius{instance=~\"^$instance.*\", chip=~\"$amd_gpu\"})",
@@ -226,7 +226,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${prometheusds}"
       },
       "fieldConfig": {
         "defaults": {
@@ -309,7 +309,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "DCGM_FI_DEV_POWER_USAGE{Hostname=~\"$instance\", gpu=~\"$nvidia_gpu\"}",
@@ -321,7 +321,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "label_replace(node_hwmon_power_average_watt{agent_hostname=~\"$instance\", chip=~\"$amd_gpu\"} * on(chip) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}, \"gpu\", \"$1\", \"card\", \"card([0-9]+)\")",
@@ -337,7 +337,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${prometheusds}"
       },
       "fieldConfig": {
         "defaults": {
@@ -405,7 +405,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "sum(DCGM_FI_DEV_POWER_USAGE{Hostname=~\"$instance\", gpu=~\"$nvidia_gpu\"})",
@@ -418,7 +418,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -447,7 +447,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${prometheusds}"
       },
       "fieldConfig": {
         "defaults": {
@@ -532,7 +532,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "DCGM_FI_DEV_GPU_UTIL{Hostname=~\"$instance\", gpu=~\"$nvidia_gpu\"}",
@@ -544,7 +544,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "label_replace(node_drm_gpu_busy_percent{instance=~\"^$instance.*\"} * on(card) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}, \"gpu\", \"$1\", \"card\", \"card([0-9]+)\")\n",
@@ -560,7 +560,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${prometheusds}"
       },
       "fieldConfig": {
         "defaults": {
@@ -645,7 +645,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "DCGM_FI_DEV_FAN_SPEED{Hostname=~\"$instance\", gpu=~\"$nvidia_gpu\"}",
@@ -657,7 +657,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "label_replace(\n  (\n    node_hwmon_fan_rpm{instance=~\"^$instance.*\", chip=~\"$amd_gpu\"} * on(chip) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}\n  ) /\n  (\n    node_hwmon_fan_max_rpm{instance=~\"^$instance.*\", chip=~\"$amd_gpu\"} * on(chip) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}\n  ) * 100,\n  \"gpu\", \"$1\", \"card\", \"card([0-9]+)\"\n)",
@@ -673,7 +673,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${prometheusds}"
       },
       "fieldConfig": {
         "defaults": {
@@ -757,7 +757,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "DCGM_FI_DEV_MEM_CLOCK{Hostname=~\"$instance\", gpu=~\"$nvidia_gpu\"} * 1000000",
@@ -771,7 +771,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "label_replace(node_hwmon_freq_freq_mhz{agent_hostname=~\"^$instance.*\", chip=~\"$amd_gpu\", sensor=\"sclk\"} * on(chip) group_right() node_drm_card_info{chip=~\"$amd_gpu\"} * 1000000, \"gpu\", \"$1\", \"card\", \"card([0-9]+)\")",
@@ -787,7 +787,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${prometheusds}"
       },
       "fieldConfig": {
         "defaults": {
@@ -872,7 +872,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "DCGM_FI_DEV_MEM_COPY_UTIL{Hostname=~\"$instance\", gpu=~\"$nvidia_gpu\"}",
@@ -884,7 +884,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${prometheusds}"
           },
           "editorMode": "code",
           "expr": "label_replace(\n    (\n        node_drm_memory_vram_used_bytes{instance=~\"^$instance.*\"} * on(card) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}\n    ) \n    / \n    (\n        node_drm_memory_vram_size_bytes{instance=~\"^$instance.*\"} * on(card) group_right() node_drm_card_info{chip=~\"$amd_gpu\"}\n    ) * 100,\n    \"gpu\", \"$1\", \"card\", \"card([0-9]+)\"\n)",
@@ -933,7 +933,7 @@
           ]
         },
         "datasource": {
-          "uid": "$datasource"
+          "uid": "${prometheusds}"
         },
         "definition": "label_values(node_hwmon_chip_names,agent_hostname)",
         "hide": 0,
@@ -966,7 +966,7 @@
           ]
         },
         "datasource": {
-          "uid": "$datasource"
+          "uid": "${prometheusds}"
         },
         "definition": "label_values(DCGM_FI_DEV_GPU_TEMP, gpu)",
         "hide": 2,
@@ -996,7 +996,7 @@
           ]
         },
         "datasource": {
-          "uid": "$datasource"
+          "uid": "${prometheusds}"
         },
         "definition": "label_values(node_drm_card_info,chip)",
         "hide": 2,
