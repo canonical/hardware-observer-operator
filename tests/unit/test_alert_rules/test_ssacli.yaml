@@ -73,6 +73,19 @@ tests:
 
   - interval: 1m
     input_series:
+      - series: 'ssacli_controller_info{instance="ubuntu-2", part="Cache Status", status="NOT CONFIGURED"}'
+        values: '1x15'
+      - series: 'ssacli_controller_info{instance="ubuntu-3", part="Cache Status", status="OK"}'
+        values: '1x15'
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: SsaCLIControllerNotOK
+        # Expect no alerts when status is NOT CONFIGURED or OK
+        exp_alerts: []
+
+
+  - interval: 1m
+    input_series:
       - series: 'ssacli_command_success{instance="ubuntu-3"}'
         values: '1x15'
       - series: 'ssacli_logical_drive_info{instance="ubuntu-3", slot="2", status="DOWN"}'
