@@ -20,14 +20,8 @@ from config import (
     ExporterSettings,
     HWTool,
 )
-from hardware import get_bmc_address
-from hw_tools import (
-    APTStrategyABC,
-    DCGMExporterStrategy,
-    NVIDIADriverStrategy,
-    SmartCtlExporterStrategy,
-    SnapStrategy,
-)
+from hardware import get_bmc_address, is_nvidia_driver_loaded
+from hw_tools import APTStrategyABC, DCGMExporterStrategy, SmartCtlExporterStrategy, SnapStrategy
 
 logger = getLogger(__name__)
 
@@ -424,7 +418,6 @@ class DCGMExporter(SnapExporter):
         """Init."""
         self.strategies = [
             DCGMExporterStrategy(str(config["dcgm-snap-channel"])),
-            NVIDIADriverStrategy(),
         ]
         super().__init__(config)
 
@@ -434,15 +427,15 @@ class DCGMExporter(SnapExporter):
         return {HWTool.DCGM}
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
-        """Validate the if the DCGM exporter is able to run."""
+        """Validate if the DCGM exporter is able to run."""
         valid, msg = super().validate_exporter_configs()
         if not valid:
             return False, msg
 
-        if not NVIDIADriverStrategy().check():
+        if not is_nvidia_driver_loaded():
             return (
                 False,
-                "Failed to communicate with NVIDIA driver. See more details in the logs",
+                "The NVIDIA driver isn't installed or loaded. See more details in the logs",
             )
         return valid, msg
 

@@ -162,21 +162,6 @@ async def test_required_resources(ops_test: OpsTest, required_resources):
 
 
 @pytest.mark.abort_on_fail
-@pytest.mark.realhw
-async def test_nvidia_driver_installation(ops_test: OpsTest, nvidia_present, unit):
-    """Test nvidia driver installation."""
-    if not nvidia_present:
-        pytest.skip("dcgm not in provided collectors, skipping test")
-
-    check_nvidia_driver_cmd = "cat /proc/driver/nvidia/version"
-    results = await run_command_on_unit(ops_test, unit.name, check_nvidia_driver_cmd)
-    exists = results.get("return-code") == 0
-
-    if not exists:
-        pytest.fail("Error occured during the driver installation. Check the logs.")
-
-
-@pytest.mark.abort_on_fail
 async def test_cos_agent_relation(ops_test: OpsTest, provided_collectors):
     """Test adding relation with grafana-agent."""
     check_active_cmd = "systemctl is-active hardware-exporter"

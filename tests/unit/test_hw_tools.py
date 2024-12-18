@@ -27,11 +27,9 @@ from hw_tools import (
     IPMIDCMIStrategy,
     IPMISELStrategy,
     IPMISENSORStrategy,
-    NVIDIADriverStrategy,
     PercCLIStrategy,
     ResourceChecksumError,
     ResourceFileSizeZeroError,
-    ResourceInstallationError,
     SAS2IRCUStrategy,
     SAS3IRCUStrategy,
     SnapStrategy,
@@ -39,9 +37,6 @@ from hw_tools import (
     StorCLIStrategy,
     StrategyABC,
     TPRStrategyABC,
-    _is_nvidia_module_blacklisted,
-    _is_nvidia_module_blacklisted_via_cmdline,
-    _is_nvidia_module_blacklisted_via_modprobe,
     _raid_hw_verifier_hwinfo,
     _raid_hw_verifier_lshw,
     bmc_hw_verifier,
@@ -873,7 +868,7 @@ class TestDiskHWVerifier(unittest.TestCase):
 
 
 @pytest.mark.parametrize(
-    "lshw_output, blacklist_output, expect",
+    "lshw_output, driver_loaded, expect",
     [
         ([], False, set()),
         (
@@ -909,7 +904,7 @@ class TestDiskHWVerifier(unittest.TestCase):
                     "vendor": "Intel Corporation",
                 },
             ],
-            False,
+            True,
             {HWTool.DCGM},
         ),
         (
@@ -931,7 +926,7 @@ class TestDiskHWVerifier(unittest.TestCase):
                     "vendor": "NVIDIA Corporation",
                 },
             ],
-            False,
+            True,
             {HWTool.DCGM},
         ),
         (
@@ -945,71 +940,17 @@ class TestDiskHWVerifier(unittest.TestCase):
                     "vendor": "NVIDIA Corporation",
                 },
             ],
-            True,
+            False,
             set(),
         ),
     ],
 )
-@mock.patch("hw_tools._is_nvidia_module_blacklisted")
+@mock.patch("hw_tools.Path.exists")
 @mock.patch("hw_tools.lshw")
-def test_nvidia_gpu_verifier(
-    mock_lshw, mock_is_nvidia_blacklisted, lshw_output, blacklist_output, expect
-):
+def test_nvidia_gpu_verifier(mock_lshw, mock_driver_path, lshw_output, driver_loaded, expect):
     mock_lshw.return_value = lshw_output
-    mock_is_nvidia_blacklisted.return_value = blacklist_output
+    mock_driver_path.return_value = driver_loaded
     assert nvidia_gpu_verifier() == expect
-
-
-@pytest.mark.parametrize("modprobe_bool", [True, False])
-@pytest.mark.parametrize("cmdline_bool", [True, False])
-@mock.patch("hw_tools._is_nvidia_module_blacklisted_via_modprobe")
-@mock.patch("hw_tools._is_nvidia_module_blacklisted_via_cmdline")
-def test_is_nvidia_module_blacklisted(
-    mock_cmdline_blacklisting, mock_modprobe_blacklisting, cmdline_bool, modprobe_bool
-):
-    mock_cmdline_blacklisting.return_value = cmdline_bool
-    mock_modprobe_blacklisting.return_value = modprobe_bool
-    assert _is_nvidia_module_blacklisted() == (
-        mock_cmdline_blacklisting() or mock_modprobe_blacklisting()
-    )
-
-
-@pytest.mark.parametrize(
-    "modprobe_config, expect",
-    [
-        ("", False),
-        ("blacklist nvidia", True),
-        ("blacklist foo", False),
-        ("foo bar", False),
-        ("foo bar\nblacklist nvidiadriver", True),
-        ("blacklist foo\nblacklist bar", False),
-    ],
-)
-@mock.patch("hw_tools.subprocess.check_output")
-def test_is_nvidia_module_blacklisted_via_modprobe(mock_modprobe, modprobe_config, expect):
-    mock_modprobe.return_value = modprobe_config
-    assert _is_nvidia_module_blacklisted_via_modprobe() == expect
-
-
-@pytest.mark.parametrize(
-    "cmdline_data, expect",
-    [
-        ("", False),
-        ("foo bar baz", False),
-        ("module_blacklist=nvidia", True),
-        ("module_blacklist=nvidiaaaaa", True),
-        ("module_blacklist=foo,bar,nvidiaaaaa", True),
-        ("module_blacklist=foo,bar,baz", False),
-        ("modprobe.blacklist=nvidia", True),
-        ("modprobe.blacklist=nvidiaaaaa", True),
-        ("modprobe.blacklist=foo,bar,nvidiaaaaa", True),
-        ("modprobe.blacklist=foo,bar,baz", False),
-    ],
-)
-@mock.patch("hw_tools.Path.read_text")
-def test_is_nvidia_module_blacklisted_via_cmdline(mock_cmdline, cmdline_data, expect):
-    mock_cmdline.return_value = cmdline_data
-    assert _is_nvidia_module_blacklisted_via_cmdline() == expect
 
 
 class TestIPMIHWVerifier(unittest.TestCase):
@@ -1255,13 +1196,6 @@ def mock_shutil_copy():
 
 
 @pytest.fixture
-def nvidia_driver_strategy(mock_check_output, mock_apt_lib, mock_path, mock_check_call):
-    strategy = NVIDIADriverStrategy()
-    strategy.installed_pkgs = mock_path
-    yield strategy
-
-
-@pytest.fixture
 def dcgm_exporter_strategy(mock_snap_lib, mock_shutil_copy):
     yield DCGMExporterStrategy("latest/stable")
 
@@ -1292,87 +1226,6 @@ def test_dcgm_create_custom_metrics_copy_fail(
 
     dcgm_exporter_strategy.snap_client.set.assert_not_called()
     dcgm_exporter_strategy.snap_client.restart.assert_not_called()
-
-
-def test_nvidia_driver_strategy_install_success(
-    mock_path, mock_check_output, mock_apt_lib, mock_check_call, nvidia_driver_strategy
-):
-    nvidia_version = mock.MagicMock()
-    nvidia_version.exists.return_value = False
-    mock_path.return_value = nvidia_version
-
-    nvidia_driver_strategy.install()
-
-    mock_apt_lib.add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
-    mock_check_output.assert_called_once_with("ubuntu-drivers --gpgpu install".split(), text=True)
-    mock_check_call.assert_called_once_with("modprobe nvidia".split())
-
-
-def test_install_nvidia_drivers_already_installed(
-    mock_path, mock_apt_lib, nvidia_driver_strategy, mock_check_output
-):
-    nvidia_version = mock.MagicMock()
-    nvidia_version.exists.return_value = True
-    mock_path.return_value = nvidia_version
-
-    nvidia_driver_strategy.install()
-
-    mock_apt_lib.add_package.assert_not_called()
-    mock_check_output.assert_not_called()
-
-
-def test_install_nvidia_drivers_nouveau_installed(mock_path, nvidia_driver_strategy, mock_apt_lib):
-    nvidia_version = mock.MagicMock()
-    nvidia_version.exists.return_value = False
-    mock_path.return_value = nvidia_version
-    mocked_open = mock.mock_open(read_data="nouveau")
-
-    with mock.patch("builtins.open", mocked_open):
-        with pytest.raises(ResourceInstallationError):
-            nvidia_driver_strategy.install()
-
-    mock_apt_lib.add_package.assert_not_called()
-    mocked_open.assert_called_once_with("/proc/modules", encoding="utf-8")
-
-
-def test_install_nvidia_drivers_subprocess_exception(
-    mock_path, mock_check_output, mock_apt_lib, nvidia_driver_strategy
-):
-    nvidia_version = mock.MagicMock()
-    nvidia_version.exists.return_value = False
-    mock_path.return_value = nvidia_version
-    mock_check_output.side_effect = subprocess.CalledProcessError(1, [])
-
-    with pytest.raises(subprocess.CalledProcessError):
-        nvidia_driver_strategy.install()
-
-    mock_apt_lib.add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
-
-
-def test_install_nvidia_drivers_no_drivers_found(
-    mock_path, mock_check_output, mock_apt_lib, nvidia_driver_strategy
-):
-    nvidia_version = mock.MagicMock()
-    nvidia_version.exists.return_value = False
-    mock_path.return_value = nvidia_version
-    mock_check_output.return_value = "No drivers found for installation"
-
-    with pytest.raises(ResourceInstallationError):
-        nvidia_driver_strategy.install()
-
-    mock_apt_lib.add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
-
-
-def test_nvidia_strategy_remove(nvidia_driver_strategy):
-    assert nvidia_driver_strategy.remove() is None
-
-
-@pytest.mark.parametrize("present, expected", [(True, True), (False, False)])
-def test_nvidia_strategy_check(nvidia_driver_strategy, mock_path, present, expected):
-    nvidia_version = mock.MagicMock()
-    nvidia_version.exists.return_value = present
-    mock_path.return_value = nvidia_version
-    assert nvidia_driver_strategy.check() is expected
 
 
 @mock.patch("hw_tools.Path.unlink")

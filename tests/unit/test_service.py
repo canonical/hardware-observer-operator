@@ -731,8 +731,7 @@ class TestDCGMSnapExporter(unittest.TestCase):
             }
         )
         self.snap_strategy = mock.MagicMock(spec=service.DCGMExporterStrategy)
-        self.nvidia_strategy = mock.MagicMock(spec=service.NVIDIADriverStrategy)
-        self.exporter.strategies = [self.snap_strategy, self.nvidia_strategy]
+        self.exporter.strategies = [self.snap_strategy]
 
     def test_exporter_name(self):
         self.assertEqual(self.exporter.exporter_name, "dcgm")
@@ -740,18 +739,19 @@ class TestDCGMSnapExporter(unittest.TestCase):
     def test_hw_tools(self):
         self.assertEqual(self.exporter.hw_tools(), {HWTool.DCGM})
 
-    @mock.patch("service.NVIDIADriverStrategy.check", return_value=True)
+    @mock.patch("service.is_nvidia_driver_loaded", return_value=True)
     def test_validate_exporter_configs_success(self, _):
         valid, msg = self.exporter.validate_exporter_configs()
         self.assertTrue(valid)
         self.assertEqual(msg, "Exporter config is valid.")
 
-    @mock.patch("service.NVIDIADriverStrategy.check", return_value=False)
+    @mock.patch("service.is_nvidia_driver_loaded", return_value=False)
     def test_validate_exporter_configs_fails(self, _):
         valid, msg = self.exporter.validate_exporter_configs()
         self.assertFalse(valid)
         self.assertEqual(
-            msg, "Failed to communicate with NVIDIA driver. See more details in the logs"
+            msg,
+            "The NVIDIA driver isn't installed or loaded. See more details in the logs",
         )
 
     @mock.patch.object(service.BaseExporter, "validate_exporter_configs")
