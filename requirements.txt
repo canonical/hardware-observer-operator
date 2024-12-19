@@ -1,6 +1,6 @@
 cosl
 distro
-ops >= 2.2.0
+git+https://github.com/canonical/operator.git@main#egg=ops
 jinja2
 redfish  # requests is included in this
 pydantic < 2
