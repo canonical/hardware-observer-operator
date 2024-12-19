@@ -616,8 +616,11 @@ def disk_hw_verifier() -> Set[HWTool]:
 def nvidia_gpu_verifier() -> Set[HWTool]:
     """Verify if an NVIDIA gpu is present and the driver is loaded.
 
-    Installing the correct driver is a task left to the operator or to the
-    principal charm that needs to use the gpu.
+    Depending on the usage of the node (local gpu usage, vgpu configuration,
+    pci passthrough), a driver must or must not be installed. Since hardware
+    observer has no way to know what is the intention of the operator, we don't
+    automate the graphics driver installation. This task should be left to the
+    principal charm that is going to use the gpu.
     """
     gpus = lshw(class_filter="display")
     if any("nvidia" in gpu.get("vendor", "").lower() for gpu in gpus):
