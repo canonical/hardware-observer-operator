@@ -5,7 +5,6 @@ Define strategy for install, remove and verifier for different hardware.
 
 import logging
 import os
-import re
 import shutil
 import stat
 import subprocess
@@ -43,6 +42,7 @@ from hardware import (
     LSHW_SUPPORTED_STORAGES,
     get_bmc_address,
     hwinfo,
+    is_nvidia_driver_loaded,
     lshw,
 )
 from keys import HP_KEYS
@@ -60,14 +60,6 @@ class ResourceFileSizeZeroError(Exception):
     def __init__(self, tool: HWTool, path: Path):
         """Init."""
         self.message = f"Tool: {tool} path: {path} size is zero"
-
-
-class ResourceInstallationError(Exception):
-    """Exception raised when a hardware tool installation fails."""
-
-    def __init__(self, tool: HWTool):
-        """Init."""
-        super().__init__(f"Installation failed for tool: {tool}")
 
 
 def copy_to_snap_common_bin(source: Path, filename: str) -> None:
@@ -264,54 +256,6 @@ class DCGMExporterStrategy(SnapStrategy):
         except Exception as err:  # pylint: disable=broad-except
             logger.error("Failed to configure custom DCGM metrics: %s", err)
             raise err
-
-
-class NVIDIADriverStrategy(APTStrategyABC):
-    """NVIDIA driver strategy class."""
-
-    _name = HWTool.NVIDIA_DRIVER
-    pkg_pattern = r"nvidia(?:-[a-zA-Z-]*)?-(\d+)(?:-[a-zA-Z]*)?"
-
-    def install(self) -> None:
-        """Install the NVIDIA driver if not present."""
-        if Path("/proc/driver/nvidia/version").exists():
-            logger.info("NVIDIA driver already installed in the machine")
-            return
-
-        with open("/proc/modules", encoding="utf-8") as modules:
-            if "nouveau" in modules.read():
-                logger.error("Nouveau driver is loaded. Unload it before installing NVIDIA driver")
-                raise ResourceInstallationError(self._name)
-
-        logger.info("Installing NVIDIA driver")
-        apt.add_package("ubuntu-drivers-common", update_cache=True)
-
-        try:
-            # This can be changed to check_call and not rely in the output if this is fixed
-            # https://github.com/canonical/ubuntu-drivers-common/issues/106
-            # https://bugs.launchpad.net/ubuntu/+source/ubuntu-drivers-common/+bug/2090502
-            result = subprocess.check_output("ubuntu-drivers --gpgpu install".split(), text=True)
-            subprocess.check_call("modprobe nvidia".split())
-
-        except subprocess.CalledProcessError as err:
-            logger.error("Failed to install the NVIDIA driver: %s", err)
-            raise err
-
-        if "No drivers found for installation" in result:
-            logger.warning(
-                "No drivers for the NVIDIA GPU were found. Manual installation is necessary"
-            )
-            raise ResourceInstallationError(self._name)
-
-        logger.info("NVIDIA driver installed")
-
-    def remove(self) -> None:
-        """Drivers shouldn't be removed by the strategy."""
-        return None
-
-    def check(self) -> bool:
-        """Check if driver was installed."""
-        return Path("/proc/driver/nvidia/version").exists()
 
 
 class SmartCtlExporterStrategy(SnapStrategy):
@@ -670,59 +614,23 @@ def disk_hw_verifier() -> Set[HWTool]:
 
 
 def nvidia_gpu_verifier() -> Set[HWTool]:
-    """Verify if the hardware has NVIDIA gpu and the driver is not blacklisted.
+    """Verify if an NVIDIA gpu is present and the driver is loaded.
 
-    If the sysadmin has blacklisted the nvidia driver (e.g. to configure pci passthrough)
-    DCGM won't be able to manage the GPU
+    Depending on the usage of the node (local gpu usage, vgpu configuration,
+    pci passthrough), a driver must or must not be installed. Since hardware
+    observer has no way to know what is the intention of the operator, we don't
+    automate the graphics driver installation. This task should be left to the
+    principal charm that is going to use the gpu.
     """
     gpus = lshw(class_filter="display")
     if any("nvidia" in gpu.get("vendor", "").lower() for gpu in gpus):
         logger.debug("NVIDIA GPU(s) detected")
-        if not _is_nvidia_module_blacklisted():
+        if is_nvidia_driver_loaded():
             logger.debug("Enabling DCGM.")
             return {HWTool.DCGM}
 
-        logger.debug("the NVIDIA driver has been blacklisted. Not enabling DCGM.")
+        logger.debug("no NVIDIA driver has been loaded. Not enabling DCGM.")
     return set()
-
-
-def _is_nvidia_module_blacklisted() -> bool:
-    """Verify if the NVIDIA driver has been blacklisted.
-
-    This is currently done by looking into modprobe config and kernel parameters
-    NOTE: we can't simply try loading the module with `modprobe -n <module>` because:
-    * the driver may not be installed
-    * we don't know the full name of the module
-    """
-    return (
-        _is_nvidia_module_blacklisted_via_modprobe() or _is_nvidia_module_blacklisted_via_cmdline()
-    )
-
-
-def _is_nvidia_module_blacklisted_via_modprobe() -> bool:
-    """Verify if the NVIDIA driver has been blacklisted via modprobe config.
-
-    see the manpages of modprobe and modprobe.d for more details
-    """
-    modprobe_config = subprocess.check_output(["modprobe", "-c"], text=True).split("\n")
-
-    # modprobe normalizes config options to "blacklist MODULE" so no need to
-    # worry about extra whitespace
-    return any(opt.startswith("blacklist nvidia") for opt in modprobe_config)
-
-
-def _is_nvidia_module_blacklisted_via_cmdline() -> bool:
-    """Verify if the NVIDIA driver has been blacklisted via kernel parameters.
-
-    possible formats: module_blacklist= or modprobe.blacklist= followed by a
-    comma-separated list of modules. See:
-    https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
-    """
-    cmdline = Path("/proc/cmdline").read_text(encoding="utf-8")
-
-    return bool(
-        re.search(r"((?<=module_blacklist)|(?<=modprobe\.blacklist))=[\w,]*nvidia", cmdline)
-    )
 
 
 def detect_available_tools() -> Set[HWTool]:
