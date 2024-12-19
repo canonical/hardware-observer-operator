@@ -68,6 +68,8 @@ tests:
     input_series:
       - series: 'smartctl_device_smart_status{device="sda", instance="ubuntu-1"}'
         values: '0x15'
+      - series: 'smartctl_device_block_size{device="sda", instance="ubuntu-1", blocks_type="physical"}'
+        values: '1x15'
 
     alert_rule_test:
       - eval_time: 10m
@@ -83,6 +85,18 @@ tests:
                 SMART health status failed for device. This means either that the device has already failed, or that it is predicting its own failure within the next 24 hours.
                   VALUE = 0
                   LABELS = map[__name__:smartctl_device_smart_status device:sda instance:ubuntu-1]
+
+  - interval: 1m
+    input_series:
+      - series: 'smartctl_device_smart_status{device="sda", instance="ubuntu-1"}'
+        values: '0x15'
+      - series: 'smartctl_device_block_size{device="sda", instance="ubuntu-1", blocks_type="physical"}'
+        values: '0x15'
+
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SmartHealthStatusFail
+        exp_alerts: # alerts shouldn't fire since block size is 0
 
   - interval: 1m
     input_series:
