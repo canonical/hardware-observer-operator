@@ -1,8 +1,11 @@
+import inspect
 import logging
+import os
 import platform
 from pathlib import Path
 
 import pytest
+from pytest_operator.plugin import OpsTest
 from utils import RESOURCES_DIR, Resource
 
 from config import HARDWARE_EXPORTER_COLLECTOR_MAPPING, TPR_RESOURCES, HWTool
@@ -48,6 +51,33 @@ def pytest_addoption(parser):
         ],
         help="Provide space-separated list of collectors for testing with real hardware.",
     )
+
+
+def get_this_script_dir() -> Path:
+    filename = inspect.getframeinfo(inspect.currentframe()).filename  # type: ignore[arg-type]
+    path = os.path.dirname(os.path.abspath(filename))
+    return Path(path)
+
+
+@pytest.fixture(scope="module")
+def bundle(ops_test: OpsTest, request, charm_path, base, provided_collectors):
+    """Configure the bundle depending on cli arguments."""
+    bundle_template_path = get_this_script_dir() / "bundle.yaml.j2"
+    log.info("Rendering bundle %s", bundle_template_path)
+    bundle = ops_test.render_bundle(
+        bundle_template_path,
+        charm=charm_path,
+        base=base,
+        redfish_disable=("redfish" not in provided_collectors),
+        resources={
+            "storcli-deb": "empty-resource",
+            "perccli-deb": "empty-resource",
+            "sas2ircu-bin": "empty-resource",
+            "sas3ircu-bin": "empty-resource",
+        },
+    )
+
+    return bundle
 
 
 @pytest.fixture(scope="module")

@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 
 import asyncio
-import inspect
 import logging
 import os
 from enum import Enum
@@ -37,12 +36,6 @@ GRAFANA_AGENT_APP_NAME = "grafana-agent"
 TIMEOUT = 600
 
 
-def get_this_script_dir() -> Path:
-    filename = inspect.getframeinfo(inspect.currentframe()).filename  # type: ignore[arg-type]
-    path = os.path.dirname(os.path.abspath(filename))
-    return Path(path)
-
-
 class AppStatus(str, Enum):
     """Various workload status messages for the app."""
 
@@ -59,7 +52,7 @@ class AppStatus(str, Enum):
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
 async def test_build_and_deploy(  # noqa: C901, function is too complex
-    ops_test: OpsTest, base, architecture, realhw, required_resources, charm_path
+    ops_test: OpsTest, base, architecture, realhw, required_resources, bundle
 ):
     """Deploy the charm together with related charms.
 
@@ -70,21 +63,6 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
     # on different architecture.
     # See issue: https://bugs.launchpad.net/juju/+bug/2067749
     await ops_test.model.set_constraints({"arch": architecture})
-
-    bundle_template_path = get_this_script_dir() / "bundle.yaml.j2"
-
-    logger.info("Rendering bundle %s", bundle_template_path)
-    bundle = ops_test.render_bundle(
-        bundle_template_path,
-        charm=charm_path,
-        base=base,
-        resources={
-            "storcli-deb": "empty-resource",
-            "perccli-deb": "empty-resource",
-            "sas2ircu-bin": "empty-resource",
-            "sas3ircu-bin": "empty-resource",
-        },
-    )
 
     juju_cmd = ["deploy", "-m", ops_test.model_full_name, str(bundle)]
 
