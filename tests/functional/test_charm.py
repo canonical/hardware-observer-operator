@@ -391,7 +391,10 @@ class TestCharmWithHW:
         assert results.get("stdout").strip() == "active"
 
     async def test_dcgm_exporter_snap_available(self, ops_test, app, unit, nvidia_present):
-        """Test if dcgm exporter snap is installed and ranning on the unit."""
+        """Test if dcgm exporter snap is installed and ranning on the unit.
+
+        NOTE: this test requires installing the correct nvidia driver beforehand.
+        """
         if not nvidia_present:
             pytest.skip("dcgm not in provided collectors, skipping test")
 
