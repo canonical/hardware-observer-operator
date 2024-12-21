@@ -23,6 +23,8 @@ applications:
   {% endif %}
   hardware-observer:
     charm: {{ charm }}
+    options:
+        redfish-disable: {{ redfish_disable }}
 
 relations:
 - - grafana-agent:juju-info
