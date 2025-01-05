@@ -70,7 +70,7 @@ class HardwareObserverCharm(ops.CharmBase):
     def exporters(self) -> List[BaseExporter]:
         """Return list of exporters based on detected hardware."""
         exporters: List[BaseExporter] = []
-        stored_tools = self.get_stored_tools()
+        stored_tools = self.stored_tools
         if stored_tools & HardwareExporter.hw_tools():
             exporters.append(
                 HardwareExporter(
@@ -88,34 +88,44 @@ class HardwareObserverCharm(ops.CharmBase):
 
         return exporters
 
-    def get_stored_tools(self) -> Set[HWTool]:
+    @property
+    def stored_tools(self) -> Set[HWTool]:
         """Get the current hardware tools from stored or from machine if not present.
 
-        This function stores the current hardware tools as strings because StoredState cannot store
-        arbitrary objects. HWTool objects can however be re-instantiated from tool names.
+        Since StoredState cannot store arbitrary objects, re-instantiate tools from tool names.
         """
         if not self._stored.stored_tools:  # type: ignore[truthy-function]
-            available_tools = detect_available_tools()  # type: ignore[unreachable]
-            self._stored.stored_tools = {tool.value for tool in available_tools}
-        if "smartctl" in self._stored.stored_tools:  # type: ignore[operator]
-            self._stored.stored_tools.remove("smartctl")  # type: ignore[attr-defined]
+            self._stored.stored_tools = {  # type: ignore[unreachable]
+                tool.value for tool in detect_available_tools()
+            }
+        # remove legacy smartctl tool if present
+        # See https://github.com/canonical/hardware-observer-operator/pull/327
+        self._stored.stored_tools.discard("smartctl")  # type: ignore[attr-defined]
         return {HWTool(value) for value in self._stored.stored_tools}  # type: ignore[attr-defined]
+
+    @stored_tools.setter
+    def stored_tools(self, tools: Set[HWTool]) -> None:
+        """Record the tools via StoredState.
+
+        StoredState cannot store arbitrary objects so we convert Set[HWTool] into Set[str].
+        This is reversible by re-instantiating tools from tool names.
+        """
+        self._stored.stored_tools = {tool.value for tool in tools}
 
     def _on_redetect_hardware(self, event: ops.ActionEvent) -> None:
         """Redetect available hardware tools and option to rerun the install hook."""
-        stored_tools = self.get_stored_tools()
         available_tools = detect_available_tools()
 
-        hw_change_detected = stored_tools != available_tools
+        hw_change_detected = self.stored_tools != available_tools
 
-        sorted_stored_tools = ",".join(map(lambda member: member.value, sorted(stored_tools)))
+        sorted_stored_tools = ",".join(map(lambda member: member.value, sorted(self.stored_tools)))
         sorted_available_tools = ",".join(
             map(lambda member: member.value, sorted(available_tools))
         )
 
         if event.params["apply"] and hw_change_detected:
             # Update the value in local Store
-            self._stored.stored_tools = available_tools
+            self.stored_tools = available_tools
             event.log(f"Run install hook with enable tools: {sorted_available_tools}")
             self._on_install_or_upgrade(event=event)
 
@@ -134,13 +144,13 @@ class HardwareObserverCharm(ops.CharmBase):
 
         remove_legacy_smartctl_exporter()
 
-        stored_tools = self.get_stored_tools()
-
         msg: str
         resource_installed: bool
 
         # Install hw tools
-        resource_installed, msg = self.hw_tool_helper.install(self.model.resources, stored_tools)
+        resource_installed, msg = self.hw_tool_helper.install(
+            self.model.resources, self.stored_tools
+        )
 
         self._stored.resource_installed = resource_installed
         if not resource_installed:
@@ -167,7 +177,7 @@ class HardwareObserverCharm(ops.CharmBase):
         # Remove binary tool
         self.hw_tool_helper.remove(
             self.model.resources,
-            self.get_stored_tools(),
+            self.stored_tools,
         )
         self._stored.resource_installed = False
 
@@ -192,7 +202,7 @@ class HardwareObserverCharm(ops.CharmBase):
                 self.model.unit.status = BlockedStatus(config_valid_message)
                 return
 
-        hw_tool_ok, error_msg = self.hw_tool_helper.check_installed(self.get_stored_tools())
+        hw_tool_ok, error_msg = self.hw_tool_helper.check_installed(self.stored_tools)
         if not hw_tool_ok:
             self.model.unit.status = BlockedStatus(error_msg)
             return

@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 
-from hardware import get_bmc_address, hwinfo, lshw
+from hardware import get_bmc_address, hwinfo, is_nvidia_driver_loaded, lshw
 
 
 class TestHwinfo:
@@ -173,3 +173,10 @@ class TestGetBMCAddress(unittest.TestCase):
     def test_get_bmc_address_error_handling(self, mock_subprocess, mock_apt):
         output = get_bmc_address()
         self.assertEqual(output, None)
+
+
+@pytest.mark.parametrize("path_exists,expected", [(True, True), (False, False)])
+@mock.patch("hardware.Path.exists")
+def test_is_nvidia_driver_loaded(mock_path, path_exists, expected):
+    mock_path.return_value = path_exists
+    assert is_nvidia_driver_loaded() == expected

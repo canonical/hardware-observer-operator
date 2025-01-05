@@ -82,29 +82,32 @@ class TestCharm(unittest.TestCase):
     def test_exporters(
         self, _, stored_tools, expect, mock_hw_exporter, mock_smart_exporter, mock_dcgm_exporter
     ):
-        self.harness.begin()
-        self.harness.charm.get_stored_tools = mock.MagicMock()
-        self.harness.charm.get_stored_tools.return_value = stored_tools
+        with mock.patch(
+            "charm.HardwareObserverCharm.stored_tools",
+            new_callable=mock.PropertyMock(
+                return_value=stored_tools,
+            ),
+        ):
+            self.harness.begin()
 
-        hw_exporter = mock.MagicMock()
-        hw_exporter.exporter_name = HARDWARE_EXPORTER_SETTINGS.name
-        mock_hw_exporter.hw_tools.return_value = HardwareExporter.hw_tools()
-        mock_hw_exporter.return_value = hw_exporter
+            hw_exporter = mock.MagicMock()
+            hw_exporter.exporter_name = HARDWARE_EXPORTER_SETTINGS.name
+            mock_hw_exporter.hw_tools.return_value = HardwareExporter.hw_tools()
+            mock_hw_exporter.return_value = hw_exporter
 
-        smart_exporter = mock.MagicMock()
-        smart_exporter.exporter_name = SmartCtlExporter.exporter_name
-        mock_smart_exporter.hw_tools.return_value = SmartCtlExporter.hw_tools()
-        mock_smart_exporter.return_value = smart_exporter
+            smart_exporter = mock.MagicMock()
+            smart_exporter.exporter_name = SmartCtlExporter.exporter_name
+            mock_smart_exporter.hw_tools.return_value = SmartCtlExporter.hw_tools()
+            mock_smart_exporter.return_value = smart_exporter
 
-        dcgm_exporter = mock.MagicMock()
-        dcgm_exporter.exporter_name = DCGMExporter.exporter_name
-        mock_dcgm_exporter.hw_tools.return_value = DCGMExporter.hw_tools()
-        mock_dcgm_exporter.return_value = dcgm_exporter
+            dcgm_exporter = mock.MagicMock()
+            dcgm_exporter.exporter_name = DCGMExporter.exporter_name
+            mock_dcgm_exporter.hw_tools.return_value = DCGMExporter.hw_tools()
+            mock_dcgm_exporter.return_value = dcgm_exporter
 
-        exporters = self.harness.charm.exporters
-        self.harness.charm.get_stored_tools.assert_called()
+            exporters = self.harness.charm.exporters
 
-        self.assertEqual({exporter.exporter_name for exporter in exporters}, expect)
+            self.assertEqual({exporter.exporter_name for exporter in exporters}, expect)
 
     @parameterized.expand(
         [
@@ -172,12 +175,15 @@ class TestCharm(unittest.TestCase):
             new_callable=mock.PropertyMock(
                 return_value=mock_exporters,
             ),
-        ) as mock_exporters:
+        ) as mock_exporters, mock.patch(
+            "charm.HardwareObserverCharm.stored_tools",
+            new_callable=mock.PropertyMock(
+                return_value=stored_tools,
+            ),
+        ):
             self.harness.begin()
             self.harness.charm.hw_tool_helper = mock.MagicMock()
             self.harness.charm.hw_tool_helper.install.return_value = hw_tool_helper_install_return
-            self.harness.charm.get_stored_tools = mock.MagicMock()
-            self.harness.charm.get_stored_tools.return_value = stored_tools
             self.harness.charm._on_update_status = mock.MagicMock()
 
             for mock_exporter, return_val in zip(
@@ -208,27 +214,25 @@ class TestCharm(unittest.TestCase):
 
     def test_remove(self):
         mock_exporters = {mock.MagicMock(), mock.MagicMock()}
+        mock_stored_tools = {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL_EXPORTER}
         with mock.patch(
             "charm.HardwareObserverCharm.exporters",
             new_callable=mock.PropertyMock(
                 return_value=mock_exporters,
             ),
-        ) as mock_exporters:
+        ) as mock_exporters, mock.patch(
+            "charm.HardwareObserverCharm.stored_tools",
+            new_callable=mock.PropertyMock(
+                return_value=mock_stored_tools,
+            ),
+        ) as mock_stored_tools:
             self.harness.begin()
             self.harness.charm.hw_tool_helper = mock.MagicMock()
-
-            self.harness.charm.get_stored_tools = mock.MagicMock()
-            self.harness.charm.get_stored_tools.return_value = {
-                HWTool.IPMI_SENSOR,
-                HWTool.IPMI_SEL,
-                HWTool.SMARTCTL_EXPORTER,
-            }
 
             self.harness.charm.on.remove.emit()
 
         self.harness.charm.hw_tool_helper.remove.assert_called_with(
-            self.harness.charm.model.resources,
-            {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.SMARTCTL_EXPORTER},
+            self.harness.charm.model.resources, mock_stored_tools
         )
         for mock_exporter in mock_exporters:
             mock_exporter.uninstall.assert_called()
@@ -362,7 +366,7 @@ class TestCharm(unittest.TestCase):
             return
 
         self.harness.charm.hw_tool_helper.check_installed.assert_called_with(
-            self.harness.charm.get_stored_tools()
+            self.harness.charm.stored_tools
         )
         if not hw_tool_check_installed[0]:
             self.assertEqual(
@@ -462,7 +466,7 @@ class TestCharm(unittest.TestCase):
         mock_detect_available_tools.return_value = detected_available_tools
         self.harness.begin()
         self.harness.charm._on_install_or_upgrade = mock.MagicMock()
-        self.harness.charm._stored.stored_tools = [tool.value for tool in stored_tools]
+        self.harness.charm.stored_tools = stored_tools
 
         output = self.harness.run_action("redetect-hardware", {"apply": apply})
 
@@ -471,14 +475,14 @@ class TestCharm(unittest.TestCase):
         if not stored_tools == detected_available_tools:
             if apply:
                 self.assertEqual(
-                    self.harness.charm.get_stored_tools(),
+                    self.harness.charm.stored_tools,
                     detected_available_tools,
                 )
                 self.harness.charm._on_install_or_upgrade.assert_called()
             else:
                 self.harness.charm._on_install_or_upgrade.assert_not_called()
                 self.assertEqual(
-                    self.harness.charm.get_stored_tools(),
+                    self.harness.charm.stored_tools,
                     {tool.value for tool in stored_tools},
                 )
         else:
@@ -599,11 +603,17 @@ class TestCharm(unittest.TestCase):
         mock_exporter.validate_exporter_configs.return_value = (True, "")
         mock_exporter.check_health.return_value = True
         mock_exporters = [mock_exporter]
+        mock_stored_tools = {HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI}
 
         with mock.patch(
             "charm.HardwareObserverCharm.exporters",
             new_callable=mock.PropertyMock(
                 return_value=mock_exporters,
+            ),
+        ), mock.patch(
+            "charm.HardwareObserverCharm.stored_tools",
+            new_callable=mock.PropertyMock(
+                return_value=mock_stored_tools,
             ),
         ):
             rid = self.harness.add_relation("cos-agent", "grafana-agent")
@@ -613,13 +623,6 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.hw_tool_helper = mock.MagicMock()
             self.harness.charm.hw_tool_helper.install.return_value = (True, "")
             self.harness.charm.hw_tool_helper.check_installed.return_value = (True, "")
-
-            self.harness.charm.get_stored_tools = mock.MagicMock()
-            self.harness.charm.get_stored_tools.return_value = {
-                HWTool.IPMI_SENSOR,
-                HWTool.IPMI_SEL,
-                HWTool.IPMI_DCMI,
-            }
 
             self.harness.charm.on.install.emit()
             self.harness.add_relation_unit(rid, "grafana-agent/0")
@@ -665,12 +668,14 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.hw_tool_helper.install.return_value = (True, "")
             self.harness.charm.hw_tool_helper.check_installed.return_value = (True, "")
 
-            self.harness.charm.get_stored_tools = mock.MagicMock()
-            self.harness.charm.get_stored_tools.return_value = [
-                HWTool.IPMI_SENSOR,
-                HWTool.IPMI_SEL,
-                HWTool.IPMI_DCMI,
-            ]
+            mock_stored_tools = mock.MagicMock()
+            type(mock_stored_tools).stored_tools = mock.PropertyMock(
+                return_value=[
+                    HWTool.IPMI_SENSOR,
+                    HWTool.IPMI_SEL,
+                    HWTool.IPMI_DCMI,
+                ]
+            )
 
             self.harness.charm.on.install.emit()
             self.harness.add_relation_unit(rid, "grafana-agent/0")
@@ -787,7 +792,7 @@ class TestCharm(unittest.TestCase):
             result = self.harness.charm.validate_configs()
             self.assertEqual(result, expect)
 
-    def test_get_stored_tools_remove_legacy_smartctl(self):
+    def test_stored_tools_remove_legacy_smartctl(self):
         self.harness.begin()
         self.harness.charm._stored.stored_tools = {"smartctl"}
-        assert self.harness.charm.get_stored_tools() == set()
+        assert self.harness.charm.stored_tools == set()

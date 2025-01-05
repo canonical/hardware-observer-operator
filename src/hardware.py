@@ -4,6 +4,7 @@ import json
 import logging
 import subprocess
 import typing as t
+from pathlib import Path
 
 from charms.operator_libs_linux.v0 import apt
 
@@ -102,3 +103,8 @@ def hwinfo(*args: str) -> t.Dict[str, str]:
         key = item.splitlines()[0].strip()
         hardware[key] = item
     return hardware
+
+
+def is_nvidia_driver_loaded() -> bool:
+    """Determine if an NVIDIA driver has been loaded."""
+    return Path("/proc/driver/nvidia/version").exists()

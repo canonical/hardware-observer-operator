@@ -19,11 +19,11 @@ logger = logging.getLogger(__name__)
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_setup_and_deploy(series, channel, lxd_ctl, k8s_ctl, lxd_model, k8s_model):
+async def test_setup_and_deploy(base, channel, lxd_ctl, k8s_ctl, lxd_model, k8s_model):
     """Setup models and then deploy Hardware Observer and COS."""
     await _deploy_cos(channel, k8s_ctl, k8s_model)
 
-    await _deploy_hardware_observer(series, channel, lxd_model)
+    await _deploy_hardware_observer(base, channel, lxd_model)
 
     await _add_cross_controller_relations(k8s_ctl, lxd_ctl, k8s_model, lxd_model)
 
@@ -148,25 +148,15 @@ async def _deploy_cos(channel, ctl, model):
     subprocess.run(cmd, check=True)
 
 
-async def _deploy_hardware_observer(series, channel, model):
+async def _deploy_hardware_observer(base, channel, model):
     """Deploy Hardware Observer and Grafana Agent on the existing lxd cloud."""
     await asyncio.gather(
         # Principal Ubuntu
-        model.deploy(
-            "ubuntu",
-            num_units=1,
-            series=series,
-            channel=channel,
-        ),
+        model.deploy("ubuntu", num_units=1, base=base, channel=channel),
         # Hardware Observer
-        model.deploy("hardware-observer", series=series, num_units=0, channel=channel),
+        model.deploy("hardware-observer", base=base, num_units=0, channel=channel),
         # Grafana Agent
-        model.deploy(
-            "grafana-agent",
-            num_units=0,
-            series=series,
-            channel=channel,
-        ),
+        model.deploy("grafana-agent", num_units=0, base=base, channel=channel),
     )
 
     await model.add_relation("ubuntu:juju-info", "hardware-observer:general-info")

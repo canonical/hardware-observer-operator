@@ -88,7 +88,7 @@ groups:
 
   - alert: SmartAttributeWarning
     # based on https://www.backblaze.com/blog/what-smart-stats-indicate-hard-drive-failures/
-    expr: smartctl_device_attribute{attribute_id=~"5|187|188|197|198"} > 0
+    expr: smartctl_device_attribute{attribute_id=~"5|187|188|197|198", attribute_value_type="raw"} > 0
     for: 2m
     labels:
       severity: warning

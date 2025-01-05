@@ -42,6 +42,7 @@ from hardware import (
     LSHW_SUPPORTED_STORAGES,
     get_bmc_address,
     hwinfo,
+    is_nvidia_driver_loaded,
     lshw,
 )
 from keys import HP_KEYS
@@ -59,14 +60,6 @@ class ResourceFileSizeZeroError(Exception):
     def __init__(self, tool: HWTool, path: Path):
         """Init."""
         self.message = f"Tool: {tool} path: {path} size is zero"
-
-
-class ResourceInstallationError(Exception):
-    """Exception raised when a hardware tool installation fails."""
-
-    def __init__(self, tool: HWTool):
-        """Init."""
-        super().__init__(f"Installation failed for tool: {tool}")
 
 
 def copy_to_snap_common_bin(source: Path, filename: str) -> None:
@@ -263,47 +256,6 @@ class DCGMExporterStrategy(SnapStrategy):
         except Exception as err:  # pylint: disable=broad-except
             logger.error("Failed to configure custom DCGM metrics: %s", err)
             raise err
-
-
-class NVIDIADriverStrategy(APTStrategyABC):
-    """NVIDIA driver strategy class."""
-
-    _name = HWTool.NVIDIA_DRIVER
-    pkg_pattern = r"nvidia(?:-[a-zA-Z-]*)?-(\d+)(?:-[a-zA-Z]*)?"
-
-    def install(self) -> None:
-        """Install the NVIDIA driver if not present."""
-        if Path("/proc/driver/nvidia/version").exists():
-            logger.info("NVIDIA driver already installed in the machine")
-            return
-
-        logger.info("Installing NVIDIA driver")
-        apt.add_package("ubuntu-drivers-common", update_cache=True)
-
-        try:
-            # This can be changed to check_call and not rely in the output if this is fixed
-            # https://github.com/canonical/ubuntu-drivers-common/issues/106
-            result = subprocess.check_output("ubuntu-drivers install --gpgpu".split(), text=True)
-
-        except subprocess.CalledProcessError as err:
-            logger.error("Failed to install the NVIDIA driver: %s", err)
-            raise err
-
-        if "No drivers found for installation" in result:
-            logger.warning(
-                "No drivers for the NVIDIA GPU were found. Manual installation is necessary"
-            )
-            raise ResourceInstallationError(self._name)
-
-        logger.info("NVIDIA driver installed")
-
-    def remove(self) -> None:
-        """Drivers shouldn't be removed by the strategy."""
-        return None
-
-    def check(self) -> bool:
-        """Check if driver was installed."""
-        return Path("/proc/driver/nvidia/version").exists()
 
 
 class SmartCtlExporterStrategy(SnapStrategy):
@@ -662,9 +614,23 @@ def disk_hw_verifier() -> Set[HWTool]:
 
 
 def nvidia_gpu_verifier() -> Set[HWTool]:
-    """Verify if the hardware has NVIDIA gpu."""
+    """Verify if an NVIDIA gpu is present and the driver is loaded.
+
+    Depending on the usage of the node (local gpu usage, vgpu configuration,
+    pci passthrough), a driver must or must not be installed. Since hardware
+    observer has no way to know what is the intention of the operator, we don't
+    automate the graphics driver installation. This task should be left to the
+    principal charm that is going to use the gpu.
+    """
     gpus = lshw(class_filter="display")
-    return {HWTool.DCGM for gpu in gpus if "nvidia" in gpu.get("vendor", "").lower()}
+    if any("nvidia" in gpu.get("vendor", "").lower() for gpu in gpus):
+        logger.debug("NVIDIA GPU(s) detected")
+        if is_nvidia_driver_loaded():
+            logger.debug("Enabling DCGM.")
+            return {HWTool.DCGM}
+
+        logger.debug("no NVIDIA driver has been loaded. Not enabling DCGM.")
+    return set()
 
 
 def detect_available_tools() -> Set[HWTool]:

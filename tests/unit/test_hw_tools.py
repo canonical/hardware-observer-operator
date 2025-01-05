@@ -27,11 +27,9 @@ from hw_tools import (
     IPMIDCMIStrategy,
     IPMISELStrategy,
     IPMISENSORStrategy,
-    NVIDIADriverStrategy,
     PercCLIStrategy,
     ResourceChecksumError,
     ResourceFileSizeZeroError,
-    ResourceInstallationError,
     SAS2IRCUStrategy,
     SAS3IRCUStrategy,
     SnapStrategy,
@@ -870,9 +868,9 @@ class TestDiskHWVerifier(unittest.TestCase):
 
 
 @pytest.mark.parametrize(
-    "lshw_output, expect",
+    "lshw_output, driver_loaded, expect",
     [
-        ([], set()),
+        ([], False, set()),
         (
             [
                 {
@@ -884,6 +882,7 @@ class TestDiskHWVerifier(unittest.TestCase):
                     "vendor": "Intel Corporation",
                 },
             ],
+            False,
             set(),
         ),
         (
@@ -905,6 +904,7 @@ class TestDiskHWVerifier(unittest.TestCase):
                     "vendor": "Intel Corporation",
                 },
             ],
+            True,
             {HWTool.DCGM},
         ),
         (
@@ -926,13 +926,30 @@ class TestDiskHWVerifier(unittest.TestCase):
                     "vendor": "NVIDIA Corporation",
                 },
             ],
+            True,
             {HWTool.DCGM},
+        ),
+        (
+            [
+                {
+                    "id": "display",
+                    "class": "display",
+                    "handle": "PCI:0000:01:00.0",
+                    "description": "VGA compatible controller",
+                    "product": "GA107M [GeForce RTX 3050 Mobile]",
+                    "vendor": "NVIDIA Corporation",
+                },
+            ],
+            False,
+            set(),
         ),
     ],
 )
+@mock.patch("hw_tools.Path.exists")
 @mock.patch("hw_tools.lshw")
-def test_nvidia_gpu_verifier(mock_lshw, lshw_output, expect):
+def test_nvidia_gpu_verifier(mock_lshw, mock_driver_path, lshw_output, driver_loaded, expect):
     mock_lshw.return_value = lshw_output
+    mock_driver_path.return_value = driver_loaded
     assert nvidia_gpu_verifier() == expect
 
 
@@ -1179,13 +1196,6 @@ def mock_shutil_copy():
 
 
 @pytest.fixture
-def nvidia_driver_strategy(mock_check_output, mock_apt_lib, mock_path, mock_check_call):
-    strategy = NVIDIADriverStrategy()
-    strategy.installed_pkgs = mock_path
-    yield strategy
-
-
-@pytest.fixture
 def dcgm_exporter_strategy(mock_snap_lib, mock_shutil_copy):
     yield DCGMExporterStrategy("latest/stable")
 
@@ -1216,72 +1226,6 @@ def test_dcgm_create_custom_metrics_copy_fail(
 
     dcgm_exporter_strategy.snap_client.set.assert_not_called()
     dcgm_exporter_strategy.snap_client.restart.assert_not_called()
-
-
-def test_nvidia_driver_strategy_install_success(
-    mock_path, mock_check_output, mock_apt_lib, nvidia_driver_strategy
-):
-    nvidia_version = mock.MagicMock()
-    nvidia_version.exists.return_value = False
-    mock_path.return_value = nvidia_version
-
-    nvidia_driver_strategy.install()
-
-    mock_apt_lib.add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
-    mock_check_output.assert_called_once_with("ubuntu-drivers install --gpgpu".split(), text=True)
-
-
-def test_install_nvidia_drivers_already_installed(
-    mock_path, mock_apt_lib, nvidia_driver_strategy, mock_check_output
-):
-    nvidia_version = mock.MagicMock()
-    nvidia_version.exists.return_value = True
-    mock_path.return_value = nvidia_version
-
-    nvidia_driver_strategy.install()
-
-    mock_apt_lib.add_package.assert_not_called()
-    mock_check_output.assert_not_called()
-
-
-def test_install_nvidia_drivers_subprocess_exception(
-    mock_path, mock_check_output, mock_apt_lib, nvidia_driver_strategy
-):
-    nvidia_version = mock.MagicMock()
-    nvidia_version.exists.return_value = False
-    mock_path.return_value = nvidia_version
-    mock_check_output.side_effect = subprocess.CalledProcessError(1, [])
-
-    with pytest.raises(subprocess.CalledProcessError):
-        nvidia_driver_strategy.install()
-
-    mock_apt_lib.add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
-
-
-def test_install_nvidia_drivers_no_drivers_found(
-    mock_path, mock_check_output, mock_apt_lib, nvidia_driver_strategy
-):
-    nvidia_version = mock.MagicMock()
-    nvidia_version.exists.return_value = False
-    mock_path.return_value = nvidia_version
-    mock_check_output.return_value = "No drivers found for installation"
-
-    with pytest.raises(ResourceInstallationError):
-        nvidia_driver_strategy.install()
-
-    mock_apt_lib.add_package.assert_called_once_with("ubuntu-drivers-common", update_cache=True)
-
-
-def test_nvidia_strategy_remove(nvidia_driver_strategy):
-    assert nvidia_driver_strategy.remove() is None
-
-
-@pytest.mark.parametrize("present, expected", [(True, True), (False, False)])
-def test_nvidia_strategy_check(nvidia_driver_strategy, mock_path, present, expected):
-    nvidia_version = mock.MagicMock()
-    nvidia_version.exists.return_value = present
-    mock_path.return_value = nvidia_version
-    assert nvidia_driver_strategy.check() is expected
 
 
 @mock.patch("hw_tools.Path.unlink")
