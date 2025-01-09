@@ -274,7 +274,7 @@ SAS3IRCU_VERSION_INFOS: t.List[ToolVersionInfo] = [
         supported_architectures=[Architecture.X86_64],
         link="https://docs.broadcom.com/docs/SAS3IRCU_P11.zip",
         desc="P11, linux_x86_64",
-        sha256_checksum="458d51b030468901fc8a207088070e6ce82db34b181d9190c8f849605f1b9b6d",
+        sha256_checksum="c536bcf82bb361bc6dda21d23d95b421582409e3a3c0e7190ec939a14808fdc3",
     ),
 ]
 
