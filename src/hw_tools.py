@@ -252,7 +252,6 @@ class DCGMExporterStrategy(SnapStrategy):
         try:
             shutil.copy(self.metric_file, self.snap_common)
             self.snap_client.set({"dcgm-exporter-metrics-file": self.metric_file.name})
-            self.snap_client.restart(reload=True)
         except Exception as err:  # pylint: disable=broad-except
             logger.error("Failed to configure custom DCGM metrics: %s", err)
             raise err
