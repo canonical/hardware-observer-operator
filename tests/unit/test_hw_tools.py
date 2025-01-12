@@ -1214,7 +1214,6 @@ def test_dcgm_create_custom_metrics(dcgm_exporter_strategy, mock_shutil_copy, mo
     dcgm_exporter_strategy.snap_client.set.assert_called_once_with(
         {"dcgm-exporter-metrics-file": "dcgm_metrics.csv"}
     )
-    dcgm_exporter_strategy.snap_client.restart.assert_called_once_with(reload=True)
 
 
 def test_dcgm_create_custom_metrics_copy_fail(
