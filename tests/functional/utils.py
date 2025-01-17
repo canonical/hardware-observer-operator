@@ -63,7 +63,7 @@ async def run_command_on_unit(ops_test, unit_name, command):
 
 async def get_hardware_exporter_config(ops_test, unit_name) -> dict:
     """Return hardware-exporter config from endpoint on unit."""
-    command = "cat /etc/hardware-exporter/config.yaml"
+    command = "cat /etc/hardware-exporter-config.yaml"
     results = await run_command_on_unit(ops_test, unit_name, command)
     if results.get("return-code") > 0:
         raise HardwareExporterConfigError

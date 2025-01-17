@@ -19,6 +19,8 @@ applications:
     channel: latest/stable
   hardware-observer:
     charm: {{ charm }}
+    options:
+        redfish-disable: {{ redfish_disable }}
 
 relations:
 - - grafana-agent:juju-info
