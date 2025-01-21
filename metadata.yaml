@@ -64,7 +64,7 @@ resources:
       The download will start automatically upon accepting the license agreement.
       Unzip the downloaded file and attach the relevant binary.
       E.g.:
-      On AMD64 hosts, use ./SAS3IRCU_P16/sas3ircu_linux_x86_rel/sas3ircu.
+      On AMD64 hosts, use ./SAS3IRCU_P16/sas3ircu_linux_x64_rel/sas3ircu.
       On ARM64 hosts, use ./SAS3IRCU_P16/sas3ircu_linux_arm_rel/sas3ircu.
     filename: sas3ircu
 
