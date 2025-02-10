@@ -5,7 +5,7 @@
 """Charm the application."""
 
 import logging
-from typing import Any, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -291,11 +291,11 @@ class HardwareObserverCharm(ops.CharmBase):
 
         return True, "Charm config is valid."
 
-    def _scrape_config(self) -> List[dict[str, Any]]:
+    def _scrape_config(self) -> List[Dict[str, Any]]:
         """Generate the scrape config as needed."""
         # Setting scrape_timeout as collect_timeout in the `duration` format specified in
         # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration
-        scrape_config: List[dict[str, Any]] = [
+        scrape_config: List[Dict[str, Any]] = [
             {"scrape_timeout": f"{self.model.config['collect-timeout']}s"}
         ]
 
