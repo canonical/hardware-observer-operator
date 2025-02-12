@@ -324,7 +324,6 @@ class HardwareObserverCharm(ops.CharmBase):
                         "static_configs": [{"targets": [f"localhost:{port}"]}],
                     }
                 )
-        logger.warning(scrape_config)
         return scrape_config
 
     @property
