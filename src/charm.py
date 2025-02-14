@@ -55,6 +55,7 @@ class HardwareObserverCharm(ops.CharmBase):
             self,
             refresh_events=[self.on.config_changed, self.on.upgrade_charm],
             scrape_configs=self._scrape_config,
+            dashboard_dirs=self._dashboards(),
         )
 
         self.num_cos_agent_relations = self.get_num_cos_agent_relations("cos-agent")
@@ -325,6 +326,18 @@ class HardwareObserverCharm(ops.CharmBase):
                     }
                 )
         return scrape_config
+
+    def _dashboards(self) -> List[str]:
+        """Create the dashboards as needed."""
+        dashboards = []
+        for exporter in self.exporters:
+            if isinstance(exporter, HardwareExporter):
+                dashboards.append("./src/dashboards_hardware_exporter")
+            if isinstance(exporter, SmartCtlExporter):
+                dashboards.append("./src/dashboards_smart_ctl")
+            if isinstance(exporter, DCGMExporter):
+                dashboards.append("./src/dashboards_dcgm")
+        return dashboards
 
     @property
     def cos_agent_related(self) -> bool:
