@@ -5,6 +5,7 @@
 
 import json
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import ops
@@ -796,3 +797,38 @@ class TestCharm(unittest.TestCase):
         self.harness.begin()
         self.harness.charm._stored.stored_tools = {"smartctl"}
         assert self.harness.charm.stored_tools == set()
+
+    @mock.patch("service.get_bmc_address")
+    @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
+    def test_scrape_config(self, mock_exporters, _):
+        self.harness.begin()
+        config = self.harness.charm.model.config
+        hw_exporter = HardwareExporter(Path(), config, set())
+        smartctl_exporter = SmartCtlExporter(config)
+        dcgm_exporter = DCGMExporter(config)
+
+        mock_exporters.return_value = [hw_exporter, smartctl_exporter, dcgm_exporter]
+
+        assert self.harness.charm._scrape_config() == [
+            {"scrape_timeout": "10s"},
+            {"metrics_path": "/metrics", "static_configs": [{"targets": ["localhost:10200"]}]},
+            {"metrics_path": "/metrics", "static_configs": [{"targets": ["localhost:10201"]}]},
+            {"metrics_path": "/metrics", "static_configs": [{"targets": ["localhost:9400"]}]},
+        ]
+
+    @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
+    def test_scrape_config_no_specific_hardware(
+        self,
+        mock_exporters,
+    ):
+        # simulate a hardware that does not have NVIDIA or tools to install hw exporter
+        self.harness.begin()
+        config = self.harness.charm.model.config
+        smartctl_exporter = SmartCtlExporter(config)
+
+        mock_exporters.return_value = [smartctl_exporter]
+
+        assert self.harness.charm._scrape_config() == [
+            {"scrape_timeout": "10s"},
+            {"metrics_path": "/metrics", "static_configs": [{"targets": ["localhost:10201"]}]},
+        ]

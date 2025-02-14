@@ -5,7 +5,7 @@
 """Charm the application."""
 
 import logging
-from typing import Any, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -28,22 +28,6 @@ class HardwareObserverCharm(ops.CharmBase):
         super().__init__(*args)
         self.hw_tool_helper = HWToolHelper()
 
-        # Add refresh_events to COSAgentProvider to update relation data when
-        # config changed (default behavior) and upgrade charm. This is useful
-        # for updating alert rules.
-        self.cos_agent_provider = COSAgentProvider(
-            self,
-            refresh_events=[self.on.config_changed, self.on.upgrade_charm],
-            metrics_endpoints=[
-                {"path": "/metrics", "port": int(self.model.config["hardware-exporter-port"])},
-                {"path": "/metrics", "port": int(self.model.config["smartctl-exporter-port"])},
-                {"path": "/metrics", "port": 9400},
-            ],
-            # Setting scrape_timeout as collect_timeout in the `duration` format specified in
-            # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration
-            scrape_configs=[{"scrape_timeout": f"{int(self.model.config['collect-timeout'])}s"}],
-        )
-
         self._stored.set_default(
             # resource_installed is a flag that tracks the installation state for
             # the juju resources and also the different exporters
@@ -63,6 +47,15 @@ class HardwareObserverCharm(ops.CharmBase):
             self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
         )
         self.framework.observe(self.on.redetect_hardware_action, self._on_redetect_hardware)
+
+        # Add refresh_events to COSAgentProvider to update relation data when
+        # config changed (default behavior) and upgrade charm. This is useful
+        # for updating alert rules.
+        self.cos_agent_provider = COSAgentProvider(
+            self,
+            refresh_events=[self.on.config_changed, self.on.upgrade_charm],
+            scrape_configs=self._scrape_config,
+        )
 
         self.num_cos_agent_relations = self.get_num_cos_agent_relations("cos-agent")
 
@@ -297,6 +290,41 @@ class HardwareObserverCharm(ops.CharmBase):
             return False, "Ports must be unique for each exporter."
 
         return True, "Charm config is valid."
+
+    def _scrape_config(self) -> List[Dict[str, Any]]:
+        """Generate the scrape config as needed."""
+        # Setting scrape_timeout as collect_timeout in the `duration` format specified in
+        # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration
+        scrape_config: List[Dict[str, Any]] = [
+            {"scrape_timeout": f"{self.model.config['collect-timeout']}s"}
+        ]
+
+        for exporter in self.exporters:
+            if isinstance(exporter, HardwareExporter):
+                port = self.model.config["hardware-exporter-port"]
+                scrape_config.append(
+                    {
+                        "metrics_path": "/metrics",
+                        "static_configs": [{"targets": [f"localhost:{port}"]}],
+                    }
+                )
+            if isinstance(exporter, SmartCtlExporter):
+                port = self.model.config["smartctl-exporter-port"]
+                scrape_config.append(
+                    {
+                        "metrics_path": "/metrics",
+                        "static_configs": [{"targets": [f"localhost:{port}"]}],
+                    }
+                )
+            if isinstance(exporter, DCGMExporter):
+                port = 9400
+                scrape_config.append(
+                    {
+                        "metrics_path": "/metrics",
+                        "static_configs": [{"targets": [f"localhost:{port}"]}],
+                    }
+                )
+        return scrape_config
 
     @property
     def cos_agent_related(self) -> bool:
