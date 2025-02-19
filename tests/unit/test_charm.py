@@ -48,7 +48,8 @@ class TestCharm(unittest.TestCase):
                 notice_count += 1
         return notice_count
 
-    def test_harness(self) -> None:
+    @mock.patch("charm.HardwareObserverCharm._dashboards")
+    def test_harness(self, _) -> None:
         """Test charm initialize."""
         self.harness.begin()
         self.assertFalse(self.harness.charm._stored.resource_installed)
@@ -77,11 +78,19 @@ class TestCharm(unittest.TestCase):
             ),
         ]
     )
+    @mock.patch("charm.HardwareObserverCharm._dashboards")
     @mock.patch("charm.DCGMExporter")
     @mock.patch("charm.SmartCtlExporter")
     @mock.patch("charm.HardwareExporter")
     def test_exporters(
-        self, _, stored_tools, expect, mock_hw_exporter, mock_smart_exporter, mock_dcgm_exporter
+        self,
+        _,
+        stored_tools,
+        expect,
+        mock_hw_exporter,
+        mock_smart_exporter,
+        mock_dcgm_exporter,
+        mock_dashboards,
     ):
         with mock.patch(
             "charm.HardwareObserverCharm.stored_tools",
@@ -452,6 +461,7 @@ class TestCharm(unittest.TestCase):
             ),
         ]
     )
+    @mock.patch("charm.HardwareObserverCharm._dashboards")
     @mock.patch(
         "charm.detect_available_tools",
     )
@@ -462,6 +472,7 @@ class TestCharm(unittest.TestCase):
         detected_available_tools,
         expect_output,
         mock_detect_available_tools,
+        _,
     ) -> None:
         """Test action detect-hardware."""
         mock_detect_available_tools.return_value = detected_available_tools
@@ -793,7 +804,8 @@ class TestCharm(unittest.TestCase):
             result = self.harness.charm.validate_configs()
             self.assertEqual(result, expect)
 
-    def test_stored_tools_remove_legacy_smartctl(self):
+    @mock.patch("charm.HardwareObserverCharm._dashboards")
+    def test_stored_tools_remove_legacy_smartctl(self, _):
         self.harness.begin()
         self.harness.charm._stored.stored_tools = {"smartctl"}
         assert self.harness.charm.stored_tools == set()
@@ -832,3 +844,34 @@ class TestCharm(unittest.TestCase):
             {"scrape_timeout": "10s"},
             {"metrics_path": "/metrics", "static_configs": [{"targets": ["localhost:10201"]}]},
         ]
+
+    @mock.patch("service.get_bmc_address")
+    @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
+    def test_dashboards(self, mock_exporters, _):
+        self.harness.begin()
+        config = self.harness.charm.model.config
+        hw_exporter = HardwareExporter(Path(), config, set())
+        smartctl_exporter = SmartCtlExporter(config)
+        dcgm_exporter = DCGMExporter(config)
+
+        mock_exporters.return_value = [hw_exporter, smartctl_exporter, dcgm_exporter]
+
+        assert self.harness.charm._dashboards() == [
+            "./src/dashboards_hardware_exporter",
+            "./src/dashboards_smart_ctl",
+            "./src/dashboards_dcgm",
+        ]
+
+    @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
+    def test_dashboards_no_specific_hardware(
+        self,
+        mock_exporters,
+    ):
+        # simulate a hardware that does not have NVIDIA or tools to install hw exporter
+        self.harness.begin()
+        config = self.harness.charm.model.config
+        smartctl_exporter = SmartCtlExporter(config)
+
+        mock_exporters.return_value = [smartctl_exporter]
+
+        assert self.harness.charm._dashboards() == ["./src/dashboards_smart_ctl"]
