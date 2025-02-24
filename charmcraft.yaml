@@ -1,50 +1,22 @@
 # Learn more about charmcraft.yaml configuration at:
 # https://juju.is/docs/sdk/charmcraft-config
 # This is a template `charmcraft.yaml` file for ops charms
-# This file is managed by bootstack-charms-spec and should not be modified
-# within individual charm repos. https://launchpad.net/bootstack-charms-spec
 
 type: charm
 
 parts:
   charm:
+    plugin: charm
+    source: .
     build-packages: [git]
 
-bases:
-  - build-on:
-    - name: ubuntu
-      channel: "22.04"
-      architectures: ["amd64"]
-    run-on:
-      - name: ubuntu
-        channel: "24.04"
-        architectures:
-          - amd64
-      - name: ubuntu
-        channel: "22.04"
-        architectures:
-          - amd64
-      - name: ubuntu
-        channel: "20.04"
-        architectures:
-          - amd64
-  - build-on:
-    - name: ubuntu
-      channel: "22.04"
-      architectures: ["arm64"]
-    run-on:
-      - name: ubuntu
-        channel: "24.04"
-        architectures:
-          - arm64
-      - name: ubuntu
-        channel: "22.04"
-        architectures:
-          - arm64
-      - name: ubuntu
-        channel: "20.04"
-        architectures:
-          - arm64
+platforms:
+  ubuntu@20.04:amd64:
+  ubuntu@22.04:amd64:
+  ubuntu@24.04:amd64:
+  ubuntu@20.04:arm64:
+  ubuntu@22.04:arm64:
+  ubuntu@24.04:arm64:
 
 actions:
   redetect-hardware:
