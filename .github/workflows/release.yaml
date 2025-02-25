@@ -36,7 +36,7 @@ jobs:
       - name: Pack and upload to charmhub
         uses: canonical/charming-actions/upload-charm@2.6.2
         with:
-          charmcraft-channel: "2.x/stable"
+          charmcraft-channel: "3.x/stable"
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
           # Ensure the charm is built in an isolated environment and on the correct base in an lxd container.
