@@ -191,7 +191,7 @@ def required_resources(resources: list[Resource], provided_collectors: set) -> l
 @pytest.fixture(scope="module")
 def charm_path(base: str, architecture: str) -> Path:
     """Fixture to determine the charm path based on the base and architecture."""
-    glob_path = f"hardware-observer_*{base.replace('@', '-')}-{architecture}*.charm"
+    glob_path = f"hardware-observer_*{base}-{architecture}*.charm"
     paths = list(Path(".").glob(glob_path))
 
     if not paths:
