@@ -91,7 +91,7 @@ jobs:
         - 'tox -e func -- -v --base ubuntu@24.04 --keep-models'
         juju-channel: ["3.4/stable"]
         exclude:
-        # NOTE(rgildein): The grafana-agent does not support ubuntu@24.04 on arm64. See #347 
+        # NOTE: grafana-agent does not support ubuntu@24.04 on arm64. See https://github.com/canonical/grafana-agent-operator/issues/207
         - test-command: 'tox -e func -- -v --base ubuntu@24.04 --keep-models'
           runs-on: [Ubuntu_ARM64_4C_16G_01]
     steps:
@@ -116,7 +116,7 @@ jobs:
         with:
           provider: "lxd"
           juju-channel: ${{ matrix.juju-channel }}
-          charmcraft-channel: "2.x/stable"
+          charmcraft-channel: "3.x/stable"
 
         # This is used by zaza in the functional tests for non-amd64 architectures (if applicable)
       - name: Set zaza juju model constraints for architecture
