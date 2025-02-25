@@ -27,7 +27,7 @@ jobs:
         with:
           provider: "lxd"
           juju-channel: ${{ matrix.juju-channel }}
-          charmcraft-channel: "2.x/stable"
+          charmcraft-channel: "3.x/stable"
 
         # The charm is built already in the check workflow and available as an artifact,
         # but we want this TICS workflow to be independent,
