@@ -101,7 +101,7 @@ jobs:
       - name: Upload the built charms
         uses: actions/upload-artifact@v4
         with:
-          name: charm_${{ env.SYSTEM_ARCH }}
+          name: built_charm_${{ env.SYSTEM_ARCH }}
           path: ./*.charm
 
   func:
