@@ -72,6 +72,17 @@ jobs:
     - name: Run unit tests
       run: tox -e unit
 
+    - name: Determine system architecture
+      run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
+
+    - name: Upload Unit Test Coverage File
+      uses: actions/upload-artifact@v4
+      with:
+        include-hidden-files: true
+        if-no-files-found: ignore
+        name: coverage-unit-${{ env.SYSTEM_ARCH }}
+        path: .coverage-unit
+
   func:
     needs:
       - lint
@@ -118,10 +129,13 @@ jobs:
           juju-channel: ${{ matrix.juju-channel }}
           charmcraft-channel: "3.x/stable"
 
+      - name: Determine system architecture
+        run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
+
         # This is used by zaza in the functional tests for non-amd64 architectures (if applicable)
       - name: Set zaza juju model constraints for architecture
         run: |
-          if [ "$(uname -m)" = "aarch64" ]; then
+          if [ "$SYSTEM_ARCH" = "aarch64" ]; then
             echo "TEST_MODEL_CONSTRAINTS=arch=arm64" >> "$GITHUB_ENV"
           fi
 
@@ -144,6 +158,14 @@ jobs:
         env:
           TEST_JUJU3: "1"  # https://github.com/openstack-charmers/zaza/pull/653
           TEST_JUJU_CHANNEL: ${{ matrix.juju-channel }}
+
+      - name: Upload Functional Test Coverage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          include-hidden-files: true
+          if-no-files-found: ignore
+          name: coverage-functional-${{ env.SYSTEM_ARCH }}
+          path: .coverage-functional
 
       # Save output for debugging
 
@@ -181,3 +203,49 @@ jobs:
         with:
           name: "juju-crashdumps-${{ env.CRASHDUMPS_ARTEFACT_SUFFIX }}"
           path: "${{ env.CRASHDUMPS_DIR }}/juju-crashdump-*.tar.xz"
+
+  tics-analysis:
+    runs-on: ubuntu-22.04
+    needs: func
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install coverage tools
+        run: |
+          pip install coverage
+      - name: Determine system architecture
+        run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
+
+      - name: Download Coverage Files
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*-${{ env.SYSTEM_ARCH }}
+          merge-multiple: true
+          path: artifacts/
+        continue-on-error: true
+
+      - name: Merge coverage reports
+        run: |
+          # Create the path that is expected to have a coverage.xml for tics
+          mkdir -p tests/report/
+          coverage_files=$(echo ./artifacts/.coverage-*)
+          if [ -n "$coverage_files" ]; then
+            echo "Merging coverage files: $coverage_files"
+            coverage combine $coverage_files
+            coverage xml -o tests/report/coverage.xml
+          else
+            echo "No coverage files found, skipping merge"
+            # Create an empty file to avoid downstream failure
+            touch tests/report/coverage.xml
+          fi
+      - name: Run TICS analysis
+        uses: tiobe/tics-github-action@v3
+        with:
+          mode: qserver
+          project: hardware-observer-operator
+          viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
+          branchdir: ${{ github.workspace }}
+          ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
+          installTics: true
