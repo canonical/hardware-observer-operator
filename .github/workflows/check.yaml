@@ -159,12 +159,17 @@ jobs:
           TEST_JUJU3: "1"  # https://github.com/openstack-charmers/zaza/pull/653
           TEST_JUJU_CHANNEL: ${{ matrix.juju-channel }}
 
+      - name: Generate Safe Test Command Identifier by removing spaces and special characters
+        run: |
+          TEST_CMD_ID=$(echo "${{ matrix.test-command }}" | sed 's/[^a-zA-Z0-9]/_/g')
+          echo "TEST_CMD_ID=$TEST_CMD_ID" >> $GITHUB_ENV
+
       - name: Upload Functional Test Coverage Artifact
         uses: actions/upload-artifact@v4
         with:
           include-hidden-files: true
           if-no-files-found: ignore
-          name: coverage-functional-${{ env.SYSTEM_ARCH }}
+          name: coverage-functional-${{ env.TEST_CMD_ID }}-${{ env.SYSTEM_ARCH }}
           path: .coverage-functional
 
       # Save output for debugging
