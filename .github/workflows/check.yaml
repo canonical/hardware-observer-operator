@@ -72,6 +72,7 @@ jobs:
     - name: Run unit tests
       run: tox -e unit
 
+
     - name: Determine system architecture
       run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
