@@ -72,7 +72,6 @@ jobs:
     - name: Run unit tests
       run: tox -e unit
 
-
     - name: Determine system architecture
       run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
@@ -81,7 +80,7 @@ jobs:
       with:
         include-hidden-files: true
         if-no-files-found: ignore
-        name: coverage-unit-${{ env.SYSTEM_ARCH }}
+        name: coverage-unit-${{ matrix.python-version }}-${{ env.SYSTEM_ARCH }}
         path: .coverage-unit
 
   func:
