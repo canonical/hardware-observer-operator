@@ -19,25 +19,25 @@ jobs:
   release:
     needs: check
     runs-on: ${{ matrix.runs-on }}
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on: [[ubuntu-22.04], [Ubuntu_ARM64_4C_16G_01]]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: true
 
-      - name: Initialize lxd  # This should dropped once it's implemented on charming-actions itself. https://github.com/canonical/charming-actions/issues/140
-        # revision is latest main at time of writing; using because it contains a fix to https://github.com/canonical/setup-lxd/issues/19
-        uses: canonical/setup-lxd@2aa6f7caf7d1484298a64192f7f63a6684e648a4
+      - name: Download the tested charms
+        uses: actions/download-artifact@v4
+        with:
+          pattern: built_charms_*
+          merge-multiple: true
+
+      - name: List the names of the tested charms
+        run: |
+          echo "CHARM_NAMES=$(ls *.charm | paste -sd ,)" | tee -a "$GITHUB_ENV"
 
       - name: Pack and upload to charmhub
-        uses: canonical/charming-actions/upload-charm@2.6.2
+        uses: canonical/charming-actions/upload-charm@2.7.0
         with:
-          charmcraft-channel: "3.x/stable"
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
-          # Ensure the charm is built in an isolated environment and on the correct base in an lxd container.
-          destructive-mode: false
+          built-charm-path: "${{ env.CHARM_NAMES }}"
