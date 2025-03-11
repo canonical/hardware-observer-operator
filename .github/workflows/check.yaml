@@ -80,7 +80,7 @@ jobs:
       with:
         include-hidden-files: true
         if-no-files-found: ignore
-        name: coverage-unit-${{ env.SYSTEM_ARCH }}
+        name: coverage-unit-${{ matrix.python-version }}-${{ env.SYSTEM_ARCH }}
         path: .coverage-unit
 
   func:
