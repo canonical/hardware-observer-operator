@@ -197,7 +197,7 @@ def parse_metrics(metrics_input: str) -> dict[str, list[Metric]]:
             parsed_metrics["ipmi_sel"].append(metric)
         elif name.startswith("ipmi"):
             parsed_metrics["ipmi_sensor"].append(metric)
-        elif name.startswith("poweredgeraid"):
+        elif name.startswith("poweredgeraid") or name.startswith("perccli"):
             parsed_metrics["poweredge_raid"].append(metric)
         elif name.startswith("megaraid") or name.startswith("storcli"):
             parsed_metrics["mega_raid"].append(metric)

@@ -238,8 +238,8 @@ class TestCharmWithHW:
 
     async def test_no_redfish_config(self, unit, ops_test, provided_collectors):
         """Test that there is no Redfish options because it's not available on lxd machines."""
-        if not provided_collectors:
-            pytest.skip("No collectors provided, skipping test")
+        if "redfish" in provided_collectors:
+            pytest.skip("redfish in provided collectors, skipping test")
 
         try:
             config = await get_hardware_exporter_config(ops_test, unit.name)
@@ -375,7 +375,7 @@ class TestCharmWithHW:
             config = await get_hardware_exporter_config(ops_test, unit.name)
         except HardwareExporterConfigError:
             pytest.fail("Not able to obtain hardware-exporter config!")
-        assert config["redfish_client_timeout"] == int(new_timeout)
+        assert config["redfish_client_timeout"] == new_timeout
 
         await app.reset_config(["collect-timeout"])
 
