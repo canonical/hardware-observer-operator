@@ -753,9 +753,9 @@ async def test_on_remove_event(app, ops_test, nvidia_present):
         lambda: ops_test.model.applications[APP_NAME].status == "unknown"
     )
 
-    if assert_snap_installed(ops_test, principal_unit.name, "smartctl-exporter"):
+    if await assert_snap_installed(ops_test, principal_unit.name, "smartctl-exporter"):
         pytest.fail("smartctl-exporter snap has not been removed")
-    if nvidia_present and assert_snap_installed(ops_test, principal_unit.name, "dcgm"):
+    if nvidia_present and await assert_snap_installed(ops_test, principal_unit.name, "dcgm"):
         pytest.fail("dcgm snap has not been removed")
 
     cmd = "ls /etc/hardware-exporter-config.yaml"
