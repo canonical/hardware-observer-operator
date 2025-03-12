@@ -252,7 +252,7 @@ jobs:
 
       - name: Install coverage tools
         run: |
-          pip install coverage
+          pip install coverage[toml]
       - name: Determine system architecture
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
