@@ -243,7 +243,7 @@ jobs:
           path: "${{ env.CRASHDUMPS_DIR }}/juju-crashdump-*.tar.xz"
 
   tics-analysis:
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, linux, amd64, tiobe, jammy]
     needs: func
     steps:
       - uses: actions/checkout@v4
