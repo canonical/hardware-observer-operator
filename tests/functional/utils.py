@@ -1,5 +1,6 @@
 """Helper functions to run functional tests for hardware-observer."""
 
+import json
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -47,6 +48,12 @@ class MetricsFetchError(Exception):
 
 class HardwareExporterConfigError(Exception):
     """Raise if something goes wrong when getting hardware-exporter config."""
+
+    pass
+
+
+class SnapConfigError(Exception):
+    """Raise if something goes wrong when getting snap config."""
 
     pass
 
@@ -100,6 +107,15 @@ async def get_hardware_exporter_metrics(
         raise MetricsFetchError
     parsed_metrics = parse_hardware_exporter_metrics(results.get("stdout").strip())
     return parsed_metrics
+
+
+async def get_snap_config(ops_test, unit_name: str, snap_name: str) -> dict:
+    """Return snap config from unit."""
+    command = f"snap get {snap_name} -d"
+    results = await run_command_on_unit(ops_test, unit_name, command)
+    if results.get("return-code") > 0:
+        raise SnapConfigError
+    return json.loads(results.get("stdout"))
 
 
 async def assert_snap_installed(ops_test, unit_name: str, snap_name: str) -> bool:

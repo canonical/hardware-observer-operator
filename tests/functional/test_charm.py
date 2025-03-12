@@ -17,11 +17,13 @@ from utils import (
     RESOURCES_DIR,
     HardwareExporterConfigError,
     MetricsFetchError,
+    SnapConfigError,
     assert_metrics,
     assert_snap_installed,
     get_generic_exporter_metrics,
     get_hardware_exporter_config,
     get_hardware_exporter_metrics,
+    get_snap_config,
     run_command_on_unit,
 )
 
@@ -377,6 +379,27 @@ class TestCharmWithHW:
         results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
         assert results.get("return-code") == 0
         assert results.get("stdout").strip() == "active"
+
+    async def test_smarctl_exporter_config_changed_port(
+        self, app, unit, ops_test, provided_collectors
+    ):
+        """Test changing the config option: smartctl-exporter-port."""
+        if not provided_collectors:
+            pytest.skip("No collectors provided, skipping test")
+
+        new_port = "10002"
+        await asyncio.gather(
+            app.set_config({"smartctl-exporter-port": new_port}),
+            ops_test.model.wait_for_idle(apps=[APP_NAME]),
+        )
+
+        try:
+            config = await get_snap_config(ops_test, unit.name, "smartctl-exporter")
+        except SnapConfigError:
+            pytest.fail("Not able to obtain smartctl-exporter config!")
+        assert config["web"]["listen-address"] == f":{new_port}"
+
+        await app.reset_config(["smartctl-exporter-port"])
 
     async def test_dcgm_exporter_snap_available(self, ops_test, app, unit, nvidia_present):
         """Test if dcgm exporter snap is installed and ranning on the unit.
