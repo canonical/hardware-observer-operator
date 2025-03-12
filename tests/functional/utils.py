@@ -85,7 +85,7 @@ async def get_generic_exporter_metrics(
 
     Raises MetricsFetchError if command to fetch metrics didn't execute successfully.
     """
-    command = f"curl -s localhost:{port}"
+    command = f"curl -s localhost:{port}/metrics"
     results = await run_command_on_unit(ops_test, unit_name, command)
     if results.get("return-code") > 0:
         raise MetricsFetchError

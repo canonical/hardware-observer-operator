@@ -239,19 +239,26 @@ class TestCharmWithHW:
 
         await app.reset_config(["hardware-exporter-port"])
 
-    async def test_smartctl_exporter_metrics(self, ops_test, app, unit):
-        """Test if smartctl exporter metrics are available."""
-        try:
-            # smartctl exporter runs on port 10201 (check config.yaml)
-            metrics = await get_generic_exporter_metrics(ops_test, unit.name, 10201, "smartctl")
-        except MetricsFetchError:
-            pytest.fail("Not able to obtain metrics!")
+    async def test_smarctl_exporter_config_changed_port(
+        self, app, unit, ops_test, provided_collectors
+    ):
+        """Test changing the config option: smartctl-exporter-port."""
+        if not provided_collectors:
+            pytest.skip("No collectors provided, skipping test")
 
-        expected_metric_values = {
-            "smartctl_version": 1.0,
-        }
-        if not assert_metrics(metrics, expected_metric_values):
-            pytest.fail("Expected metrics not present!")
+        new_port = "10002"
+        await asyncio.gather(
+            app.set_config({"smartctl-exporter-port": new_port}),
+            ops_test.model.wait_for_idle(apps=[APP_NAME]),
+        )
+
+        try:
+            config = await get_snap_config(ops_test, unit.name, "smartctl-exporter")
+        except SnapConfigError:
+            pytest.fail("Not able to obtain smartctl-exporter config!")
+        assert config["web"]["listen-address"] == f":{new_port}"
+
+        await app.reset_config(["smartctl-exporter-port"])
 
     async def test_config_changed_log_level(self, app, unit, ops_test, provided_collectors):
         """Test changing the config option: exporter-log-level."""
@@ -394,27 +401,6 @@ class TestCharmWithHW:
         assert results.get("return-code") == 0
         assert results.get("stdout").strip() == "active"
 
-    async def test_smarctl_exporter_config_changed_port(
-        self, app, unit, ops_test, provided_collectors
-    ):
-        """Test changing the config option: smartctl-exporter-port."""
-        if not provided_collectors:
-            pytest.skip("No collectors provided, skipping test")
-
-        new_port = "10002"
-        await asyncio.gather(
-            app.set_config({"smartctl-exporter-port": new_port}),
-            ops_test.model.wait_for_idle(apps=[APP_NAME]),
-        )
-
-        try:
-            config = await get_snap_config(ops_test, unit.name, "smartctl-exporter")
-        except SnapConfigError:
-            pytest.fail("Not able to obtain smartctl-exporter config!")
-        assert config["web"]["listen-address"] == f":{new_port}"
-
-        await app.reset_config(["smartctl-exporter-port"])
-
     async def test_dcgm_exporter_snap_available(self, ops_test, app, unit, nvidia_present):
         """Test if dcgm exporter snap is installed and ranning on the unit.
 
@@ -472,6 +458,20 @@ class TestCharmWithHW:
             pytest.fail("Not able to obtain metrics!")
 
         assert metrics.get(collector), f"{collector} specific metrics are not available."
+
+    async def test_smartctl_exporter_metrics(self, ops_test, app, unit):
+        """Test if smartctl exporter metrics are available."""
+        try:
+            # smartctl exporter runs on port 10201 (check config.yaml)
+            metrics = await get_generic_exporter_metrics(ops_test, unit.name, 10201, "smartctl")
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        expected_metric_values = {
+            "smartctl_version": 1.0,
+        }
+        if not assert_metrics(metrics, expected_metric_values):
+            pytest.fail("Expected metrics not present!")
 
     async def test_redfish_metrics(self, ops_test, app, unit, provided_collectors):  # noqa: C901
         """Tests for redfish specific metrics."""
