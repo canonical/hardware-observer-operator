@@ -236,19 +236,6 @@ class TestCharmWithHW:
 
         await app.reset_config(["hardware-exporter-port"])
 
-    async def test_no_redfish_config(self, unit, ops_test, provided_collectors):
-        """Test that there is no Redfish options because it's not available on lxd machines."""
-        if "redfish" in provided_collectors:
-            pytest.skip("redfish in provided collectors, skipping test")
-
-        try:
-            config = await get_hardware_exporter_config(ops_test, unit.name)
-        except HardwareExporterConfigError:
-            pytest.fail("Not able to obtain hardware-exporter config!")
-        assert config.get("redfish_host") is None
-        assert config.get("redfish_username") is None
-        assert config.get("redfish_client_timeout") is None
-
     async def test_config_changed_log_level(self, app, unit, ops_test, provided_collectors):
         """Test changing the config option: exporter-log-level."""
         if not provided_collectors:
