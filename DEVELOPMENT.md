@@ -1,6 +1,8 @@
-# Contributing
+# Development
 
-To make contributions to this charm, you'll need a working [development setup](https://juju.is/docs/sdk/dev-setup).
+## Setup environment
+
+To start working on this charm, you'll need a working [development setup](https://juju.is/docs/sdk/dev-setup).
 
 You can create an environment for development with `tox`:
 
