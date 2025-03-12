@@ -19,8 +19,9 @@ from utils import (
     MetricsFetchError,
     assert_metrics,
     assert_snap_installed,
+    get_generic_exporter_metrics,
     get_hardware_exporter_config,
-    get_metrics_output,
+    get_hardware_exporter_metrics,
     run_command_on_unit,
 )
 
@@ -339,8 +340,8 @@ class TestCharmWithHW:
             ):
                 with attempt:
                     logging.info(f"Fetching metrics attempt #{attempt.retry_state.attempt_number}")
-                    get_metrics_output.cache_clear()  # clear empty metrics from cache
-                    metrics = await get_metrics_output(ops_test, unit.name)
+                    get_hardware_exporter_metrics.cache_clear()  # clear empty metrics from cache
+                    metrics = await get_hardware_exporter_metrics(ops_test, unit.name)
                     await ops_test.model.wait_for_idle(apps=[APP_NAME])
         except RetryError:
             pytest.fail("Not able to obtain metrics!")
@@ -394,6 +395,33 @@ class TestCharmWithHW:
         assert results.get("return-code") == 0
         assert results.get("stdout").strip() == "active"
 
+    async def test_smartctl_exporter_metrics(self, ops_test, app, unit):
+        """Test if smartctl exporter metrics are available."""
+        try:
+            # smartctl exporter runs on port 10201 (check config.yaml)
+            metrics = await get_generic_exporter_metrics(ops_test, unit.name, 10201, "smartctl")
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        expected_metric_values = {
+            "smartctl_version": 1.0,
+        }
+        if not assert_metrics(metrics, expected_metric_values):
+            pytest.fail("Expected metrics not present!")
+
+    async def test_dcgm_exporter_metrics(self, ops_test, app, unit, nvidia_present):
+        """Test if dcgm exporter metrics are available."""
+        if not nvidia_present:
+            pytest.skip("dcgm not in provided collectors, skipping test")
+
+        try:
+            # DCGM exporter runs on port 9400
+            metrics = await get_generic_exporter_metrics(ops_test, unit.name, 9400, "DCGM")
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        assert metrics, "Metrics result should not be empty"
+
     @pytest.mark.parametrize(
         "collector",
         [
@@ -416,7 +444,7 @@ class TestCharmWithHW:
 
         # collector is available, proceed to run collector specific tests
         try:
-            metrics = await get_metrics_output(ops_test, unit.name)
+            metrics = await get_hardware_exporter_metrics(ops_test, unit.name)
         except MetricsFetchError:
             pytest.fail("Not able to obtain metrics!")
 
@@ -428,7 +456,7 @@ class TestCharmWithHW:
             pytest.skip("redfish not in provided collectors, skipping test")
 
         try:
-            metrics = await get_metrics_output(ops_test, unit.name)
+            metrics = await get_hardware_exporter_metrics(ops_test, unit.name)
         except MetricsFetchError:
             pytest.fail("Not able to obtain metrics!")
 
@@ -445,7 +473,7 @@ class TestCharmWithHW:
             pytest.skip("poweredge_raid not in provided collectors, skipping test")
 
         try:
-            metrics = await get_metrics_output(ops_test, unit.name)
+            metrics = await get_hardware_exporter_metrics(ops_test, unit.name)
         except MetricsFetchError:
             pytest.fail("Not able to obtain metrics!")
 
@@ -462,7 +490,7 @@ class TestCharmWithHW:
             pytest.skip("mega_raid not in provided collectors, skipping test")
 
         try:
-            metrics = await get_metrics_output(ops_test, unit.name)
+            metrics = await get_hardware_exporter_metrics(ops_test, unit.name)
         except MetricsFetchError:
             pytest.fail("Not able to obtain metrics!")
 
@@ -478,7 +506,7 @@ class TestCharmWithHW:
             pytest.skip("ipmi_dcmi not in provided collectors, skipping test")
 
         try:
-            metrics = await get_metrics_output(ops_test, unit.name)
+            metrics = await get_hardware_exporter_metrics(ops_test, unit.name)
         except MetricsFetchError:
             pytest.fail("Not able to obtain metrics!")
 
@@ -494,7 +522,7 @@ class TestCharmWithHW:
             pytest.skip("ipmi_sensor not in provided collectors, skipping test")
 
         try:
-            metrics = await get_metrics_output(ops_test, unit.name)
+            metrics = await get_hardware_exporter_metrics(ops_test, unit.name)
         except MetricsFetchError:
             pytest.fail("Not able to obtain metrics!")
 
@@ -510,7 +538,7 @@ class TestCharmWithHW:
             pytest.skip("ipmi_sel not in provided collectors, skipping test")
 
         try:
-            metrics = await get_metrics_output(ops_test, unit.name)
+            metrics = await get_hardware_exporter_metrics(ops_test, unit.name)
         except MetricsFetchError:
             pytest.fail("Not able to obtain metrics!")
 
@@ -535,7 +563,7 @@ class TestCharmWithHW:
             pytest.skip(f"{collector} not in provided collectors, skipping test")
 
         try:
-            metrics = await get_metrics_output(ops_test, unit.name)
+            metrics = await get_hardware_exporter_metrics(ops_test, unit.name)
         except MetricsFetchError:
             pytest.fail("Not able to obtain metrics!")
 
@@ -551,7 +579,7 @@ class TestCharmWithHW:
             pytest.skip("hpe_ssa not in provided collectors, skipping test")
 
         try:
-            metrics = await get_metrics_output(ops_test, unit.name)
+            metrics = await get_hardware_exporter_metrics(ops_test, unit.name)
         except MetricsFetchError:
             pytest.fail("Not able to obtain metrics!")
 
@@ -689,7 +717,7 @@ class TestCharmWithHW:
 
 
 @pytest.mark.abort_on_fail
-async def test_on_remove_event(app, ops_test):
+async def test_on_remove_event(app, ops_test, nvidia_present):
     """Test _on_remove event cleans up the service on the host machine."""
     await asyncio.gather(
         app.remove_relation(f"{APP_NAME}:general-info", f"{PRINCIPAL_APP_NAME}:juju-info"),
@@ -701,6 +729,11 @@ async def test_on_remove_event(app, ops_test):
     await ops_test.model.block_until(
         lambda: ops_test.model.applications[APP_NAME].status == "unknown"
     )
+
+    if assert_snap_installed(ops_test, principal_unit.name, "smartctl-exporter"):
+        pytest.fail("smartctl-exporter snap has not been removed")
+    if nvidia_present and assert_snap_installed(ops_test, principal_unit.name, "dcgm"):
+        pytest.fail("dcgm snap has not been removed")
 
     cmd = "ls /etc/hardware-exporter-config.yaml"
     results = await run_command_on_unit(ops_test, principal_unit.name, cmd)

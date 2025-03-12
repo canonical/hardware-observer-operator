@@ -51,7 +51,8 @@ class HardwareExporterConfigError(Exception):
     pass
 
 
-async def run_command_on_unit(ops_test, unit_name, command):
+async def run_command_on_unit(ops_test, unit_name: str, command: str) -> dict:
+    """Run command on unit and return results."""
     complete_command = ["exec", "--unit", unit_name, "--", *command.split()]
     return_code, stdout, _ = await ops_test.juju(*complete_command)
     results = {
@@ -70,9 +71,26 @@ async def get_hardware_exporter_config(ops_test, unit_name) -> dict:
     return yaml.safe_load(results.get("stdout"))
 
 
+async def get_generic_exporter_metrics(
+    ops_test, unit_name: str, port: int, metric_name: str
+) -> Optional[list[Metric]]:
+    """Return parsed prometheus metric output from Smartctl Exporter on unit.
+
+    Raises MetricsFetchError if command to fetch metrics didn't execute successfully.
+    """
+    command = f"curl -s localhost:{port}"
+    results = await run_command_on_unit(ops_test, unit_name, command)
+    if results.get("return-code") > 0:
+        raise MetricsFetchError
+    parsed_metrics = parse_generic_exporter_metrics(results.get("stdout").strip(), metric_name)
+    return parsed_metrics
+
+
 @alru_cache
-async def get_metrics_output(ops_test, unit_name) -> Optional[dict[str, list[Metric]]]:
-    """Return parsed prometheus metric output from endpoint on unit.
+async def get_hardware_exporter_metrics(
+    ops_test, unit_name: str
+) -> Optional[dict[str, list[Metric]]]:
+    """Return parsed prometheus metric output from Hardware Exporter on unit.
 
     Raises MetricsFetchError if command to fetch metrics didn't execute successfully.
     """
@@ -80,7 +98,7 @@ async def get_metrics_output(ops_test, unit_name) -> Optional[dict[str, list[Met
     results = await run_command_on_unit(ops_test, unit_name, command)
     if results.get("return-code") > 0:
         raise MetricsFetchError
-    parsed_metrics = parse_metrics(results.get("stdout").strip())
+    parsed_metrics = parse_hardware_exporter_metrics(results.get("stdout").strip())
     return parsed_metrics
 
 
@@ -144,7 +162,37 @@ def _parse_single_metric(metric: str) -> Optional[Metric]:
         return None
 
 
-def parse_metrics(metrics_input: str) -> dict[str, list[Metric]]:
+def parse_generic_exporter_metrics(metrics_input: str, metric_name: str) -> list[Metric]:
+    """Parse raw metrics and return a list of parsed Metric Objects.
+
+    For example, parsing this metrics_input for metric_name "smartctl",
+        # HELP smartctl_device_smart_status General smart status
+        # TYPE smartctl_device_smart_status gauge
+        smartctl_device_smart_status{device="nvme0"} 1
+
+        # HELP smartctl_device_power_cycle_count Device power cycle count
+        # TYPE smartctl_device_power_cycle_count counter
+        smartctl_device_power_cycle_count{device="nvme0"} 495
+
+    would return,
+        [
+            Metric(name='smartctl_device_smart_status', labels='device="nvme0"', value=1.0),
+            Metric(name='smartctl_device_power_cycle_count', labels='device="nvme0"', value=495.0)
+        ]
+    """
+    parsed_metrics = []
+    for line in metrics_input.split("\n"):
+        metric = _parse_single_metric(line)
+        if not metric:
+            continue
+
+        name = metric.name
+        if name.startswith(metric_name):
+            parsed_metrics.append(metric)
+    return parsed_metrics
+
+
+def parse_hardware_exporter_metrics(metrics_input: str) -> dict[str, list[Metric]]:
     """Parse raw metrics and return dictionary of parsed Metric objects for each collector.
 
     For example, parsing this metrics_input,
