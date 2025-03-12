@@ -239,6 +239,20 @@ class TestCharmWithHW:
 
         await app.reset_config(["hardware-exporter-port"])
 
+    async def test_smartctl_exporter_metrics(self, ops_test, app, unit):
+        """Test if smartctl exporter metrics are available."""
+        try:
+            # smartctl exporter runs on port 10201 (check config.yaml)
+            metrics = await get_generic_exporter_metrics(ops_test, unit.name, 10201, "smartctl")
+        except MetricsFetchError:
+            pytest.fail("Not able to obtain metrics!")
+
+        expected_metric_values = {
+            "smartctl_version": 1.0,
+        }
+        if not assert_metrics(metrics, expected_metric_values):
+            pytest.fail("Expected metrics not present!")
+
     async def test_config_changed_log_level(self, app, unit, ops_test, provided_collectors):
         """Test changing the config option: exporter-log-level."""
         if not provided_collectors:
@@ -417,20 +431,6 @@ class TestCharmWithHW:
         results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
         assert results.get("return-code") == 0
         assert results.get("stdout").strip() == "active"
-
-    async def test_smartctl_exporter_metrics(self, ops_test, app, unit):
-        """Test if smartctl exporter metrics are available."""
-        try:
-            # smartctl exporter runs on port 10201 (check config.yaml)
-            metrics = await get_generic_exporter_metrics(ops_test, unit.name, 10201, "smartctl")
-        except MetricsFetchError:
-            pytest.fail("Not able to obtain metrics!")
-
-        expected_metric_values = {
-            "smartctl_version": 1.0,
-        }
-        if not assert_metrics(metrics, expected_metric_values):
-            pytest.fail("Expected metrics not present!")
 
     async def test_dcgm_exporter_metrics(self, ops_test, app, unit, nvidia_present):
         """Test if dcgm exporter metrics are available."""
