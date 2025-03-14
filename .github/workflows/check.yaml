@@ -131,7 +131,7 @@ jobs:
       fail-fast: false
       matrix:
         runs-on: [[ubuntu-22.04], [Ubuntu_ARM64_4C_16G_01]]
-        test-command: ['tox -e func -- -v --base ubuntu@20.04 --keep-models', 'tox -e func -- -v --base ubuntu@22.04 --keep-models', 'if [ "$(uname -m)" = "aarch64" ]; then echo "skipping func tests on ubuntu@24.04/arm64"; else tox -e func -- -v --base ubuntu@24.04 --keep-models; fi' ]
+        test-command: ['tox -e func -- -v --base ubuntu@20.04 --keep-models', 'tox -e func -- -v --base ubuntu@22.04 --keep-models', 'tox -e func -- -v --base ubuntu@24.04 --keep-models' ]
         juju-channel: ["3.4/stable"]
     steps:
       - uses: actions/checkout@v4
