@@ -202,7 +202,7 @@ jobs:
         with:
           include-hidden-files: true
           if-no-files-found: ignore
-          name: coverage-functional-${{ env.SYSTEM_ARCH }}
+          name: coverage-functional-${{ env.TEST_CMD_ID }}-${{ env.SYSTEM_ARCH }}
           path: .coverage-func
 
       # Save output for debugging
@@ -243,10 +243,7 @@ jobs:
           path: "${{ env.CRASHDUMPS_DIR }}/juju-crashdump-*.tar.xz"
 
   tics-analysis:
-    runs-on: ubuntu-22.04
-    if: >
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: [self-hosted, linux, amd64, tiobe, jammy]
     needs: func
     steps:
       - uses: actions/checkout@v4
@@ -255,8 +252,7 @@ jobs:
 
       - name: Install coverage tools
         run: |
-          pip install coverage
-
+          pip install coverage[toml]
       - name: Determine system architecture
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
@@ -273,11 +269,11 @@ jobs:
           # Create the path that is expected to have a coverage.xml for tics
           mkdir -p tests/report/
 
-          coverage_files=./artifacts/.coverage*
+          coverage_files=(./artifacts/.coverage*)
 
-          if [ -n "$coverage_files" ]; then
-            echo "Merging coverage files: $coverage_files"
-            coverage combine $coverage_files
+          if [ -e "${coverage_files[0]}" ]; then
+            echo "Merging coverage files: ${coverage_files[*]}"
+            coverage combine "${coverage_files[@]}"
             coverage xml -o tests/report/coverage.xml
           else
             echo "No coverage files found, skipping merge"
