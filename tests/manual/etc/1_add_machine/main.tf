@@ -9,7 +9,7 @@ terraform {
 
 provider "juju" {}
 
-resource "juju_model" "hw_obs" {
+resource "juju_model" "hw-obs" {
   name = "hw-obs"
 
   cloud {
@@ -18,7 +18,7 @@ resource "juju_model" "hw_obs" {
 }
 
 resource "juju_machine" "machine" {
-  model = juju_model.hw_obs.name
+  model = juju_model.hw-obs.name
 
   ssh_address      = var.ssh_address
   public_key_file  = var.public_key_file
@@ -27,7 +27,7 @@ resource "juju_machine" "machine" {
 
 resource "juju_application" "ubuntu" {
   name  = "ubuntu"
-  model = juju_model.hw_obs.name
+  model = juju_model.hw-obs.name
 
   units     = 1
   placement = juju_machine.machine.machine_id
@@ -41,7 +41,7 @@ resource "juju_application" "ubuntu" {
 
 resource "juju_application" "microk8s" {
   name  = "microk8s"
-  model = juju_model.hw_obs.name
+  model = juju_model.hw-obs.name
 
   units     = 1
   placement = juju_machine.machine.machine_id
@@ -58,7 +58,7 @@ resource "juju_application" "microk8s" {
 
 resource "juju_application" "hardware-observer" {
   name  = "hardware-observer"
-  model = juju_model.hw_obs.name
+  model = juju_model.hw-obs.name
 
   units = 0
 
@@ -69,7 +69,7 @@ resource "juju_application" "hardware-observer" {
 }
 
 resource "juju_integration" "ubuntu-to-hardware-observer" {
-  model = juju_model.hw_obs.name
+  model = juju_model.hw-obs.name
 
   application {
     name     = juju_application.ubuntu.name

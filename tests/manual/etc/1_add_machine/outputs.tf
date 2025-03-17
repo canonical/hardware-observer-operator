@@ -1,7 +1,6 @@
-output "model_name" {
-  value = juju_model.hw_obs.name
+output "machine_model" {
+  value = juju_model.hw-obs.name
 }
-
 output "ubuntu_name" {
   value = juju_application.ubuntu.name
 }
