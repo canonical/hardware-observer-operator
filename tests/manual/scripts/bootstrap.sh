@@ -23,7 +23,9 @@ fi
 
 # Install nvidia package
 sudo ubuntu-drivers --gpgpu install
-sudo modprobe nvidia
+if [ ! sudo modprobe nvidia ]; then
+    echo "Failed to add nvidia kernel module"
+fi
 
 # Workaround for https://bugs.launchpad.net/juju/+bug/1964513
 USER=$(whoami)
