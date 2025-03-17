@@ -10,7 +10,7 @@
   - [ ] lsi_sas_3
   - [ ] mega_raid
   - [ ] poweredge_raid
-- [x] DCGM Exporter (nvidia)
+- [x] DCGM Exporter (require NVIDIA)
   - [x] dcgm
-- [x] Smartctl Exporter (smart disks)
-    [x] smartctl
+- [x] Smartctl Exporter (require S.M.A.R.T disks)
+  - [x] smartctl
