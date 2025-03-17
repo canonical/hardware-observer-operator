@@ -10,7 +10,7 @@ terraform {
 provider "juju" {}
 
 module "grafana-agent" {
-  source = "git::https://github.com/chanchiwai-ray/snap-openstack.git//sunbeam-python/sunbeam/features/observability/etc/deploy-grafana-agent?ref=fix-observability-feature"
+  source = "git::https://github.com/canonical/snap-openstack.git//sunbeam-python/sunbeam/features/observability/etc/deploy-grafana-agent"
 
   grafana-agent-base             = var.grafana_agent_base
   grafana-agent-channel          = "latest/stable"
