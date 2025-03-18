@@ -8,7 +8,7 @@ machine.
 > You can only submit job defined in this directory!
 
 The `./submit.sh` script is a simple wrapper for `testflinger submit` that allow user to submit the jobs with customize
-[`distro`][job-schema] and [`ssk_keys`][ssh-keys] (only support one ssh keys).
+[`distro`][job-schema] and [`ssk_keys`][sshkeys] (only support one ssh keys).
 
 ## Quick Start
 
@@ -77,4 +77,4 @@ and `README.md` contains the testable items on that machine.
 
 [testflinger]: https://certification.canonical.com/docs/ops/tel-labs-docs/how-to/use_machines_through_testflinger/
 [job-schema]: https://canonical-testflinger.readthedocs-hosted.com/en/latest/reference/job-schema.html
-[ssk-keys]: https://canonical-testflinger.readthedocs-hosted.com/en/latest/reference/test-phases.html#reserve
+[sskkeys]: https://canonical-testflinger.readthedocs-hosted.com/en/latest/reference/test-phases.html#reserve
