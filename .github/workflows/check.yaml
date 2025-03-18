@@ -243,10 +243,7 @@ jobs:
           path: "${{ env.CRASHDUMPS_DIR }}/juju-crashdump-*.tar.xz"
 
   tics-analysis:
-    runs-on: ubuntu-22.04
-    if: >
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: [self-hosted, linux, amd64, tiobe, jammy]
     needs: func
     steps:
       - uses: actions/checkout@v4
@@ -255,8 +252,7 @@ jobs:
 
       - name: Install coverage tools
         run: |
-          pip install coverage
-
+          pip install coverage[toml]
       - name: Determine system architecture
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
