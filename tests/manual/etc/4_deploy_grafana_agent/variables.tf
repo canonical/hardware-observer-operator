@@ -33,4 +33,3 @@ variable "logging-offer-url" {
   type        = string
   default     = null
 }
-
