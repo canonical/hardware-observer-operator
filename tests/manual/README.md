@@ -31,7 +31,7 @@ ssh ubuntu@xxx.xxx.xxx
 git clone https://github.com/canonical/hardware-observer-operator.git
 cd hardware-observer-operator/tests/manual/
 ./scripts/bootstrap.sh
-terrgrunt run-all apply
+terragrunt run-all apply
 ```
 
 [testflinger]: https://canonical-testflinger.readthedocs-hosted.com/en/latest/
