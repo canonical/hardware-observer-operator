@@ -28,7 +28,7 @@ variable "grafana-dashboard-offer-url" {
   default     = null
 }
 
-variable "logging-offer-url" {
+variable "loki-logging-offer-url" {
   description = "Offer URL from loki-k8s:logging application"
   type        = string
   default     = null
