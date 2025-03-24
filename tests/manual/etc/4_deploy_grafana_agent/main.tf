@@ -17,7 +17,7 @@ module "grafana-agent" {
   principal-application-model    = var.machine_model
   receive-remote-write-offer-url = var.receive-remote-write-offer-url
   grafana-dashboard-offer-url    = var.grafana-dashboard-offer-url
-  logging-offer-url              = var.logging-offer-url
+  logging-offer-url              = var.loki-logging-offer-url
 
 }
 
