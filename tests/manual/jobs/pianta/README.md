@@ -32,7 +32,8 @@ Please consult the team for redfish credential.
 After you have obtained the redfish credential, you can follow the steps to config Hardware Observer Operator to use
 that redfish credential.
 
+0. Find the user: `sudo ipmitool user list 1`
 1. Enable the user: `sudo ipmitool user enable <USER-ID>`
 2. Update charm config: `juju config hardware-observer redfish-username=<username> redfish-password=<password>`
 
-As a good practice, you should disable the testing redfish user when you are done with testing: `sudo ipmitool userdisable <USER-ID>`.
+As a good practice, you should disable the testing redfish user when you are done with testing: `sudo ipmitool user disable <USER-ID>`.
