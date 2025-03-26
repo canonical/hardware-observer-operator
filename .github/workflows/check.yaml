@@ -189,7 +189,6 @@ jobs:
           echo "$CHARM_PATH_FOCAL"
           ${{ matrix.test-command }}
         env:
-          TEST_JUJU3: "1"  # https://github.com/openstack-charmers/zaza/pull/653
           TEST_JUJU_CHANNEL: ${{ matrix.juju-channel }}
 
       - name: Generate Safe Test Command Identifier by removing spaces and special characters
