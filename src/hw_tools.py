@@ -371,7 +371,7 @@ class SSACLIStrategy(APTStrategyABC):
 
     _name = HWTool.SSACLI
     pkg = HWTool.SSACLI.value
-    repo_line = "deb http://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
+    repo_line = "deb https://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
 
     @property
     def repo(self) -> apt.DebianRepository:
