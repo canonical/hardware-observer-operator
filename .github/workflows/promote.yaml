@@ -3,37 +3,42 @@
 # - Edit it in the canonical/solutions-engineering-automation repository.
 # - Open a PR with the changes.
 # - When the PR merges, the soleng-terraform bot will open a PR to the target repositories with the changes.
-name: Promote charm to default track, standard risk levels.
 
-on:
-  workflow_dispatch:
-    inputs:
-      channel-promotion:
-        description: 'Channel Promotion, e.g. latest/edge -> latest/candidate'
-        required: true
-        type: choice
-        options:
-          - 'latest/edge -> latest/candidate'
-          - 'latest/candidate -> latest/stable'
+# Workflow temporarily disable until there are fixes for:
+# https://github.com/canonical/charming-actions/issues/157
+# https://github.com/canonical/charmcraft/issues/2243
 
-jobs:
-  promote-charm:
-    name: Promote charm
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set channels
-        id: set-channels
-        run: |
-          channel_promotion="${{ github.event.inputs.channel-promotion }}"
-          origin=$(echo "$channel_promotion" | sed 's/\s*->.*//')
-          destination=$(echo "$channel_promotion" | sed 's/.*->\s*//')
-          echo "destination-channel=$destination" >> $GITHUB_OUTPUT
-          echo "origin-channel=$origin" >> $GITHUB_OUTPUT
-      - name: Promote charm to channel
-        uses: canonical/charming-actions/promote-charm@2.6.3
-        with:
-          credentials: ${{ secrets.CHARMHUB_TOKEN }}
-          destination-channel: ${{ steps.set-channels.outputs.destination-channel }}
-          origin-channel: ${{ steps.set-channels.outputs.origin-channel }}
-          charmcraft-channel: "3.x/stable"
+# name: Promote charm to default track, standard risk levels.
+#
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       channel-promotion:
+#         description: 'Channel Promotion, e.g. latest/edge -> latest/candidate'
+#         required: true
+#         type: choice
+#         options:
+#           - 'latest/edge -> latest/candidate'
+#           - 'latest/candidate -> latest/stable'
+#
+# jobs:
+#   promote-charm:
+#     name: Promote charm
+#     runs-on: ubuntu-22.04
+#     steps:
+#       - uses: actions/checkout@v4
+#       - name: Set channels
+#         id: set-channels
+#         run: |
+#           channel_promotion="${{ github.event.inputs.channel-promotion }}"
+#           origin=$(echo "$channel_promotion" | sed 's/\s*->.*//')
+#           destination=$(echo "$channel_promotion" | sed 's/.*->\s*//')
+#           echo "destination-channel=$destination" >> $GITHUB_OUTPUT
+#           echo "origin-channel=$origin" >> $GITHUB_OUTPUT
+#       - name: Promote charm to channel
+#         uses: canonical/charming-actions/promote-charm@2.6.3
+#         with:
+#           credentials: ${{ secrets.CHARMHUB_TOKEN }}
+#           destination-channel: ${{ steps.set-channels.outputs.destination-channel }}
+#           origin-channel: ${{ steps.set-channels.outputs.origin-channel }}
+#           charmcraft-channel: "3.x/stable"
