@@ -8,7 +8,15 @@
 # https://github.com/canonical/charming-actions/issues/157
 # https://github.com/canonical/charmcraft/issues/2243
 
-# name: Promote charm to default track, standard risk levels.
+name: Promote charm
+on:
+  workflow_dispatch:
+
+jobs:
+  disabled_notice:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "This workflow is temporarily disabled. No actions will be performed."
 #
 # on:
 #   workflow_dispatch:
