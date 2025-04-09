@@ -131,8 +131,10 @@ jobs:
       fail-fast: false
       matrix:
         runs-on: [[ubuntu-24.04], [Ubuntu_ARM64_4C_16G_01], [self-hosted, linux, s390x]]
-        test-command: ['if [ "$(uname -m)" = "s390x" ]; then echo "skipping func tests on ubuntu@20.04/s390x"; else tox -e func -- -v --base ubuntu@20.04 --keep-models; fi', 'if [ "$(uname -m)" = "s390x" ]; then echo "skipping func tests on ubuntu@22.04/s390x"; else tox -e func -- -v --base ubuntu@22.04 --keep-models; fi', 'if [ "$(uname -m)" = "s390x" ]; then echo "skipping func tests on ubuntu@24.04/s390x"; else tox -e func -- -v --base ubuntu@24.04 --keep-models; fi' ]
+        test-command: ['tox -e func -- -v --base ubuntu@20.04 --keep-models', 'tox -e func -- -v --base ubuntu@22.04 --keep-models', 'tox -e func -- -v --base ubuntu@24.04 --keep-models' ]
         juju-channel: ["3.4/stable"]
+        exclude:
+          - runs-on: [self-hosted, linux, s390x]  # setup-python action does not support s390x arch
     steps:
       - uses: actions/checkout@v4
         with:
