@@ -93,7 +93,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [[ubuntu-22.04], [Ubuntu_ARM64_4C_16G_01]]
+        runs-on: [[ubuntu-24.04], [Ubuntu_ARM64_4C_16G_01], [self-hosted, linux, s390x]]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -130,8 +130,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [[ubuntu-22.04], [Ubuntu_ARM64_4C_16G_01]]
-        test-command: ['tox -e func -- -v --base ubuntu@20.04 --keep-models', 'tox -e func -- -v --base ubuntu@22.04 --keep-models', 'tox -e func -- -v --base ubuntu@24.04 --keep-models' ]
+        runs-on: [[ubuntu-24.04], [Ubuntu_ARM64_4C_16G_01], [self-hosted, linux, s390x]]
+        test-command: ['if [ "$(uname -m)" = "s390x" ]; then echo "skipping func tests on ubuntu@20.04/s390x"; else tox -e func -- -v --base ubuntu@20.04 --keep-models; fi', 'if [ "$(uname -m)" = "s390x" ]; then echo "skipping func tests on ubuntu@22.04/s390x"; else tox -e func -- -v --base ubuntu@22.04 --keep-models; fi', 'if [ "$(uname -m)" = "s390x" ]; then echo "skipping func tests on ubuntu@24.04/s390x"; else tox -e func -- -v --base ubuntu@24.04 --keep-models; fi' ]
         juju-channel: ["3.4/stable"]
     steps:
       - uses: actions/checkout@v4
@@ -164,6 +164,8 @@ jobs:
         run: |
           if [ "${{ env.SYSTEM_ARCH }}" = "aarch64" ]; then
             echo "TEST_MODEL_CONSTRAINTS=arch=arm64" >> "$GITHUB_ENV"
+          elif [ "${{ env.SYSTEM_ARCH }}" = "s390x" ]; then
+            echo "TEST_MODEL_CONSTRAINTS=arch=s390x" >> "$GITHUB_ENV"
           fi
 
       - name: Download the built charms
