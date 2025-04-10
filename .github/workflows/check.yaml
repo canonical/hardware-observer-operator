@@ -277,11 +277,12 @@ jobs:
           if [ -e "${coverage_files[0]}" ]; then
             echo "Merging coverage files: ${coverage_files[*]}"
             coverage combine "${coverage_files[@]}"
-            coverage xml -o tests/report/coverage.xml
-          else
-            echo "No coverage files found, skipping merge"
-            # Create an empty file to avoid downstream failure
-            touch tests/report/coverage.xml
+
+            # Check if there is actual data to report before generating XML with merged reports
+            if coverage report > /dev/null 2>&1; then
+              coverage xml -o tests/report/coverage.xml
+            fi
+
           fi
 
       - name: Run TICS analysis
