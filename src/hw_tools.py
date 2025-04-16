@@ -777,3 +777,65 @@ class HWToolHelper:
         if failed_checks:
             return False, f"Fail strategy checks: {failed_checks}"
         return True, ""
+
+    @staticmethod
+    def correct_log_permissions() -> None:
+        """Update permissions on log files to comply with CIS benchmarks.
+
+        Equivalent to the CIS remediation from issue
+        [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
+        """
+        logger.info("Fixing permissions on log files to comply with CIS benchmarks")
+        try:
+
+            cmd = [
+                "find",
+                "/var/log/",
+                "-perm",
+                "/u+xs,g+xws,o+xwrt",
+                "!",
+                "-name",
+                "history.log*",
+                "!",
+                "-name",
+                "eipp.log.xz*",
+                "!",
+                "-name",
+                "[bw]tmp",
+                "!",
+                "-name",
+                "[bw]tmp.*",
+                "!",
+                "-name",
+                "[bw]tmp-*",
+                "!",
+                "-name",
+                "lastlog",
+                "!",
+                "-name",
+                "lastlog.*",
+                "!",
+                "-name",
+                "cloud-init.log*",
+                "!",
+                "-name",
+                "localmessages*",
+                "!",
+                "-name",
+                "waagent.log*",
+                "-type",
+                "f",
+                "-regextype",
+                "posix-extended",
+                "-regex",
+                ".*",
+                "-exec",
+                "chmod",
+                "u-xs,g-xws,o-xwrt",
+                "{}",
+                ";",
+            ]
+            subprocess.run(cmd, check=True)
+            logger.debug("Successfully correct log file permissions")
+        except subprocess.SubprocessError as e:
+            logger.error(f"Failed to correct log file permissions: {e}")

@@ -163,6 +163,9 @@ class HardwareObserverCharm(ops.CharmBase):
                 self.model.unit.status = BlockedStatus(msg)
                 return
 
+        # Correct log permissions
+        self.hw_tool_helper.correct_log_permissions()
+
         self._on_update_status(event)
 
     def _on_remove(self, _: EventBase) -> None:
@@ -231,6 +234,9 @@ class HardwareObserverCharm(ops.CharmBase):
             )
             event.defer()
             return
+
+        # Correct log permissions
+        self.hw_tool_helper.correct_log_permissions()
 
         if self.cos_agent_related:
             success, message = self.validate_configs()
