@@ -106,7 +106,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [[ubuntu-24.04], [Ubuntu_ARM64_4C_16G_01], [self-hosted, linux, s390x]]
+        runs-on: [[ubuntu-24.04], [Ubuntu_ARM64_4C_16G_01], [self-hosted, linux, s390x],[self-hosted, ppc64el]]
     steps:
       - uses: actions/checkout@v4
         with:
