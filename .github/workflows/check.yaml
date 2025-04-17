@@ -76,17 +76,18 @@ jobs:
       run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
     - name: Create artifact name suffix
-      run: |  
-        PYTHON_VERSION_SANITIZED=${matrix.python-version//./-}
+      run: |
+        PYTHON_VERSION_SANITIZED=${{ matrix.python-version }}
+        PYTHON_VERSION_SANITIZED=${PYTHON_VERSION_SANITIZED//./-}
         echo "ARTIFACT_SUFFIX=$PYTHON_VERSION_SANITIZED-${{ env.SYSTEM_ARCH }}" >> $GITHUB_ENV
 
     - name: Rename Unit Test Coverage Artifact
-      run: |  
-        if [ -e ".coverage-unit" ]; then  
+      run: |
+        if [ -e ".coverage-unit" ]; then
           mv .coverage-unit .coverage-unit-${{ env.ARTIFACT_SUFFIX }}
-        else  
-          echo "No coverage file found, skipping rename"  
-        fi  
+        else
+          echo "No coverage file found, skipping rename"
+        fi
 
     - name: Upload Unit Test Coverage File
       uses: actions/upload-artifact@v4
@@ -203,24 +204,24 @@ jobs:
           ${{ matrix.test-command }}
         env:
           TEST_JUJU_CHANNEL: ${{ matrix.juju-channel }}
-      
+
       - name: Generate Safe Test Command Identifier by removing spaces and special characters
         run: |
           TEST_CMD_ID=$(echo "${{ matrix.test-command }}" | sed 's/[^a-zA-Z0-9]/_/g')
           echo "TEST_CMD_ID=$TEST_CMD_ID" >> $GITHUB_ENV
-      
+
       - name: Create artifact name suffix
         run: |
           echo "ARTIFACT_SUFFIX=${{ env.TEST_CMD_ID }}-${{ env.SYSTEM_ARCH }}" >> $GITHUB_ENV
-          
+
       - name: Rename Functional Test Coverage Artifact
         run: |
           if [ -e ".coverage-func" ]; then
             mv .coverage-func .coverage-func-${{ env.ARTIFACT_SUFFIX }}
           else
             echo "No coverage file found, skipping rename"
-          fi 
-      
+          fi
+
       - name: Upload Functional Test Coverage Artifact
         uses: actions/upload-artifact@v4
         with:
