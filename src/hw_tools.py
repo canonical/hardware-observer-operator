@@ -8,6 +8,7 @@ import os
 import shutil
 import stat
 import subprocess
+import textwrap
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
@@ -846,19 +847,21 @@ class HWToolHelper:
     def generate_storelib_config(hw_strategy: TPRStrategyABC) -> bool:
         """Generate configuration file for storelib library logging.
 
-        Address the issue from
+        Workaround to address the issue from
         [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
         """
+        tool_name = hw_strategy.name.value
+
         # Check if the tool is installed
         if not hw_strategy.check():
-            logger.debug("Tool %s is not installed", hw_strategy.name)
+            logger.debug("Tool %s is not installed", tool_name)
             return False
 
         # Check if the strategy has the symlink_bin attribute
         if hasattr(hw_strategy, "symlink_bin"):
             tool_dir: Path = hw_strategy.symlink_bin.parent
         else:
-            logger.debug("Tool %s does not have a symlink_bin attribute", hw_strategy.name)
+            logger.debug("Tool %s does not have a symlink_bin attribute", tool_name)
             return False
 
         # Check if the tool directory exists
@@ -867,39 +870,64 @@ class HWToolHelper:
             return False
 
         # Create the directory to store the log files
-        log_dir = Path(f"/tmp/hwo_storelib_logs/{hw_strategy.name}")
+        log_dir = Path(f"/tmp/hwo_storelib_logs/{tool_name}")
         log_dir.mkdir(parents=True, exist_ok=True)
         logger.info("Created directory for storelib logs: %s", log_dir)
 
+        # Name of the .ini config file, this can be varied based on the storelib version and
+        # the tool used. For Storcli, the config file is likely named "storelibconfit.ini"
+        config_file_name = "storelibconfit.ini"
+
         # Create the config file content
-        config_content = f"""
-        # Debug Level:
-        # 0 - No Debug
-        # 1 - Level 1
-        # 2 - Level 2
-        DEBUGLEVEL=2
-        # Write option on startup
-        # 0 - Append to existing debug file
-        # 1 - create new file
-        OVERWRITE=0
-        # Directory where debug file will be created
-        DEBUGDIR={log_dir}
-        #DEBUGLEVEL2MASK
-        #SCSICOMMANDFILTER
-        # Flag to turn Simulation Mode (0-No Simulation, 1- Simulation Mode (Requires simlib.dll))
-        #SIMULATION
-        #LIBPATH
-        #MAXDRVRBUFSIZE
-        #VENDORID
-        """
+        config_content = (
+            textwrap.dedent(
+                f"""
+                # Debug Level:
+                # 0 - No Debug
+                # 1 - Level 1
+                # 2 - Level 2
+                DEBUGLEVEL=2
+                # Write option on startup
+                # 0 - Append to existing debug file
+                # 1 - create new file
+                OVERWRITE=0
+                # Directory where debug file will be created
+                DEBUGDIR={log_dir}
+                #DEBUGLEVEL2MASK
+                #SCSICOMMANDFILTER
+                # Flag to turn Simulation Mode (0-No Simulation, 1- Simulation Mode (Requires simlib.dll))
+                #SIMULATION
+                #LIBPATH
+                #MAXDRVRBUFSIZE
+                #VENDORID
+                """
+            ).strip()
+            + "\n"
+        )
 
         # Write the config file
-        config_path = os.path.join(tool_dir, "storelibconfit.ini")
+        config_path = tool_dir / config_file_name
         try:
             with open(config_path, "w") as f:
                 f.write(config_content)
             logger.info(f"Created storelib configuration file at {config_path}")
-            return True
         except (IOError, PermissionError) as e:
             logger.error(f"Failed to write configuration file: {e}")
             return False
+
+        # Check if the strategy has the origin_path attribute
+        # If yes, create a symlink
+        if hasattr(hw_strategy, "origin_path"):
+            symlink_tool_dir: Path = hw_strategy.origin_path.parent
+
+            if not symlink_tool_dir.exists():
+                return True
+
+            symlink_path = symlink_tool_dir / config_file_name
+            try:
+                symlink(src=config_path, dst=symlink_path)
+                logger.info(f"Created symlink for storelib configuration file at {symlink_path}")
+            except (IOError, PermissionError) as e:
+                logger.error(f"Failed to create symlink: {e}")
+                return False
+        return True

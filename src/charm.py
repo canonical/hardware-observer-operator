@@ -182,9 +182,8 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_update_status(self, _: EventBase) -> None:  # noqa: C901
         """Update the charm's status."""
-        # Correct log permissions to deal with issue
+        # Correct log permissions in /var/log/ to deal with issue
         # https://github.com/canonical/hardware-observer-operator/issues/424
-        # if {HWTool.STORCLI, HWTool.PERCCLI} & self.stored_tools:
         self.hw_tool_helper.correct_log_permissions()
 
         if not self._stored.resource_installed:  # type: ignore[truthy-function]
