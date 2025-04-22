@@ -182,12 +182,10 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_update_status(self, _: EventBase) -> None:  # noqa: C901
         """Update the charm's status."""
-
-        # Correct log permissions if storcli is detected
-        # Currently this is to deal with issue https://github.com/canonical/hardware-observer-operator/issues/424
-        # but later other tools may also need this for compliance with CIS Hardening benchmarks
-        if HWTool.STORCLI in self.stored_tools:
-            self.hw_tool_helper.correct_log_permissions()
+        # Correct log permissions to deal with issue
+        # https://github.com/canonical/hardware-observer-operator/issues/424
+        # if {HWTool.STORCLI, HWTool.PERCCLI} & self.stored_tools:
+        self.hw_tool_helper.correct_log_permissions()
 
         if not self._stored.resource_installed:  # type: ignore[truthy-function]
             # The charm should be in BlockedStatus with install failed msg

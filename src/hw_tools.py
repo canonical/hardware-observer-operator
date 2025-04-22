@@ -736,9 +736,11 @@ class HWToolHelper:
                     path = fetch_tools.get(strategy.name)  # pylint: disable=W0212
                     if path:
                         strategy.install(path)
+                        self.generate_storelib_config(strategy)
 
                 elif isinstance(strategy, (APTStrategyABC, SnapStrategy)):
                     strategy.install()  # pylint: disable=E1120
+
                 logger.info("Strategy %s install success", strategy)
             except (
                 ResourceFileSizeZeroError,
@@ -839,3 +841,65 @@ class HWToolHelper:
             logger.debug("Successfully correct log file permissions")
         except subprocess.SubprocessError as e:
             logger.error(f"Failed to correct log file permissions: {e}")
+
+    @staticmethod
+    def generate_storelib_config(hw_strategy: TPRStrategyABC) -> bool:
+        """Generate configuration file for storelib library logging.
+
+        Address the issue from
+        [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
+        """
+        # Check if the tool is installed
+        if not hw_strategy.check():
+            logger.debug("Tool %s is not installed", hw_strategy.name)
+            return False
+
+        # Check if the strategy has the symlink_bin attribute
+        if hasattr(hw_strategy, "symlink_bin"):
+            tool_dir: Path = hw_strategy.symlink_bin.parent
+        else:
+            logger.debug("Tool %s does not have a symlink_bin attribute", hw_strategy.name)
+            return False
+
+        # Check if the tool directory exists
+        if not tool_dir.exists():
+            logger.debug("Tool directory %s does not exist", tool_dir)
+            return False
+
+        # Create the directory to store the log files
+        log_dir = Path(f"/tmp/hwo_storelib_logs/{hw_strategy.name}")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Created directory for storelib logs: %s", log_dir)
+
+        # Create the config file content
+        config_content = f"""
+        # Debug Level:
+        # 0 - No Debug
+        # 1 - Level 1
+        # 2 - Level 2
+        DEBUGLEVEL=2
+        # Write option on startup
+        # 0 - Append to existing debug file
+        # 1 - create new file
+        OVERWRITE=0
+        # Directory where debug file will be created
+        DEBUGDIR={log_dir}
+        #DEBUGLEVEL2MASK
+        #SCSICOMMANDFILTER
+        # Flag to turn Simulation Mode (0-No Simulation, 1- Simulation Mode (Requires simlib.dll))
+        #SIMULATION
+        #LIBPATH
+        #MAXDRVRBUFSIZE
+        #VENDORID
+        """
+
+        # Write the config file
+        config_path = os.path.join(tool_dir, "storelibconfit.ini")
+        try:
+            with open(config_path, "w") as f:
+                f.write(config_content)
+            logger.info(f"Created storelib configuration file at {config_path}")
+            return True
+        except (IOError, PermissionError) as e:
+            logger.error(f"Failed to write configuration file: {e}")
+            return False
