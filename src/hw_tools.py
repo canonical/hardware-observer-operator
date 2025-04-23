@@ -915,8 +915,19 @@ class HWToolHelper:
             logger.error(f"Failed to write configuration file: {e}")
             return False
 
-        # Check if the strategy has the origin_path attribute
-        # If yes, create a symlink
+        # Create a symlink at root directory if it doesn't exist yet
+        symlink_path_root = Path(f"/{config_file_name}")
+        if not symlink_path_root.exists():
+            try:
+                symlink(src=config_path, dst=symlink_path_root)
+                logger.info(
+                    f"Created symlink for storelib configuration file at {symlink_path_root}"
+                )
+            except (IOError, PermissionError) as e:
+                logger.error(f"Failed to create symlink: {e}")
+                return False
+
+        # If the strategy has the "origin_path" attribute, also create a symlink there
         if hasattr(hw_strategy, "origin_path"):
             symlink_tool_dir: Path = hw_strategy.origin_path.parent
 
