@@ -857,18 +857,6 @@ class HWToolHelper:
             logger.debug("Tool %s is not installed", tool_name)
             return False
 
-        # Check if the strategy has the symlink_bin attribute
-        if hasattr(hw_strategy, "symlink_bin"):
-            tool_dir: Path = hw_strategy.symlink_bin.parent
-        else:
-            logger.debug("Tool %s does not have a symlink_bin attribute", tool_name)
-            return False
-
-        # Check if the tool directory exists
-        if not tool_dir.exists():
-            logger.debug("Tool directory %s does not exist", tool_dir)
-            return False
-
         # Create the directory to store the log files
         log_dir = Path(f"/tmp/hwo_storelib_logs/{tool_name}")
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -905,40 +893,42 @@ class HWToolHelper:
             + "\n"
         )
 
-        # Write the config file
-        config_path = tool_dir / config_file_name
-        try:
-            with open(config_path, "w") as f:
-                f.write(config_content)
-            logger.info(f"Created storelib configuration file at {config_path}")
-        except (IOError, PermissionError) as e:
-            logger.error(f"Failed to write configuration file: {e}")
-            return False
-
-        # Create a symlink at root directory if it doesn't exist yet
-        symlink_path_root = Path(f"/{config_file_name}")
-        if not symlink_path_root.exists():
+        # Place the config file in the root directory (for storcli it must be in /)
+        config_path = Path(f"/{config_file_name}")
+        if not config_path.exists():
+            # Write the config file
             try:
-                symlink(src=config_path, dst=symlink_path_root)
-                logger.info(
-                    f"Created symlink for storelib configuration file at {symlink_path_root}"
-                )
+                with open(config_path, "w") as f:
+                    f.write(config_content)
+                logger.info(f"Created storelib configuration file at {config_path}")
             except (IOError, PermissionError) as e:
-                logger.error(f"Failed to create symlink: {e}")
+                logger.error(f"Failed to write configuration file: {e}")
                 return False
+
+        # Make a symlink to the config file in the symlink tool directory if it exists
+        if hasattr(hw_strategy, "symlink_bin"):
+            symlink_dir: Path = hw_strategy.symlink_bin.parent
+            if not symlink_dir.exists():
+                logger.debug("Symlink directory %s does not exist", symlink_dir)
+            else:
+                symlink_path = symlink_dir / config_file_name
+                symlink(src=config_path, dst=symlink_path)
+                logger.info(f"Created symlink for storelib configuration file at {symlink_path}")
+        else:
+            logger.debug("Tool %s does not have a symlink_bin attribute", tool_name)
 
         # If the strategy has the "origin_path" attribute, also create a symlink there
         if hasattr(hw_strategy, "origin_path"):
-            symlink_tool_dir: Path = hw_strategy.origin_path.parent
+            tool_dir: Path = hw_strategy.origin_path.parent
+            if not tool_dir.exists():
+                logger.debug("Root directory %s does not exist", tool_dir)
+            else:
+                symlink_root_path = tool_dir / config_file_name
+                symlink(src=config_path, dst=symlink_root_path)
+                logger.info(
+                    f"Created symlink for storelib configuration file at {symlink_root_path}"
+                )
+        else:
+            logger.debug("Tool %s does not have an origin_path attribute", tool_name)
 
-            if not symlink_tool_dir.exists():
-                return True
-
-            symlink_path = symlink_tool_dir / config_file_name
-            try:
-                symlink(src=config_path, dst=symlink_path)
-                logger.info(f"Created symlink for storelib configuration file at {symlink_path}")
-            except (IOError, PermissionError) as e:
-                logger.error(f"Failed to create symlink: {e}")
-                return False
         return True

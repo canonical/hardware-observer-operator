@@ -1263,3 +1263,79 @@ def test_remove_legacy_smartctl_exporter_not_exists(
     mock_systemd.service_disable.assert_not_called()
     mock_path_unlink.assert_not_called()
     mock_shutil.rmtree.assert_not_called()
+
+
+class TestCorrectLogPermissions(unittest.TestCase):
+    """Tests for the HWToolHelper.correct_log_permissions method."""
+
+    @mock.patch("hw_tools.subprocess.run")
+    def test_correct_log_permissions_success(self, mock_subprocess_run):
+        """Test that log permissions correction works correctly."""
+        HWToolHelper.correct_log_permissions()
+        mock_subprocess_run.assert_called_once()
+        args, kwargs = mock_subprocess_run.call_args
+
+        expected_parts = [
+            "find",
+            "/var/log/",
+            "-perm",
+            "/u+xs,g+xws,o+xwrt",
+            "!",
+            "-name",
+            "history.log*",
+            "!",
+            "-name",
+            "eipp.log.xz*",
+            "!",
+            "-name",
+            "[bw]tmp",
+            "!",
+            "-name",
+            "[bw]tmp.*",
+            "!",
+            "-name",
+            "[bw]tmp-*",
+            "!",
+            "-name",
+            "lastlog",
+            "!",
+            "-name",
+            "lastlog.*",
+            "!",
+            "-name",
+            "cloud-init.log*",
+            "!",
+            "-name",
+            "localmessages*",
+            "!",
+            "-name",
+            "waagent.log*",
+            "-type",
+            "f",
+            "-regextype",
+            "posix-extended",
+            "-regex",
+            ".*",
+            "-exec",
+            "chmod",
+            "u-xs,g-xws,o-xwrt",
+            "{}",
+            ";",
+        ]
+
+        self.assertListEqual(args[0], expected_parts)
+        self.assertTrue(kwargs.get("check"))
+
+    @mock.patch(
+        "hw_tools.subprocess.run", side_effect=subprocess.SubprocessError("Mock subprocess error")
+    )
+    @mock.patch("hw_tools.logger")
+    def test_correct_log_permissions_error(self, mock_logger, mock_subprocess_run):
+        """Test error handling when log permission correction fails."""
+        HWToolHelper.correct_log_permissions()
+
+        mock_logger.error.assert_called_once()
+        error_message = mock_logger.error.call_args[0][0]
+        self.assertIn("Failed to correct log file permissions", error_message)
+
+        mock_subprocess_run.assert_called_once()
