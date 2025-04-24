@@ -1,3 +1,4 @@
+import copy
 import stat
 import subprocess
 import unittest
@@ -1339,3 +1340,128 @@ class TestCorrectLogPermissions(unittest.TestCase):
         self.assertIn("Failed to correct log file permissions", error_message)
 
         mock_subprocess_run.assert_called_once()
+
+
+class TestGenerateStorelibConfig(unittest.TestCase):
+    """Tests for the HWToolHelper.generate_storelib_config static method."""
+
+    def setUp(self):
+        """Set up variables for testing."""
+        self.mock_strategy = mock.MagicMock(spec=TPRStrategyABC)
+        self.mock_strategy.name = mock.MagicMock()
+        self.mock_strategy.name.value = "test_tool"
+        self.mock_strategy.check.return_value = True
+        self.mock_strategy.symlink_bin = Path("/mock/bin/test_tool")
+        self.mock_strategy.origin_path = Path("/mock/original/test_tool")
+        self.config_file_name = "storelibconfit.ini"
+        self.expected_log_dir = f"/tmp/hwo_storelib_logs/{self.mock_strategy.name.value}"
+
+    @mock.patch("hw_tools.Path.exists")
+    @mock.patch("hw_tools.Path.mkdir")
+    @mock.patch("hw_tools.open", new_callable=mock.mock_open)
+    @mock.patch("hw_tools.symlink")
+    def test_generate_config_success(self, mock_symlink, mock_open, mock_mkdir, mock_exists):
+        """Test successful generation of storelib configuration file and symlinks."""
+        # Set up mocks
+        mock_exists.return_value = False
+
+        result = HWToolHelper.generate_storelib_config(self.mock_strategy)
+        self.assertTrue(result)
+
+        # Verify directory creation and file writing
+        mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+        mock_open.assert_called_once()
+        file_path_arg = mock_open.call_args[0][0]
+
+        # Verify the root path of the config file
+        self.assertEqual(file_path_arg, Path(f"/{self.config_file_name}"))
+
+        # Verify config content contains log directory path
+        handle = mock_open()
+        written_content = handle.write.call_args[0][0]
+        self.assertIn(f"DEBUGDIR={self.expected_log_dir}", written_content)
+
+        # Verify 2 correct symlinks were created
+        self.assertEqual(mock_symlink.call_count, 2)
+        self.assertEqual(
+            mock_symlink.call_args_list[0][1]["src"], Path(f"/{self.config_file_name}")
+        )
+        self.assertEqual(
+            mock_symlink.call_args_list[0][1]["dst"],
+            self.mock_strategy.symlink_bin.parent / self.config_file_name,
+        )
+        self.assertEqual(
+            mock_symlink.call_args_list[1][1]["src"], Path(f"/{self.config_file_name}")
+        )
+        self.assertEqual(
+            mock_symlink.call_args_list[1][1]["dst"],
+            self.mock_strategy.origin_path.parent / self.config_file_name,
+        )
+
+    def test_generate_config_tool_not_installed(self):
+        """Test function returns False when the tool is not installed."""
+        self.mock_strategy.check.return_value = False
+        result = HWToolHelper.generate_storelib_config(self.mock_strategy)
+        self.assertFalse(result)
+
+    @mock.patch("hw_tools.Path.exists")
+    @mock.patch("hw_tools.Path.mkdir")
+    @mock.patch("hw_tools.open")
+    @mock.patch("hw_tools.logger")
+    def test_generate_config_write_error(self, mock_logger, mock_open, mock_mkdir, mock_exists):
+        """Test error handling when writing config file fails."""
+        # Set up mocks
+        mock_exists.return_value = False
+        mock_open.side_effect = IOError("Mock IO error")
+
+        result = HWToolHelper.generate_storelib_config(self.mock_strategy)
+
+        self.assertFalse(result)
+        mock_logger.error.assert_called_once()
+        error_message = mock_logger.error.call_args[0][0]
+        self.assertIn("Failed to write configuration file", error_message)
+
+    @mock.patch("hw_tools.Path.exists")
+    @mock.patch("hw_tools.Path.mkdir")
+    @mock.patch("hw_tools.open")
+    @mock.patch("hw_tools.symlink")
+    @mock.patch("hw_tools.logger")
+    def test_generate_config_without_symlink_bin(
+        self, mock_logger, mock_symlink, mock_open, mock_mkdir, mock_exists
+    ):
+        """Test function handling when strategy has no symlink_bin attribute."""
+        # Set up mocks and a strategy with no symlink_bin
+        mock_exists.return_value = False
+        strategy = copy.deepcopy(self.mock_strategy)
+        del strategy.symlink_bin
+
+        result = HWToolHelper.generate_storelib_config(strategy)
+
+        # Result is still True (not a failure) but only one symlink is created
+        self.assertTrue(result)
+        self.assertEqual(mock_symlink.call_count, 1)
+        mock_logger.debug.assert_any_call(
+            "Tool %s does not have a symlink_bin attribute", strategy.name.value
+        )
+
+    @mock.patch("hw_tools.Path.exists")
+    @mock.patch("hw_tools.Path.mkdir")
+    @mock.patch("hw_tools.open")
+    @mock.patch("hw_tools.symlink")
+    @mock.patch("hw_tools.logger")
+    def test_generate_config_without_origin_path(
+        self, mock_logger, mock_symlink, mock_open, mock_mkdir, mock_exists
+    ):
+        """Test function handling when strategy has no origin_path attribute."""
+        # Set up mocks and a strategy with no origin_path
+        strategy = copy.deepcopy(self.mock_strategy)
+        del strategy.origin_path
+
+        result = HWToolHelper.generate_storelib_config(strategy)
+
+        # Result is still True (not a failure) but only one symlink is created
+        self.assertTrue(result)
+        self.assertEqual(mock_symlink.call_count, 1)
+        mock_logger.debug.assert_any_call(
+            "Tool %s does not have an origin_path attribute", strategy.name.value
+        )

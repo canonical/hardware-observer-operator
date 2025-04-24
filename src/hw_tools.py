@@ -908,26 +908,18 @@ class HWToolHelper:
         # Make a symlink to the config file in the symlink tool directory if it exists
         if hasattr(hw_strategy, "symlink_bin"):
             symlink_dir: Path = hw_strategy.symlink_bin.parent
-            if not symlink_dir.exists():
-                logger.debug("Symlink directory %s does not exist", symlink_dir)
-            else:
-                symlink_path = symlink_dir / config_file_name
-                symlink(src=config_path, dst=symlink_path)
-                logger.info(f"Created symlink for storelib configuration file at {symlink_path}")
+            symlink_path = symlink_dir / config_file_name
+            symlink(src=config_path, dst=symlink_path)
+            logger.info(f"Created symlink for storelib configuration file at {symlink_path}")
         else:
             logger.debug("Tool %s does not have a symlink_bin attribute", tool_name)
 
         # If the strategy has the "origin_path" attribute, also create a symlink there
         if hasattr(hw_strategy, "origin_path"):
             tool_dir: Path = hw_strategy.origin_path.parent
-            if not tool_dir.exists():
-                logger.debug("Root directory %s does not exist", tool_dir)
-            else:
-                symlink_root_path = tool_dir / config_file_name
-                symlink(src=config_path, dst=symlink_root_path)
-                logger.info(
-                    f"Created symlink for storelib configuration file at {symlink_root_path}"
-                )
+            symlink_root_path = tool_dir / config_file_name
+            symlink(src=config_path, dst=symlink_root_path)
+            logger.info(f"Created symlink for storelib configuration file at {symlink_root_path}")
         else:
             logger.debug("Tool %s does not have an origin_path attribute", tool_name)
 
