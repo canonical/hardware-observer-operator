@@ -20,6 +20,9 @@ platforms:
   ubuntu@20.04:s390x:
   ubuntu@22.04:s390x:
   ubuntu@24.04:s390x:
+  ubuntu@20.04:ppc64el:
+  ubuntu@22.04:ppc64el:
+  ubuntu@24.04:ppc64el:
 
 actions:
   redetect-hardware:
