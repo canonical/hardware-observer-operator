@@ -10,6 +10,9 @@ parts:
     source: .
     build-packages: [git]
     charm-binary-python-packages:
+      # workaround dependeny loop
+      - cosl
+      - pydantic < 2
       - git+https://github.com/canonical/prometheus-hardware-exporter.git
 
 platforms:
