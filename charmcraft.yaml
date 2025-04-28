@@ -9,6 +9,11 @@ parts:
     plugin: charm
     source: .
     build-packages: [git]
+    charm-binary-python-packages:
+      # workaround for fixing dependency loop https://github.com/canonical/charmcraft/issues/2259
+      - cosl
+      - pydantic < 2
+      - git+https://github.com/canonical/prometheus-hardware-exporter.git
 
 platforms:
   ubuntu@20.04:amd64:
