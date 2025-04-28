@@ -179,6 +179,14 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     def remove(self) -> None:
         """Remove details."""
 
+    def _generate_storelib_config(self) -> bool:
+        """Generate configuration file for storelib library logging."""
+        return True
+
+    def _remove_storelib_config(self) -> None:
+        """Remove the storelib configuration file."""
+        pass
+
 
 class SnapStrategy(StrategyABC):
     """Snap strategy class."""
@@ -275,6 +283,10 @@ class StorCLIStrategy(TPRStrategyABC):
     origin_path = Path("/opt/MegaRAID/storcli/storcli64")
     symlink_bin = TOOLS_DIR / HWTool.STORCLI.value
 
+    # Name of the .ini config file, this can be varied based on the storelib version and
+    # the tool used. For Storcli, the config file is likely named "storelibconfit.ini"
+    _config_file_name = "storelibconfit.ini"
+
     def install(self, path: Path) -> None:
         """Install storcli."""
         if file_is_empty(path):
@@ -284,16 +296,82 @@ class StorCLIStrategy(TPRStrategyABC):
             raise ResourceChecksumError
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
+        self._generate_storelib_config()
 
     def remove(self) -> None:
         """Remove storcli."""
         self.symlink_bin.unlink(missing_ok=True)
         logger.debug("Remove file %s", self.symlink_bin)
         remove_deb(pkg=self.name)
+        self._remove_storelib_config()
 
     def check(self) -> bool:
         """Check resource status."""
         return self.symlink_bin.exists() and os.access(self.symlink_bin, os.X_OK)
+
+    def _generate_storelib_config(self) -> bool:
+        """Generate configuration file for storelib library logging.
+
+        Workaround to address the issue from
+        [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
+        """
+        tool_name = self._name.value
+
+        # Create the directory to store the log files by storelib
+        log_dir = Path(f"/tmp/hwo_storelib_logs/{tool_name}")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Created directory for storelib logs: %s", log_dir)
+
+        # Create the config file content
+        config_content = (
+            textwrap.dedent(
+                f"""
+                # Debug Level:
+                # 0 - No Debug
+                # 1 - Level 1
+                # 2 - Level 2
+                DEBUGLEVEL=2
+                DISABLELOG=1
+                # Write option on startup
+                # 0 - Append to existing debug file
+                # 1 - create new file
+                OVERWRITE=0
+                # Directory where debug file will be created
+                DEBUGDIR={log_dir}
+                #DEBUGLEVEL2MASK
+                #SCSICOMMANDFILTER
+                # Flag to turn Simulation Mode (0-No Simulation, 1- Simulation Mode (Requires simlib.dll))
+                #SIMULATION
+                #LIBPATH
+                #MAXDRVRBUFSIZE
+                #VENDORID
+                """
+            ).strip()
+            + "\n"
+        )
+
+        # Place the config file (for storcli it should likely be in '/' directory)
+        config_path = Path(f"/{self._config_file_name}")
+        if not config_path.exists():
+            # Write the config file
+            try:
+                with open(config_path, "w") as f:
+                    f.write(config_content)
+                logger.info(f"Created storelib configuration file at {config_path}")
+            except (IOError, PermissionError) as e:
+                logger.error(f"Failed to write configuration file: {e}")
+                return False
+
+        return True
+
+    def _remove_storelib_config(self) -> None:
+        """Remove the storelib configuration file."""
+        config_path = Path(f"/{self._config_file_name}")
+        if config_path.exists():
+            config_path.unlink()
+            logger.info(f"Removed storelib configuration file at {config_path}")
+        else:
+            logger.debug("Storelib configuration file does not exist at %s", config_path)
 
 
 class PercCLIStrategy(TPRStrategyABC):
@@ -737,7 +815,6 @@ class HWToolHelper:
                     path = fetch_tools.get(strategy.name)  # pylint: disable=W0212
                     if path:
                         strategy.install(path)
-                        self.generate_storelib_config(strategy)
 
                 elif isinstance(strategy, (APTStrategyABC, SnapStrategy)):
                     strategy.install()  # pylint: disable=E1120
@@ -783,144 +860,31 @@ class HWToolHelper:
 
     @staticmethod
     def correct_log_permissions() -> None:
-        """Update permissions on log files to comply with CIS benchmarks.
+        """Update permissions on log files created by storelib to match CIS benchmarks.
 
-        Equivalent to the CIS remediation from issue
+        Issue:
         [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
         """
-        logger.info("Fixing permissions on log files to comply with CIS benchmarks")
+        logger.info(
+            "Fixing permissions on storelibdebugit.txt files to comply with CIS benchmarks"
+        )
         try:
-
+            # Set permission of files with 'storelibdebugit.txt' in /var/log/ to rw-r-----
             cmd = [
                 "find",
                 "/var/log/",
-                "-perm",
-                "/u+xs,g+xws,o+xwrt",
-                "!",
-                "-name",
-                "history.log*",
-                "!",
-                "-name",
-                "eipp.log.xz*",
-                "!",
-                "-name",
-                "[bw]tmp",
-                "!",
-                "-name",
-                "[bw]tmp.*",
-                "!",
-                "-name",
-                "[bw]tmp-*",
-                "!",
-                "-name",
-                "lastlog",
-                "!",
-                "-name",
-                "lastlog.*",
-                "!",
-                "-name",
-                "cloud-init.log*",
-                "!",
-                "-name",
-                "localmessages*",
-                "!",
-                "-name",
-                "waagent.log*",
                 "-type",
                 "f",
-                "-regextype",
-                "posix-extended",
-                "-regex",
-                ".*",
+                "-name",
+                "storelibdebugit.txt*",
                 "-exec",
                 "chmod",
-                "u-xs,g-xws,o-xwrt",
+                "0640",
                 "{}",
                 ";",
             ]
+
             subprocess.run(cmd, check=True)
-            logger.debug("Successfully correct log file permissions")
+            logger.debug("Successfully correct storelibdebugit.txt file permissions")
         except subprocess.SubprocessError as e:
-            logger.error(f"Failed to correct log file permissions: {e}")
-
-    @staticmethod
-    def generate_storelib_config(hw_strategy: TPRStrategyABC) -> bool:
-        """Generate configuration file for storelib library logging.
-
-        Workaround to address the issue from
-        [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
-        """
-        tool_name = hw_strategy.name.value
-
-        # Check if the tool is installed
-        if not hw_strategy.check():
-            logger.debug("Tool %s is not installed", tool_name)
-            return False
-
-        # Create the directory to store the log files
-        log_dir = Path(f"/tmp/hwo_storelib_logs/{tool_name}")
-        log_dir.mkdir(parents=True, exist_ok=True)
-        logger.info("Created directory for storelib logs: %s", log_dir)
-
-        # Name of the .ini config file, this can be varied based on the storelib version and
-        # the tool used. For Storcli, the config file is likely named "storelibconfit.ini"
-        config_file_name = "storelibconfit.ini"
-
-        # Create the config file content
-        config_content = (
-            textwrap.dedent(
-                f"""
-                # Debug Level:
-                # 0 - No Debug
-                # 1 - Level 1
-                # 2 - Level 2
-                DEBUGLEVEL=2
-                # Write option on startup
-                # 0 - Append to existing debug file
-                # 1 - create new file
-                OVERWRITE=0
-                # Directory where debug file will be created
-                DEBUGDIR={log_dir}
-                #DEBUGLEVEL2MASK
-                #SCSICOMMANDFILTER
-                # Flag to turn Simulation Mode (0-No Simulation, 1- Simulation Mode (Requires simlib.dll))
-                #SIMULATION
-                #LIBPATH
-                #MAXDRVRBUFSIZE
-                #VENDORID
-                """
-            ).strip()
-            + "\n"
-        )
-
-        # Place the config file in the root directory (for storcli it must be in /)
-        config_path = Path(f"/{config_file_name}")
-        if not config_path.exists():
-            # Write the config file
-            try:
-                with open(config_path, "w") as f:
-                    f.write(config_content)
-                logger.info(f"Created storelib configuration file at {config_path}")
-            except (IOError, PermissionError) as e:
-                logger.error(f"Failed to write configuration file: {e}")
-                return False
-
-        # Make a symlink to the config file in the symlink tool directory if it exists
-        if hasattr(hw_strategy, "symlink_bin"):
-            symlink_dir: Path = hw_strategy.symlink_bin.parent
-            symlink_path = symlink_dir / config_file_name
-            symlink(src=config_path, dst=symlink_path)
-            logger.info(f"Created symlink for storelib configuration file at {symlink_path}")
-        else:
-            logger.debug("Tool %s does not have a symlink_bin attribute", tool_name)
-
-        # If the strategy has the "origin_path" attribute, also create a symlink there
-        if hasattr(hw_strategy, "origin_path"):
-            tool_dir: Path = hw_strategy.origin_path.parent
-            symlink_root_path = tool_dir / config_file_name
-            symlink(src=config_path, dst=symlink_root_path)
-            logger.info(f"Created symlink for storelib configuration file at {symlink_root_path}")
-        else:
-            logger.debug("Tool %s does not have an origin_path attribute", tool_name)
-
-        return True
+            logger.error(f"Failed to correct storelibdebugit.txt file permissions: {e}")
