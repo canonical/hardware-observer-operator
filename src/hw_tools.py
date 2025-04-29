@@ -179,13 +179,146 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     def remove(self) -> None:
         """Remove details."""
 
+    @property
+    def _config_file_path(self) -> Path:
+        """Path to the storelib config file.
+
+        Path to the storelib config file for tools that use
+        `storelib` as backend, default is `/storelibconfit.ini`.
+        Inheriting classes should override this if the config file
+        needs to be placed somewhere else or has a different name.
+        This default setup is already tested with StorCLI.
+        """
+        return Path("/storelibconfit.ini")
+
+    @property
+    def _storelib_log_dir(self) -> Path:
+        """Default path to the storelib log directory of the tool."""
+        return Path(f"/tmp/hwo_storelib_logs/{self._name.value}")
+
+    @property
+    def _storelib_config_content(self) -> str:
+        """Content template for the storelib config file."""
+        return (
+            textwrap.dedent(
+                f"""
+                # Debug Level:
+                # 0 - No Debug
+                # 1 - Level 1
+                # 2 - Level 2
+                DEBUGLEVEL=2
+                DISABLELOG=1
+                # Write option on startup
+                # 0 - Append to existing debug file
+                # 1 - create new file
+                OVERWRITE=0
+                # Directory where debug file will be created
+                DEBUGDIR={self._storelib_log_dir}
+                #DEBUGLEVEL2MASK
+                #SCSICOMMANDFILTER
+                # Flag to turn Simulation Mode (0-No Simulation, 1- Simulation Mode (Requires simlib.dll))
+                #SIMULATION
+                #LIBPATH
+                #MAXDRVRBUFSIZE
+                #VENDORID
+                #HWOTOOL={self._name.value}
+                """
+            ).strip()
+            + "\n"
+        )
+
     def _generate_storelib_config(self) -> bool:
-        """Generate configuration file for storelib library logging."""
+        """Generate configuration file for storelib library logging.
+
+        Workaround to address the issue from
+        [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
+        """
+        # Create the directory for storelib logs
+        self._storelib_log_dir.mkdir(parents=True, exist_ok=True)
+
+        if not self._config_file_path.exists():
+            # Write the config file
+            try:
+                with open(self._config_file_path, "w") as f:
+                    f.write(self._storelib_config_content)
+                logger.info(f"Created storelib config file at {self._config_file_path}")
+            except (IOError, PermissionError) as e:
+                logger.error(f"Failed to write storelib config file: {e}")
+                return False
+        else:
+            # If the file already exists, check if the tool already in the file
+            # If not, append the tool to the file
+            try:
+                with open(self._config_file_path, "r+") as f:
+                    content = f.read()
+                    tool = f"#HWOTOOL={self._name.value}"
+                    if tool not in content:
+                        # Append the current tool to the file
+                        f.write(f"\n{tool}\n")
+                        logger.info(
+                            f"Add {tool} to storelib config file at {self._config_file_path}"
+                        )
+            except (IOError, PermissionError) as e:
+                logger.error(f"Failed to append storelib config file with {tool}: {e}")
+                return False
+
         return True
 
     def _remove_storelib_config(self) -> None:
-        """Remove the storelib configuration file."""
-        pass
+        """Try to remove/adjust the storelib configuration file.
+
+        - If there is no registration of the current tool in the file,
+        do nothing and log a warning.
+        - If there are multiple tools using the same config file, only remove the
+        registration of the current tool from the file (the line `HWOTool=<tool_name>`).
+        - Otherwise, remove the file.
+
+        """
+        try:
+            if not self._config_file_path.exists():
+                logger.info(f"Storelib config file at {self._config_file_path} does not exist!")
+                return
+
+            try:
+                with open(self._config_file_path, "r") as f:
+                    lines = f.readlines()
+            except (IOError, PermissionError) as e:
+                logger.error(f"Failed to read storelib config file: {e}")
+                return
+
+            hwtool_lines = [line for line in lines if line.startswith("#HWOTOOL=")]
+
+            # If the current tool is not found in the config file, log a warning
+            if not any(self._name.value in line for line in hwtool_lines):
+                logger.warning(
+                    f"{self._name.value} not found in storelib config file at {self._config_file_path}.\
+                    File is not removed."
+                )
+                return
+
+            # If there are multiple HWOTOOL lines, only remove the line that contains current tool
+            if len(hwtool_lines) > 1:
+                lines = [
+                    line
+                    for line in lines
+                    if not (line.startswith("#HWOTOOL=") and self._name.value in line)
+                ]
+                try:
+                    with open(self._config_file_path, "w") as f:
+                        f.writelines(lines)
+                    logger.info(
+                        f"Removed {self._name.value} from storelib config file at {self._config_file_path}"
+                    )
+                except (IOError, PermissionError) as e:
+                    logger.error(f"Failed to update storelib config file: {e}")
+            else:
+                try:
+                    self._config_file_path.unlink()
+                    logger.info(f"Removed storelib configuration file at {self._config_file_path}")
+                except (IOError, PermissionError) as e:
+                    logger.error(f"Failed to remove storelib config file: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error when removing storelib config: {e}")
 
 
 class SnapStrategy(StrategyABC):
@@ -283,10 +416,6 @@ class StorCLIStrategy(TPRStrategyABC):
     origin_path = Path("/opt/MegaRAID/storcli/storcli64")
     symlink_bin = TOOLS_DIR / HWTool.STORCLI.value
 
-    # Name of the .ini config file, this can be varied based on the storelib version and
-    # the tool used. For Storcli, the config file is likely named "storelibconfit.ini"
-    _config_file_name = "storelibconfit.ini"
-
     def install(self, path: Path) -> None:
         """Install storcli."""
         if file_is_empty(path):
@@ -308,70 +437,6 @@ class StorCLIStrategy(TPRStrategyABC):
     def check(self) -> bool:
         """Check resource status."""
         return self.symlink_bin.exists() and os.access(self.symlink_bin, os.X_OK)
-
-    def _generate_storelib_config(self) -> bool:
-        """Generate configuration file for storelib library logging.
-
-        Workaround to address the issue from
-        [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
-        """
-        tool_name = self._name.value
-
-        # Create the directory to store the log files by storelib
-        log_dir = Path(f"/tmp/hwo_storelib_logs/{tool_name}")
-        log_dir.mkdir(parents=True, exist_ok=True)
-        logger.info("Created directory for storelib logs: %s", log_dir)
-
-        # Create the config file content
-        config_content = (
-            textwrap.dedent(
-                f"""
-                # Debug Level:
-                # 0 - No Debug
-                # 1 - Level 1
-                # 2 - Level 2
-                DEBUGLEVEL=2
-                DISABLELOG=1
-                # Write option on startup
-                # 0 - Append to existing debug file
-                # 1 - create new file
-                OVERWRITE=0
-                # Directory where debug file will be created
-                DEBUGDIR={log_dir}
-                #DEBUGLEVEL2MASK
-                #SCSICOMMANDFILTER
-                # Flag to turn Simulation Mode (0-No Simulation, 1- Simulation Mode (Requires simlib.dll))
-                #SIMULATION
-                #LIBPATH
-                #MAXDRVRBUFSIZE
-                #VENDORID
-                """
-            ).strip()
-            + "\n"
-        )
-
-        # Place the config file (for storcli it should likely be in '/' directory)
-        config_path = Path(f"/{self._config_file_name}")
-        if not config_path.exists():
-            # Write the config file
-            try:
-                with open(config_path, "w") as f:
-                    f.write(config_content)
-                logger.info(f"Created storelib configuration file at {config_path}")
-            except (IOError, PermissionError) as e:
-                logger.error(f"Failed to write configuration file: {e}")
-                return False
-
-        return True
-
-    def _remove_storelib_config(self) -> None:
-        """Remove the storelib configuration file."""
-        config_path = Path(f"/{self._config_file_name}")
-        if config_path.exists():
-            config_path.unlink()
-            logger.info(f"Removed storelib configuration file at {config_path}")
-        else:
-            logger.debug("Storelib configuration file does not exist at %s", config_path)
 
 
 class PercCLIStrategy(TPRStrategyABC):
@@ -859,32 +924,33 @@ class HWToolHelper:
         return True, ""
 
     @staticmethod
-    def correct_log_permissions() -> None:
+    def correct_log_permissions() -> bool:
         """Update permissions on log files created by storelib to match CIS benchmarks.
 
-        Issue:
+        Workaround to address issue
         [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
         """
         logger.info(
             "Fixing permissions on storelibdebugit.txt files to comply with CIS benchmarks"
         )
+        file_name = "storelibdebugit.txt"
         try:
-            # Set permission of files with 'storelibdebugit.txt' in /var/log/ to rw-r-----
-            cmd = [
-                "find",
-                "/var/log/",
-                "-type",
-                "f",
-                "-name",
-                "storelibdebugit.txt*",
-                "-exec",
-                "chmod",
-                "0640",
-                "{}",
-                ";",
-            ]
+            target_file_paths = []
+            for root, _, files in os.walk("/var/log/"):
+                for file in files:
+                    if file.startswith(file_name):
+                        target_file_paths.append(os.path.join(root, file))
 
-            subprocess.run(cmd, check=True)
-            logger.debug("Successfully correct storelibdebugit.txt file permissions")
-        except subprocess.SubprocessError as e:
-            logger.error(f"Failed to correct storelibdebugit.txt file permissions: {e}")
+            for file_path in target_file_paths:
+                # Set permission to rw-r-----
+                os.chmod(file_path, 0o640)
+
+            logger.debug(f"Successfully corrected permission for {file_name}")
+
+        except OSError as e:
+            logger.error(
+                f"Failed to correct {file_name} file permissions: {e}. Consider correct it manually in /var/log/"
+            )
+            return False
+
+        return True
