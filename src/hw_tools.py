@@ -206,7 +206,7 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
                 # 0 - No Debug
                 # 1 - Level 1
                 # 2 - Level 2
-                DEBUGLEVEL=2
+                DEBUGLEVEL=0
                 DISABLELOG=1
                 # Write option on startup
                 # 0 - Append to existing debug file
@@ -226,7 +226,7 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
             + "\n"
         )
 
-    def _generate_storelib_config(self) -> bool:
+    def _generate_storelib_config(self) -> None:
         """Generate configuration file for storelib library logging.
 
         Workaround to address the issue from
@@ -238,29 +238,30 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
         # Check if file exists and log warning before overwriting
         if self._config_file_path.exists():
             logger.warning(
-                f"Storelib config file at {self._config_file_path} already exists. Overwriting it."
+                "Storelib config file at %s already exists. Overwriting it.",
+                self._config_file_path,
             )
 
         # Write the config file
         try:
             with open(self._config_file_path, "w") as f:
                 f.write(self._storelib_config_content)
-            logger.info(f"Created storelib config file at {self._config_file_path}")
-            return True
-        except (IOError, PermissionError) as e:
-            logger.error(f"Failed to write storelib config file: {e}")
-            return False
+            logger.info("Created storelib config file at %s", self._config_file_path)
+        except (IOError, PermissionError) as err:
+            logger.error("Failed to write storelib config file: %s", err)
+            raise err
 
     def _remove_storelib_config(self) -> None:
         """Remove the storelib configuration file."""
         try:
             if self._config_file_path.exists():
                 self._config_file_path.unlink()
-                logger.info(f"Removed storelib configuration file at {self._config_file_path}")
+                logger.info("Removed storelib configuration file at %s", self._config_file_path)
             else:
-                logger.info(f"Storelib config file at {self._config_file_path} does not exist")
-        except Exception as e:
-            logger.error(f"Failed to remove storelib config file: {e}")
+                logger.info("Storelib config file at %s does not exist", self._config_file_path)
+        except Exception as err:
+            logger.error("Failed to remove storelib config file: %s", err)
+            raise err
 
 
 class SnapStrategy(StrategyABC):
@@ -367,8 +368,7 @@ class StorCLIStrategy(TPRStrategyABC):
             raise ResourceChecksumError
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
-        if not self._generate_storelib_config():
-            raise OSError(f"Failed to generate storelib config file at {self._config_file_path}")
+        self._generate_storelib_config()
 
     def remove(self) -> None:
         """Remove storcli."""
@@ -888,11 +888,13 @@ class HWToolHelper:
                 # Set permission to rw-r-----
                 os.chmod(file_path, 0o640)
 
-            logger.debug(f"Successfully corrected permission for {file_name}")
+            logger.debug("Successfully corrected permission for %s", file_name)
 
-        except OSError as e:
+        except OSError as err:
             logger.error(
-                f"Failed to correct {file_name} file permissions: {e}. Consider correct it manually in /var/log/"
+                "Failed to correct %s file permissions: %s. Consider correct it manually in /var/log/",
+                file_name,
+                err,
             )
             return False
 
