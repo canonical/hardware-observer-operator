@@ -221,7 +221,6 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
                 #LIBPATH
                 #MAXDRVRBUFSIZE
                 #VENDORID
-                #HWOTOOL={self._name.value}
                 """
             ).strip()
             + "\n"
@@ -236,89 +235,32 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
         # Create the directory for storelib logs
         self._storelib_log_dir.mkdir(parents=True, exist_ok=True)
 
-        if not self._config_file_path.exists():
-            # Write the config file
-            try:
-                with open(self._config_file_path, "w") as f:
-                    f.write(self._storelib_config_content)
-                logger.info(f"Created storelib config file at {self._config_file_path}")
-            except (IOError, PermissionError) as e:
-                logger.error(f"Failed to write storelib config file: {e}")
-                return False
-        else:
-            # If the file already exists, check if the tool already in the file
-            # If not, append the tool to the file
-            try:
-                with open(self._config_file_path, "r+") as f:
-                    content = f.read()
-                    tool = f"#HWOTOOL={self._name.value}"
-                    if tool not in content:
-                        # Append the current tool to the file
-                        f.write(f"\n{tool}\n")
-                        logger.info(
-                            f"Add {tool} to storelib config file at {self._config_file_path}"
-                        )
-            except (IOError, PermissionError) as e:
-                logger.error(f"Failed to append storelib config file with {tool}: {e}")
-                return False
+        # Check if file exists and log warning before overwriting
+        if self._config_file_path.exists():
+            logger.warning(
+                f"Storelib config file at {self._config_file_path} already exists. Overwriting it."
+            )
 
-        return True
+        # Write the config file
+        try:
+            with open(self._config_file_path, "w") as f:
+                f.write(self._storelib_config_content)
+            logger.info(f"Created storelib config file at {self._config_file_path}")
+            return True
+        except (IOError, PermissionError) as e:
+            logger.error(f"Failed to write storelib config file: {e}")
+            return False
 
     def _remove_storelib_config(self) -> None:
-        """Try to remove/adjust the storelib configuration file.
-
-        - If there is no registration of the current tool in the file,
-        do nothing and log a warning.
-        - If there are multiple tools using the same config file, only remove the
-        registration of the current tool from the file (the line `HWOTool=<tool_name>`).
-        - Otherwise, remove the file.
-
-        """
+        """Remove the storelib configuration file."""
         try:
-            if not self._config_file_path.exists():
-                logger.info(f"Storelib config file at {self._config_file_path} does not exist!")
-                return
-
-            try:
-                with open(self._config_file_path, "r") as f:
-                    lines = f.readlines()
-            except (IOError, PermissionError) as e:
-                logger.error(f"Failed to read storelib config file: {e}")
-                return
-
-            hwtool_lines = [line for line in lines if line.startswith("#HWOTOOL=")]
-
-            # If the current tool is not found in the config file, log a warning
-            if not any(self._name.value in line for line in hwtool_lines):
-                logger.warning(
-                    f"{self._name.value} not found in storelib config file at {self._config_file_path}.\
-                    File is not removed."
-                )
-                return
-
-            # If there are multiple HWOTOOL lines, only remove the line that contains current tool
-            if len(hwtool_lines) > 1:
-                lines = [
-                    line
-                    for line in lines
-                    if not (line.startswith("#HWOTOOL=") and self._name.value in line)
-                ]
-                try:
-                    with open(self._config_file_path, "w") as f:
-                        f.writelines(lines)
-                    logger.info(
-                        f"Removed {self._name.value} from storelib config file at {self._config_file_path}"
-                    )
-                except (IOError, PermissionError) as e:
-                    logger.error(f"Failed to update storelib config file: {e}")
+            if self._config_file_path.exists():
+                self._config_file_path.unlink()
+                logger.info(f"Removed storelib configuration file at {self._config_file_path}")
             else:
-                try:
-                    self._config_file_path.unlink()
-                    logger.info(f"Removed storelib configuration file at {self._config_file_path}")
-                except (IOError, PermissionError) as e:
-                    logger.error(f"Failed to remove storelib config file: {e}")
+                logger.info(f"Storelib config file at {self._config_file_path} does not exist")
         except Exception as e:
-            logger.error(f"Unexpected error when removing storelib config: {e}")
+            logger.error(f"Failed to remove storelib config file: {e}")
 
 
 class SnapStrategy(StrategyABC):
@@ -425,7 +367,8 @@ class StorCLIStrategy(TPRStrategyABC):
             raise ResourceChecksumError
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
-        self._generate_storelib_config()
+        if not self._generate_storelib_config():
+            raise OSError(f"Failed to generate storelib config file at {self._config_file_path}")
 
     def remove(self) -> None:
         """Remove storcli."""
