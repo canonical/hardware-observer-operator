@@ -182,11 +182,8 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_update_status(self, _: EventBase) -> None:  # noqa: C901
         """Update the charm's status."""
-        if not self.hw_tool_helper.correct_log_permissions():
-            self.model.unit.status = BlockedStatus(
-                "Cannot set permissions for storelib log files. See logs for details."
-            )
-            return
+        # If correction failed, the charm will be set in error status
+        self.hw_tool_helper.correct_log_permissions()
 
         if not self._stored.resource_installed:  # type: ignore[truthy-function]
             # The charm should be in BlockedStatus with install failed msg

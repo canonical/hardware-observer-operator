@@ -259,7 +259,7 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
                 logger.info("Removed storelib configuration file at %s", self._config_file_path)
             else:
                 logger.info("Storelib config file at %s does not exist", self._config_file_path)
-        except Exception as err:
+        except (IOError, PermissionError) as err:
             logger.error("Failed to remove storelib config file: %s", err)
             raise err
 
@@ -867,7 +867,7 @@ class HWToolHelper:
         return True, ""
 
     @staticmethod
-    def correct_log_permissions() -> bool:
+    def correct_log_permissions() -> None:
         """Update permissions on log files created by storelib to match CIS benchmarks.
 
         Workaround to address issue
@@ -888,14 +888,10 @@ class HWToolHelper:
                 # Set permission to rw-r-----
                 os.chmod(file_path, 0o640)
 
-            logger.debug("Successfully corrected permission for %s", file_name)
-
-        except OSError as err:
+        except (IOError, PermissionError) as err:
             logger.error(
                 "Failed to correct %s file permissions: %s. Consider correct it manually in /var/log/",
                 file_name,
                 err,
             )
-            return False
-
-        return True
+            raise err
