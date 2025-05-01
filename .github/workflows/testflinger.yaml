@@ -1,0 +1,35 @@
+name: Testflinger
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [testflinger-ci]
+    paths-ignore:
+      - "**.md"
+      - "**.rst"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testflinger-submit:
+    runs-on: [self-hosted, testflinger]
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Submit job
+        uses: canonical/testflinger/.github/actions/submit@v1
+        with:
+          poll: true
+          job: |
+            job_queue: torchtusk
+            test_data:
+              test_cmds: |
+                #!/usr/bin/env bash
+                git clone https://github.com/canonical/hardware-observer-operator.git
+                cd hardware-observer-operator/tests/manual/
+                ./scripts/bootstrap.sh
+                terragrunt run-all apply
