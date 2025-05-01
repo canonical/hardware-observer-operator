@@ -26,7 +26,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
       - name: Submit job
-        uses: canonical/testflinger/.github/actions/submit@v1
+        uses: canonical/testflinger/.github/actions/submit@main
         with:
           poll: true
           job: |
