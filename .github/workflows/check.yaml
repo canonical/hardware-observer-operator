@@ -303,10 +303,10 @@ jobs:
           if [ -e "${coverage_files[0]}" ]; then
             echo "Merging coverage files: ${coverage_files[*]}"
             coverage combine "${coverage_files[@]}"
-            coverage report --show-missing
 
             # Check if there is actual data to report before generating XML with merged reports
             if coverage report > /dev/null 2>&1; then
+              coverage report --show-missing
               coverage xml -o tests/report/coverage.xml
             fi
 
