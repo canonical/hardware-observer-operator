@@ -6,9 +6,6 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [testflinger-ci]
-    paths-ignore:
-      - "**.md"
-      - "**.rst"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
