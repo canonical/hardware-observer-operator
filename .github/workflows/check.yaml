@@ -34,7 +34,7 @@ jobs:
             test_data:
               test_cmds: |
                 #!/usr/bin/env bash
-                git clone https://github.com/canonical/hardware-observer-operator.git
+                git clone -b testflinger-ci https://github.com/canonical/hardware-observer-operator.git
                 cd hardware-observer-operator/tests/manual/
                 ./scripts/bootstrap.sh
                 terragrunt run-all apply

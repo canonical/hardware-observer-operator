@@ -3,6 +3,7 @@
 set -xe
 
 sudo apt update
+sudo apt-get install -y snapd
 
 # Set up packages
 sudo snap install juju
