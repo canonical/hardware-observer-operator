@@ -34,10 +34,13 @@ jobs:
             test_data:
               test_cmds: |
                 #!/usr/bin/env bash
-                git clone -b testflinger-ci https://github.com/canonical/hardware-observer-operator.git
-                cd hardware-observer-operator/tests/manual/
-                ./scripts/bootstrap.sh
-                terragrunt run-all apply
+                ssh ubuntu@${DEVICE_IP} <<'EOF'
+                  set -ex
+                  git clone -b testflinger-ci https://github.com/canonical/hardware-observer-operator.git
+                  cd hardware-observer-operator/tests/manual/
+                  ./scripts/bootstrap.sh
+                  terragrunt run-all apply --terragrunt-non-interactive
+                EOF
   # lint:
   #   name: Lint
   #   strategy:
