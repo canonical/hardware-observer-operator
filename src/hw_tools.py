@@ -8,6 +8,7 @@ import os
 import shutil
 import stat
 import subprocess
+import textwrap
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
@@ -178,6 +179,90 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     def remove(self) -> None:
         """Remove details."""
 
+    @property
+    def _config_file_path(self) -> Path:
+        """Path to the storelib config file.
+
+        Path to the storelib config file for tools that use
+        `storelib` as backend, default is `/storelibconfit.ini`.
+        Inheriting classes should override this if the config file
+        needs to be placed somewhere else or has a different name.
+        This default setup is already tested with StorCLI.
+        """
+        return Path("/storelibconfit.ini")
+
+    @property
+    def _storelib_log_dir(self) -> Path:
+        """Default path to the storelib log directory of the tool."""
+        return Path(f"/tmp/hwo_storelib_logs/{self._name.value}")
+
+    @property
+    def _storelib_config_content(self) -> str:
+        """Content template for the storelib config file."""
+        return (
+            textwrap.dedent(
+                f"""
+                # Debug Level:
+                # 0 - No Debug
+                # 1 - Level 1
+                # 2 - Level 2
+                DEBUGLEVEL=0
+                DISABLELOG=1
+                # Write option on startup
+                # 0 - Append to existing debug file
+                # 1 - create new file
+                OVERWRITE=0
+                # Directory where debug file will be created
+                DEBUGDIR={self._storelib_log_dir}
+                #DEBUGLEVEL2MASK
+                #SCSICOMMANDFILTER
+                # Flag to turn Simulation Mode (0-No Simulation, 1- Simulation Mode (Requires simlib.dll))
+                #SIMULATION
+                #LIBPATH
+                #MAXDRVRBUFSIZE
+                #VENDORID
+                """
+            ).strip()
+            + "\n"
+        )
+
+    def _generate_storelib_config(self) -> None:
+        """Generate configuration file for storelib library logging.
+
+        Workaround to address the issue from
+        [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
+        """
+        # Create the directory for storelib logs
+        self._storelib_log_dir.mkdir(parents=True, exist_ok=True)
+
+        # Check if file exists and log warning before overwriting
+        if self._config_file_path.exists():
+            logger.warning(
+                "Storelib config file at %s already exists. Overwriting it.",
+                self._config_file_path,
+            )
+
+        # Write the config file
+        try:
+            with open(self._config_file_path, "w") as f:
+                f.write(self._storelib_config_content)
+            logger.info("Created storelib config file at %s", self._config_file_path)
+        except (IOError, PermissionError) as err:
+            logger.error("Failed to write storelib config file: %s", err)
+            raise err
+
+    def _remove_storelib_config(self) -> None:
+        """Remove the storelib configuration file."""
+        try:
+            if self._config_file_path.exists():
+                self._config_file_path.unlink()
+                logger.info("Removed storelib configuration file at %s", self._config_file_path)
+            else:
+                logger.info("Storelib config file at %s does not exist", self._config_file_path)
+        except (IOError, PermissionError) as err:
+            logger.error("Failed to remove storelib config file: %s", err)
+            raise err
+
 
 class SnapStrategy(StrategyABC):
     """Snap strategy class."""
@@ -283,12 +368,14 @@ class StorCLIStrategy(TPRStrategyABC):
             raise ResourceChecksumError
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
+        self._generate_storelib_config()
 
     def remove(self) -> None:
         """Remove storcli."""
         self.symlink_bin.unlink(missing_ok=True)
         logger.debug("Remove file %s", self.symlink_bin)
         remove_deb(pkg=self.name)
+        self._remove_storelib_config()
 
     def check(self) -> bool:
         """Check resource status."""
@@ -739,6 +826,7 @@ class HWToolHelper:
 
                 elif isinstance(strategy, (APTStrategyABC, SnapStrategy)):
                     strategy.install()  # pylint: disable=E1120
+
                 logger.info("Strategy %s install success", strategy)
             except (
                 ResourceFileSizeZeroError,
@@ -777,3 +865,33 @@ class HWToolHelper:
         if failed_checks:
             return False, f"Fail strategy checks: {failed_checks}"
         return True, ""
+
+    @staticmethod
+    def correct_log_permissions() -> None:
+        """Update permissions on log files created by storelib to match CIS benchmarks.
+
+        Workaround to address issue
+        [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
+        """
+        logger.info(
+            "Fixing permissions on storelibdebugit.txt files to comply with CIS benchmarks"
+        )
+        file_name = "storelibdebugit.txt"
+        try:
+            target_file_paths = []
+            for root, _, files in os.walk("/var/log/"):
+                for file in files:
+                    if file.startswith(file_name):
+                        target_file_paths.append(os.path.join(root, file))
+
+            for file_path in target_file_paths:
+                # Set permission to rw-r-----
+                os.chmod(file_path, 0o640)
+
+        except (IOError, PermissionError) as err:
+            logger.error(
+                "Failed to correct %s file permissions: %s. Consider correct it manually in /var/log/",
+                file_name,
+                err,
+            )
+            raise err
