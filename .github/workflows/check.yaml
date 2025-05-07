@@ -268,7 +268,7 @@ jobs:
           path: "${{ env.CRASHDUMPS_DIR }}/juju-crashdump-*.tar.xz"
 
   tics-analysis:
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, linux, amd64, tiobe, jammy]
     if: >
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
@@ -281,6 +281,20 @@ jobs:
       - name: Install coverage tools
         run: |
           pip install coverage
+
+      # Install everything from all requirements.txt files otherwise TICS errors.
+      - name: Install all charm dependencies
+        run: |
+          for f in $(find -name '*requirements.txt'); do
+              echo "${f}"
+              pip3 install --requirement "${f}"
+          done
+
+          # For reactive charms
+          for f in $(find -name 'wheelhouse.txt'); do
+              echo "${f}"
+              pip3 install --requirement "${f}"
+          done
 
       - name: Determine system architecture
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
