@@ -206,9 +206,22 @@ jobs:
   #       with:
   #         name: built_charms_${{ env.SYSTEM_ARCH }}
 
+<<<<<<< HEAD
   #     - name: List the names of the downloaded charms
   #       run: |
   #         ls *.charm
+=======
+  tics-analysis:
+    runs-on: [self-hosted, linux, amd64, tiobe, jammy]
+    if: >
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    needs: func
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+>>>>>>> main
 
   #     - name: Run tests
   #       run: |
@@ -226,10 +239,29 @@ jobs:
   #       env:
   #         TEST_JUJU_CHANNEL: ${{ matrix.juju-channel }}
 
+<<<<<<< HEAD
   #     - name: Generate Safe Test Command Identifier by removing spaces and special characters
   #       run: |
   #         TEST_CMD_ID=$(echo "${{ matrix.test-command }}" | sed 's/[^a-zA-Z0-9]/_/g')
   #         echo "TEST_CMD_ID=$TEST_CMD_ID" >> $GITHUB_ENV
+=======
+      # Install everything from all requirements.txt files otherwise TICS errors.
+      - name: Install all charm dependencies
+        run: |
+          for f in $(find -name '*requirements.txt'); do
+              echo "${f}"
+              pip3 install --requirement "${f}"
+          done
+
+          # For reactive charms
+          for f in $(find -name 'wheelhouse.txt'); do
+              echo "${f}"
+              pip3 install --requirement "${f}"
+          done
+
+      - name: Determine system architecture
+        run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
+>>>>>>> main
 
   #     - name: Create artifact name suffix
   #       run: |
