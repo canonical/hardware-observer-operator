@@ -64,6 +64,7 @@ resource "juju_application" "hardware-observer" {
 
   charm {
     name    = "hardware-observer"
+    base = juju_machine.machine.base
     channel = "latest/stable"
   }
 }
