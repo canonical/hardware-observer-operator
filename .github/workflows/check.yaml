@@ -280,7 +280,7 @@ jobs:
 
       - name: Install coverage tools
         run: |
-          pip install coverage
+          pip install coverage[toml]
 
       # Install everything from all requirements.txt files otherwise TICS errors.
       - name: Install all charm dependencies
