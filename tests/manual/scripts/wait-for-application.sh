@@ -15,6 +15,15 @@ juju switch $MODEL
 juju wait-for application $APPLICATION --query='status=="active" || status=="idle"'
 
 if [[ "$APPLICATION" == "microk8s" ]]; then
-    echo "Waiting for microk8s to be ready..."
-    sudo microk8s status --wait-ready
+    echo "Waiting for API server to respond..."
+    for i in {1..20}; do
+        if curl --insecure --silent https://127.0.0.1:16443/healthz | grep -q "401"; then
+            echo "API server is up and running."
+            break
+        else
+            echo "API server not ready yet, retrying..."
+            sleep 3
+        fi
+    done
+
 fi
