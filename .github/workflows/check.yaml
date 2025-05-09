@@ -30,7 +30,7 @@ jobs:
         with:
           poll: true
           job: |
-            job_queue: eevee
+            job_queue: torchtusk
             test_data:
               test_cmds: |
                 #!/usr/bin/env bash
@@ -40,7 +40,7 @@ jobs:
                   cd hardware-observer-operator
                   ./tests/manual/scripts/bootstrap.sh
                   terragrunt run-all apply --terragrunt-non-interactive
-                  tox -e func -- -v --realhw --model test --collectors ipmi_dcmi ipmi_sel ipmi_sensor --keep-models
+                  tox -e func -- -v --realhw --model test --collectors ipmi_dcmi ipmi_sel ipmi_sensor --keep-models --no-deploy
                 EOF
   # lint:
   #   name: Lint
