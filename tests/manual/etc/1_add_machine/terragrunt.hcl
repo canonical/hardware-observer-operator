@@ -10,6 +10,11 @@ terraform {
     execute      = [find_in_parent_folders("./scripts/wait-for-application.sh"), "hw-obs", "microk8s"]
     run_on_error = true
   }
+  after_hook "wait-for-microk8s-api-server" {
+    commands     = ["apply"]
+    execute      = [find_in_parent_folders("./scripts/wait-for-microk8s.sh"), "microk8s"]
+    run_on_error = true
+  }
   after_hook "get-kubeconfig" {
     commands     = ["apply"]
     execute      = [find_in_parent_folders("./scripts/get-kubeconfig.sh")]
