@@ -9,4 +9,4 @@ if [ -z "$MODEL" ]; then
     exit 1
 fi
 
-juju wait-for model $MODEL --query='forEach(applications, app => app.status == "active")'
+juju wait-for model --timeout=20m0s $MODEL --query='forEach(applications, app => app.status == "active")'

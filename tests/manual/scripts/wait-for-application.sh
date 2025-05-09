@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+set -x
 
 MODEL="$1"
 APPLICATION="$2"
