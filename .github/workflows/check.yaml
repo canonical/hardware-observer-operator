@@ -30,16 +30,17 @@ jobs:
         with:
           poll: true
           job: |
-            job_queue: torchtusk
+            job_queue: eevee
             test_data:
               test_cmds: |
                 #!/usr/bin/env bash
                 ssh ubuntu@${DEVICE_IP} <<'EOF'
                   set -ex
                   git clone -b testflinger-ci https://github.com/canonical/hardware-observer-operator.git
-                  cd hardware-observer-operator/tests/manual/
-                  ./scripts/bootstrap.sh
+                  cd hardware-observer-operator
+                  ./tests/manual/scripts/bootstrap.sh
                   terragrunt run-all apply --terragrunt-non-interactive
+                  tox -e func -- -v --realhw --model test --collectors ipmi_dcmi ipmi_sel ipmi_sensor --keep-models
                 EOF
   # lint:
   #   name: Lint
