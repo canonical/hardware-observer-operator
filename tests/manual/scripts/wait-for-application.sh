@@ -13,8 +13,3 @@ fi
 juju switch $MODEL
 
 juju wait-for application $APPLICATION --query='status=="active" || status=="idle"'
-
-if [[ "$APPLICATION" == "microk8s" ]]; then
-    echo "Waiting for microk8s to be ready..."
-    sudo microk8s status --wait-ready
-fi
