@@ -1,6 +1,4 @@
 -r requirements.txt
-cosl
-pydantic < 2
 coverage
 flake8
 parameterized
