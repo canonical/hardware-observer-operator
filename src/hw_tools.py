@@ -8,9 +8,9 @@ import os
 import shutil
 import stat
 import subprocess
-import textwrap
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
+from string import Template
 from typing import Dict, List, Set, Tuple
 
 import requests
@@ -180,7 +180,7 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
         """Remove details."""
 
     @property
-    def _config_file_path(self) -> Path:
+    def _storelib_config_file_path(self) -> Path:
         """Path to the storelib config file.
 
         Path to the storelib config file for tools that use
@@ -199,32 +199,10 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     @property
     def _storelib_config_content(self) -> str:
         """Content template for the storelib config file."""
-        return (
-            textwrap.dedent(
-                f"""
-                # Debug Level:
-                # 0 - No Debug
-                # 1 - Level 1
-                # 2 - Level 2
-                DEBUGLEVEL=0
-                DISABLELOG=1
-                # Write option on startup
-                # 0 - Append to existing debug file
-                # 1 - create new file
-                OVERWRITE=0
-                # Directory where debug file will be created
-                DEBUGDIR={self._storelib_log_dir}
-                #DEBUGLEVEL2MASK
-                #SCSICOMMANDFILTER
-                # Flag to turn Simulation Mode (0-No Simulation, 1- Simulation Mode (Requires simlib.dll))
-                #SIMULATION
-                #LIBPATH
-                #MAXDRVRBUFSIZE
-                #VENDORID
-                """
-            ).strip()
-            + "\n"
-        )
+        template_path = Path(__file__).parent / "storelib_conf.template"
+        with template_path.open() as f:
+            template = Template(f.read())
+        return template.substitute(debug_dir=self._storelib_log_dir)
 
     def _generate_storelib_config(self) -> None:
         """Generate configuration file for storelib library logging.
@@ -236,17 +214,17 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
         self._storelib_log_dir.mkdir(parents=True, exist_ok=True)
 
         # Check if file exists and log warning before overwriting
-        if self._config_file_path.exists():
+        if self._storelib_config_file_path.exists():
             logger.warning(
                 "Storelib config file at %s already exists. Overwriting it.",
-                self._config_file_path,
+                self._storelib_config_file_path,
             )
 
         # Write the config file
         try:
-            with open(self._config_file_path, "w") as f:
+            with open(self._storelib_config_file_path, "w") as f:
                 f.write(self._storelib_config_content)
-            logger.info("Created storelib config file at %s", self._config_file_path)
+            logger.info("Created storelib config file at %s", self._storelib_config_file_path)
         except (IOError, PermissionError) as err:
             logger.error("Failed to write storelib config file: %s", err)
             raise err
@@ -254,11 +232,15 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     def _remove_storelib_config(self) -> None:
         """Remove the storelib configuration file."""
         try:
-            if self._config_file_path.exists():
-                self._config_file_path.unlink()
-                logger.info("Removed storelib configuration file at %s", self._config_file_path)
+            if self._storelib_config_file_path.exists():
+                self._storelib_config_file_path.unlink()
+                logger.info(
+                    "Removed storelib configuration file at %s", self._storelib_config_file_path
+                )
             else:
-                logger.info("Storelib config file at %s does not exist", self._config_file_path)
+                logger.info(
+                    "Storelib config file at %s does not exist", self._storelib_config_file_path
+                )
         except (IOError, PermissionError) as err:
             logger.error("Failed to remove storelib config file: %s", err)
             raise err
@@ -867,30 +849,27 @@ class HWToolHelper:
         return True, ""
 
     @staticmethod
-    def correct_log_permissions() -> None:
+    def correct_storelib_log_permissions() -> None:
         """Update permissions on log files created by storelib to match CIS benchmarks.
 
         Workaround to address issue
         [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
         """
-        logger.info(
-            "Fixing permissions on storelibdebugit.txt files to comply with CIS benchmarks"
-        )
         file_name = "storelibdebugit.txt"
+        target_perm = 0o640
         try:
-            target_file_paths = []
-            for root, _, files in os.walk("/var/log/"):
-                for file in files:
-                    if file.startswith(file_name):
-                        target_file_paths.append(os.path.join(root, file))
+            log_dir = Path("/var/log")
+            target_file_paths = log_dir.rglob(f"{file_name}*")
 
             for file_path in target_file_paths:
-                # Set permission to rw-r-----
-                os.chmod(file_path, 0o640)
+                current_perm = file_path.stat().st_mode & 0o777
+                if current_perm != target_perm:
+                    file_path.chmod(target_perm)
+                    logger.warning("Correct %s permissions to %o", file_path, target_perm)
 
         except (IOError, PermissionError) as err:
             logger.error(
-                "Failed to correct %s file permissions: %s. Consider correct it manually in /var/log/",
+                "Failed to correct %s file permissions: %s",
                 file_name,
                 err,
             )

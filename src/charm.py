@@ -182,9 +182,6 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_update_status(self, _: EventBase) -> None:  # noqa: C901
         """Update the charm's status."""
-        # If correction failed, the charm will be set in error status
-        self.hw_tool_helper.correct_log_permissions()
-
         if not self._stored.resource_installed:  # type: ignore[truthy-function]
             # The charm should be in BlockedStatus with install failed msg
             return  # type: ignore[unreachable]
@@ -206,6 +203,9 @@ class HardwareObserverCharm(ops.CharmBase):
 
         # Check health of all exporters
         exporters_health = [self._check_exporter_health(exporter) for exporter in self.exporters]
+
+        # If this correction failed, the charm will be set in error status
+        self.hw_tool_helper.correct_storelib_log_permissions()
 
         if all(exporters_health):
             self.model.unit.status = ActiveStatus("Unit is ready")

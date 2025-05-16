@@ -1285,55 +1285,51 @@ def test_remove_legacy_smartctl_exporter_exist(
 
 
 class TestCorrectLogPermissions(unittest.TestCase):
-    """Test for `HWToolHelper.correct_log_permissions()`."""
+    """Test for `HWToolHelper.correct_storelib_log_permissions()`."""
 
-    @mock.patch("hw_tools.os.walk")
-    @mock.patch("hw_tools.os.chmod")
-    def test_correct_log_permissions_success(self, mock_chmod, mock_walk):
-        """Test successful correction of log file permissions."""
-        mock_walk.return_value = [
-            (
-                "/var/log/some/path",
-                [],
-                ["storelibdebugit.txt", "storelibdebugit.txt.1", "other_file.log"],
-            )
-        ]
-        HWToolHelper.correct_log_permissions()
-
-        mock_walk.assert_called_once_with("/var/log/")
-        expected_calls = [
-            mock.call("/var/log/some/path/storelibdebugit.txt", 0o640),
-            mock.call("/var/log/some/path/storelibdebugit.txt.1", 0o640),
-        ]
-        mock_chmod.assert_has_calls(expected_calls, any_order=True)
-        self.assertEqual(mock_chmod.call_count, 2)
-
-    @mock.patch("hw_tools.os.walk")
-    @mock.patch("hw_tools.os.chmod", side_effect=OSError("Permission denied"))
-    @mock.patch("hw_tools.os.path.join", return_value="/var/log/some/path/storelibdebugit.txt")
     @mock.patch("hw_tools.logger")
-    def test_correct_log_permissions_error(self, mock_logger, mock_join, mock_chmod, mock_walk):
-        """Test error handling when permission correction fails."""
-        mock_walk.return_value = [
-            ("/var/log/some/path", [], ["storelibdebugit.txt", "other_file.log"])
-        ]
-        with self.assertRaises(OSError):
-            HWToolHelper.correct_log_permissions()
+    @mock.patch("hw_tools.Path")
+    def test_correct_storelib_log_permissions_success(self, mock_path_cls, mock_logger):
+        mock_log_dir = mock.Mock(spec=Path)
+        mock_file1 = mock.Mock(spec=Path)
+        mock_file2 = mock.Mock(spec=Path)
+        mock_file1.stat.return_value.st_mode = 0o600
+        mock_file2.stat.return_value.st_mode = 0o644
+        mock_path_cls.return_value = mock_log_dir
+        mock_log_dir.rglob.return_value = [mock_file1, mock_file2]
 
-        mock_chmod.assert_called_once_with("/var/log/some/path/storelibdebugit.txt", 0o640)
-        mock_logger.error.assert_called_once_with(
-            "Failed to correct %s file permissions: %s. Consider correct it manually in /var/log/",
-            "storelibdebugit.txt",
-            mock_chmod.side_effect,
+        target_perm = 0o640
+        HWToolHelper.correct_storelib_log_permissions()
+
+        mock_file1.chmod.assert_called_once_with(target_perm)
+        mock_file2.chmod.assert_called_once_with(target_perm)
+
+        mock_logger.warning.assert_any_call(
+            "Correct %s permissions to %o", mock_file1, target_perm
+        )
+        mock_logger.warning.assert_any_call(
+            "Correct %s permissions to %o", mock_file2, target_perm
         )
 
-    @mock.patch("hw_tools.os.walk")
-    @mock.patch("hw_tools.os.chmod")
-    def test_correct_log_permissions_no_matching_files(self, mock_chmod, mock_walk):
-        """Test behavior when no matching files are found."""
-        mock_walk.return_value = [("/var/log/some/path", [], ["other_file.log"])]
-        HWToolHelper.correct_log_permissions()
-        mock_chmod.assert_not_called()
+    @mock.patch("hw_tools.logger")
+    @mock.patch("hw_tools.Path")
+    def test_correct_storelib_log_permissions_error(self, mock_path_cls, mock_logger):
+        mock_log_dir = mock.Mock(spec=Path)
+        mock_file = mock.Mock(spec=Path)
+        mock_file.name = "storelibdebugit.txt"
+        mock_file.stat.return_value.st_mode = 0o644
+        mock_path_cls.return_value = mock_log_dir
+        mock_log_dir.rglob.return_value = [mock_file]
+
+        mock_file.chmod.side_effect = OSError("Permission denied")
+        with self.assertRaises(OSError):
+            HWToolHelper.correct_storelib_log_permissions()
+
+        mock_logger.error.assert_called_once_with(
+            "Failed to correct %s file permissions: %s",
+            mock_file.name,
+            mock_file.chmod.side_effect,
+        )
 
 
 class TestTPRStrategyStorelib(unittest.TestCase):
@@ -1358,23 +1354,21 @@ class TestTPRStrategyStorelib(unittest.TestCase):
         self.strategy = self.MockTPRStrategyInheritance()
 
     @mock.patch("hw_tools.Path.mkdir")
-    @mock.patch("hw_tools.Path.exists")
+    @mock.patch("hw_tools.Path.exists", return_value=False)
     @mock.patch("builtins.open", new_callable=mock.mock_open)
     @mock.patch("hw_tools.logger")
     def test_generate_storelib_config_success(
         self, mock_logger, mock_open, mock_exists, mock_mkdir
     ):
         """Test successful generation of storelib config file."""
-        mock_exists.return_value = False
-
         self.strategy._generate_storelib_config()
 
         mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
-        mock_open.assert_called_once_with(self.strategy._config_file_path, "w")
+        mock_open.assert_called_once_with(self.strategy._storelib_config_file_path, "w")
         mock_file_handle = mock_open()
         self.assertTrue(mock_file_handle.write.called)
         mock_logger.info.assert_called_with(
-            "Created storelib config file at %s", self.strategy._config_file_path
+            "Created storelib config file at %s", self.strategy._storelib_config_file_path
         )
 
     @mock.patch("hw_tools.Path.mkdir")
@@ -1400,7 +1394,7 @@ class TestTPRStrategyStorelib(unittest.TestCase):
         self.strategy._remove_storelib_config()
         mock_unlink.assert_called_once()
         mock_logger.info.assert_called_with(
-            "Removed storelib configuration file at %s", self.strategy._config_file_path
+            "Removed storelib configuration file at %s", self.strategy._storelib_config_file_path
         )
 
     @mock.patch("hw_tools.Path.exists")
@@ -1412,7 +1406,7 @@ class TestTPRStrategyStorelib(unittest.TestCase):
         self.strategy._remove_storelib_config()
         mock_unlink.assert_not_called()
         mock_logger.info.assert_called_with(
-            "Storelib config file at %s does not exist", self.strategy._config_file_path
+            "Storelib config file at %s does not exist", self.strategy._storelib_config_file_path
         )
 
     @mock.patch("hw_tools.Path.exists")
