@@ -3,6 +3,15 @@
 set -xe
 
 sudo apt update
+sudo apt-get install -y snapd
+
+sudo systemctl start snapd
+sudo systemctl enable snapd
+sudo systemctl start snapd.socket
+
+# Wait until snapd is fully initialized
+sudo systemctl is-active --quiet snapd.seeded.service || sudo systemctl start snapd.seeded.service
+sudo systemctl --no-pager --wait is-system-running
 
 # Set up packages
 sudo snap install juju

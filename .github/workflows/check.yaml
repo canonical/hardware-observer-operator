@@ -20,318 +20,322 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Lint
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.8', '3.10', '3.12']
-    runs-on: ubuntu-24.04
+  testflinger-submit:
+    runs-on: [self-hosted, testflinger]
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        # pin tox to the current major version to avoid
-        # workflows breaking all at once when a new major version is released.
-        python -m pip install 'tox<5'
-
-    - name: Run linters
-      run: tox -e lint
-
-  unit:
-    name: Unit
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.8', '3.10', '3.12']
-    runs-on: ubuntu-24.04
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install 'tox<5'
-
-    - name: Run unit tests
-      run: tox -e unit
-
-    - name: Determine system architecture
-      run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
-
-    - name: Create artifact name suffix
-      run: |
-        PYTHON_VERSION_SANITIZED=${{ matrix.python-version }}
-        PYTHON_VERSION_SANITIZED=${PYTHON_VERSION_SANITIZED//./-}
-        echo "ARTIFACT_SUFFIX=$PYTHON_VERSION_SANITIZED-${{ env.SYSTEM_ARCH }}" >> $GITHUB_ENV
-
-    - name: Rename Unit Test Coverage Artifact
-      run: |
-        if [ -e ".coverage-unit" ]; then
-          mv .coverage-unit .coverage-unit-${{ env.ARTIFACT_SUFFIX }}
-        else
-          echo "No coverage file found, skipping rename"
-        fi
-
-    - name: Upload Unit Test Coverage File
-      uses: actions/upload-artifact@v4
-      with:
-        include-hidden-files: true
-        if-no-files-found: ignore
-        name: coverage-unit-${{ env.ARTIFACT_SUFFIX }}
-        path: .coverage-unit-${{ env.ARTIFACT_SUFFIX }}
-
-  build:
-    needs:
-      - lint
-      - unit
-    name: build charms
-    runs-on: ${{ matrix.runs-on }}
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on: [[ubuntu-24.04], [Ubuntu_ARM64_4C_16G_01], [self-hosted, linux, s390x],[self-hosted, ppc64el]]
-    steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Submit job
+        uses: canonical/testflinger/.github/actions/submit@main
         with:
-          submodules: true
+          poll: true
+          job: |
+            job_queue: torchtusk
+            test_data:
+              test_cmds: |
+                #!/usr/bin/env bash
+                ssh ubuntu@${DEVICE_IP} <<'EOF'
+                  set -ex
+                  git clone -b testflinger-ci https://github.com/canonical/hardware-observer-operator.git
+                  cd hardware-observer-operator
+                  ./tests/manual/scripts/bootstrap.sh
+                  terragrunt run-all apply --terragrunt-non-interactive
+                  tox -e func -- -v --realhw --model test --collectors ipmi_dcmi ipmi_sel ipmi_sensor --keep-models --no-deploy
+                EOF
+  # lint:
+  #   name: Lint
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       python-version: ['3.8', '3.10', '3.12']
+  #   runs-on: ubuntu-24.04
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #     with:
+  #       submodules: true
 
-      - uses: canonical/craft-actions/charmcraft/setup@main
-        with:
-          channel: "3.x/stable"
+  #   - name: Set up Python ${{ matrix.python-version }}
+  #     uses: actions/setup-python@v5
+  #     with:
+  #       python-version: ${{ matrix.python-version }}
 
-      - name: Pack the charms
-        id: build
-        run: |
-          charmcraft -v pack
-          echo "charms=$(ls -1 *.charm | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+  #   - name: Install dependencies
+  #     run: |
+  #       python -m pip install --upgrade pip
+  #       # pin tox to the current major version to avoid
+  #       # workflows breaking all at once when a new major version is released.
+  #       python -m pip install 'tox<5'
 
-      - name: List the names of the built charms
-        run: echo "::notice::Successfully built ${{ steps.build.outputs.charms}}"
+  #   - name: Run linters
+  #     run: tox -e lint
 
-      - name: Determine system architecture
-        run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
+  # unit:
+  #   name: Unit
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       python-version: ['3.8', '3.10', '3.12']
+  #   runs-on: ubuntu-24.04
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #     with:
+  #       submodules: true
 
-      - name: Upload the tested charms
-        uses: actions/upload-artifact@v4
-        with:
-          name: built_charms_${{ env.SYSTEM_ARCH }}
-          path: ./*.charm
+  #   - name: Set up Python ${{ matrix.python-version }}
+  #     uses: actions/setup-python@v5
+  #     with:
+  #       python-version: ${{ matrix.python-version }}
 
-  func:
-    needs:
-      - build
-    name: functional tests
-    runs-on: ${{ matrix.runs-on }}
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on: [[ubuntu-24.04], [Ubuntu_ARM64_4C_16G_01]]
-        test-command: ['tox -e func -- -v --base ubuntu@20.04 --keep-models', 'tox -e func -- -v --base ubuntu@22.04 --keep-models', 'tox -e func -- -v --base ubuntu@24.04 --keep-models' ]
-        juju-channel: ["3.4/stable"]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
+  #   - name: Install dependencies
+  #     run: |
+  #       python -m pip install --upgrade pip
+  #       python -m pip install 'tox<5'
 
-        # arm64 runners don't have gcc installed by default
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y gcc
+  #   - name: Run unit tests
+  #     run: tox -e unit
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+  #   - name: Determine system architecture
+  #     run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
-      - name: Setup Juju environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          provider: "lxd"
-          juju-channel: ${{ matrix.juju-channel }}
-          charmcraft-channel: "3.x/stable"
+  #   - name: Create artifact name suffix
+  #     run: |
+  #       PYTHON_VERSION_SANITIZED=${{ matrix.python-version }}
+  #       PYTHON_VERSION_SANITIZED=${PYTHON_VERSION_SANITIZED//./-}
+  #       echo "ARTIFACT_SUFFIX=$PYTHON_VERSION_SANITIZED-${{ env.SYSTEM_ARCH }}" >> $GITHUB_ENV
 
-      - name: Determine system architecture
-        run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
+  #   - name: Rename Unit Test Coverage Artifact
+  #     run: |
+  #       if [ -e ".coverage-unit" ]; then
+  #         mv .coverage-unit .coverage-unit-${{ env.ARTIFACT_SUFFIX }}
+  #       else
+  #         echo "No coverage file found, skipping rename"
+  #       fi
 
-        # This is used by zaza in the functional tests for non-amd64 architectures (if applicable)
-      - name: Set zaza juju model constraints for architecture
-        run: |
-          if [ "${{ env.SYSTEM_ARCH }}" = "aarch64" ]; then
-            echo "TEST_MODEL_CONSTRAINTS=arch=arm64" >> "$GITHUB_ENV"
-          fi
+  #   - name: Upload Unit Test Coverage File
+  #     uses: actions/upload-artifact@v4
+  #     with:
+  #       include-hidden-files: true
+  #       if-no-files-found: ignore
+  #       name: coverage-unit-${{ env.ARTIFACT_SUFFIX }}
+  #       path: .coverage-unit-${{ env.ARTIFACT_SUFFIX }}
 
-      - name: Download the built charms
-        uses: actions/download-artifact@v4
-        with:
-          name: built_charms_${{ env.SYSTEM_ARCH }}
+  # build:
+  #   needs:
+  #     - lint
+  #     - unit
+  #   name: build charms
+  #   runs-on: ${{ matrix.runs-on }}
+  #   timeout-minutes: 120
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       runs-on: [[ubuntu-24.04], [Ubuntu_ARM64_4C_16G_01], [self-hosted, linux, s390x],[self-hosted, ppc64el]]
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: true
 
-      - name: List the names of the downloaded charms
-        run: |
-          ls *.charm
+  #     - uses: canonical/craft-actions/charmcraft/setup@main
+  #       with:
+  #         channel: "3.x/stable"
 
-      - name: Run tests
-        run: |
-          # These variables are for a consistent method to find the charm file(s) across all projects.
-          # It is designed to work both with charms that output one file per base,
-          # and charms that output a single file to run on all bases.
-          # Not all charms will use them, and for some charms the variables will resolve to the same file.
-          export CHARM_PATH_NOBLE="$(pwd)/$(ls | grep '.*24.04.*\.charm$')"
-          echo "$CHARM_PATH_NOBLE"
-          export CHARM_PATH_JAMMY="$(pwd)/$(ls | grep '.*22.04.*\.charm$')"
-          echo "$CHARM_PATH_JAMMY"
-          export CHARM_PATH_FOCAL="$(pwd)/$(ls | grep '.*20.04.*\.charm$')"
-          echo "$CHARM_PATH_FOCAL"
-          ${{ matrix.test-command }}
-        env:
-          TEST_JUJU_CHANNEL: ${{ matrix.juju-channel }}
+  #     - name: Pack the charms
+  #       id: build
+  #       run: |
+  #         charmcraft -v pack
+  #         echo "charms=$(ls -1 *.charm | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
 
-      - name: Generate Safe Test Command Identifier by removing spaces and special characters
-        run: |
-          TEST_CMD_ID=$(echo "${{ matrix.test-command }}" | sed 's/[^a-zA-Z0-9]/_/g')
-          echo "TEST_CMD_ID=$TEST_CMD_ID" >> $GITHUB_ENV
+  #     - name: List the names of the built charms
+  #       run: echo "::notice::Successfully built ${{ steps.build.outputs.charms}}"
 
-      - name: Create artifact name suffix
-        run: |
-          echo "ARTIFACT_SUFFIX=${{ env.TEST_CMD_ID }}-${{ env.SYSTEM_ARCH }}" >> $GITHUB_ENV
+  #     - name: Determine system architecture
+  #       run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
-      - name: Rename Functional Test Coverage Artifact
-        run: |
-          if [ -e ".coverage-func" ]; then
-            mv .coverage-func .coverage-func-${{ env.ARTIFACT_SUFFIX }}
-          else
-            echo "No coverage file found, skipping rename"
-          fi
+  #     - name: Upload the tested charms
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: built_charms_${{ env.SYSTEM_ARCH }}
+  #         path: ./*.charm
 
-      - name: Upload Functional Test Coverage Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          include-hidden-files: true
-          if-no-files-found: ignore
-          name: coverage-functional-${{ env.ARTIFACT_SUFFIX }}
-          path: .coverage-func-${{ env.ARTIFACT_SUFFIX }}
+  # func:
+  #   needs:
+  #     - build
+  #   name: functional tests
+  #   runs-on: ${{ matrix.runs-on }}
+  #   timeout-minutes: 120
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       runs-on: [[ubuntu-24.04], [Ubuntu_ARM64_4C_16G_01]]
+  #       test-command: ['tox -e func -- -v --base ubuntu@20.04 --keep-models', 'tox -e func -- -v --base ubuntu@22.04 --keep-models', 'tox -e func -- -v --base ubuntu@24.04 --keep-models' ]
+  #       juju-channel: ["3.4/stable"]
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: true
 
-      # Save output for debugging
+  #       # arm64 runners don't have gcc installed by default
+  #     - name: Install dependencies
+  #       run: |
+  #         sudo apt update
+  #         sudo apt install -y gcc
 
-      - name: Generate debugging information
-        if: always()
-        run: |
-          set -x
-          # install dependencies
-          sudo snap install --classic juju-crashdump
-          sudo apt install -y jq uuid
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.12"
 
-          # Print juju controller information for debugging
-          # to check controller and client are compatible versions;
-          # we can have a mismatch if using an external controller.
-          juju version
-          juju controllers
+  #     - name: Setup Juju environment
+  #       uses: charmed-kubernetes/actions-operator@main
+  #       with:
+  #         provider: "lxd"
+  #         juju-channel: ${{ matrix.juju-channel }}
+  #         charmcraft-channel: "3.x/stable"
 
-          models="$(juju models --format json | jq -r '.models[]."short-name"')"
-          dir="$(mktemp -d)"
-          # Use a different dir to avoid charmed-kubernetes/actions-operator from also trying to upload crashdumps.
-          # We don't want to rely on that action, because it doesn't use a descriptive enough name for the artefact,
-          # and we may stop using that action soon.
-          echo "CRASHDUMPS_DIR=$dir" | tee -a "$GITHUB_ENV"
-          echo "CRASHDUMPS_ARTEFACT_SUFFIX=$(uuid)-$(uname -m)" | tee -a "$GITHUB_ENV"
+  #     - name: Determine system architecture
+  #       run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
-          for model in $models; do
-            # show status here for quick debugging
-            juju status -m "$model"
-            juju-crashdump --as-root -m "$model" -u "$model-$(uname -m)" -o "$dir"
-          done
+  #       # This is used by zaza in the functional tests for non-amd64 architectures (if applicable)
+  #     - name: Set zaza juju model constraints for architecture
+  #       run: |
+  #         if [ "${{ env.SYSTEM_ARCH }}" = "aarch64" ]; then
+  #           echo "TEST_MODEL_CONSTRAINTS=arch=arm64" >> "$GITHUB_ENV"
+  #         fi
 
-      - name: Upload juju crashdumps
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: "juju-crashdumps-${{ env.CRASHDUMPS_ARTEFACT_SUFFIX }}"
-          path: "${{ env.CRASHDUMPS_DIR }}/juju-crashdump-*.tar.xz"
+  #     - name: Download the built charms
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: built_charms_${{ env.SYSTEM_ARCH }}
 
-  tics-analysis:
-    runs-on: [self-hosted, linux, amd64, tiobe, jammy]
-    if: >
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-    needs: func
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Install coverage tools
-        run: |
-          pip install coverage
+  #     - name: List the names of the downloaded charms
+  #       run: |
+  #         ls *.charm
 
-      # Install everything from all requirements.txt files otherwise TICS errors.
-      - name: Install all charm dependencies
-        run: |
-          for f in $(find -name '*requirements.txt'); do
-              echo "${f}"
-              pip3 install --requirement "${f}"
-          done
+  #     - name: Run tests
+  #       run: |
+  #         # These variables are for a consistent method to find the charm file(s) across all projects.
+  #         # It is designed to work both with charms that output one file per base,
+  #         # and charms that output a single file to run on all bases.
+  #         # Not all charms will use them, and for some charms the variables will resolve to the same file.
+  #         export CHARM_PATH_NOBLE="$(pwd)/$(ls | grep '.*24.04.*\.charm$')"
+  #         echo "$CHARM_PATH_NOBLE"
+  #         export CHARM_PATH_JAMMY="$(pwd)/$(ls | grep '.*22.04.*\.charm$')"
+  #         echo "$CHARM_PATH_JAMMY"
+  #         export CHARM_PATH_FOCAL="$(pwd)/$(ls | grep '.*20.04.*\.charm$')"
+  #         echo "$CHARM_PATH_FOCAL"
+  #         ${{ matrix.test-command }}
+  #       env:
+  #         TEST_JUJU_CHANNEL: ${{ matrix.juju-channel }}
 
-          # For reactive charms
-          for f in $(find -name 'wheelhouse.txt'); do
-              echo "${f}"
-              pip3 install --requirement "${f}"
-          done
+  #     - name: Create artifact name suffix
+  #       run: |
+  #         echo "ARTIFACT_SUFFIX=${{ env.TEST_CMD_ID }}-${{ env.SYSTEM_ARCH }}" >> $GITHUB_ENV
 
-      - name: Determine system architecture
-        run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
+  #     - name: Rename Functional Test Coverage Artifact
+  #       run: |
+  #         if [ -e ".coverage-func" ]; then
+  #           mv .coverage-func .coverage-func-${{ env.ARTIFACT_SUFFIX }}
+  #         else
+  #           echo "No coverage file found, skipping rename"
+  #         fi
 
-      - name: Download Coverage Files
-        uses: actions/download-artifact@v4
-        with:
-          pattern: coverage-*-${{ env.SYSTEM_ARCH }}
-          merge-multiple: true
-          path: artifacts/
-        continue-on-error: true
+  #     - name: Upload Functional Test Coverage Artifact
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         include-hidden-files: true
+  #         if-no-files-found: ignore
+  #         name: coverage-functional-${{ env.ARTIFACT_SUFFIX }}
+  #         path: .coverage-func-${{ env.ARTIFACT_SUFFIX }}
 
-      - name: Merge coverage reports
-        run: |
-          # Create the path that is expected to have a coverage.xml for tics
-          mkdir -p tests/report/
+  #     # Save output for debugging
 
-          coverage_files=(./artifacts/.coverage*)
+  #     - name: Generate debugging information
+  #       if: always()
+  #       run: |
+  #         set -x
+  #         # install dependencies
+  #         sudo snap install --classic juju-crashdump
+  #         sudo apt install -y jq uuid
 
-          if [ -e "${coverage_files[0]}" ]; then
-            echo "Merging coverage files: ${coverage_files[*]}"
-            coverage combine "${coverage_files[@]}"
+  #         # Print juju controller information for debugging
+  #         # to check controller and client are compatible versions;
+  #         # we can have a mismatch if using an external controller.
+  #         juju version
+  #         juju controllers
 
-            # Check if there is actual data to report before generating XML with merged reports
-            if coverage report > /dev/null 2>&1; then
-              coverage report --show-missing
-              coverage xml -o tests/report/coverage.xml
-            fi
+  #         models="$(juju models --format json | jq -r '.models[]."short-name"')"
+  #         dir="$(mktemp -d)"
+  #         # Use a different dir to avoid charmed-kubernetes/actions-operator from also trying to upload crashdumps.
+  #         # We don't want to rely on that action, because it doesn't use a descriptive enough name for the artefact,
+  #         # and we may stop using that action soon.
+  #         echo "CRASHDUMPS_DIR=$dir" | tee -a "$GITHUB_ENV"
+  #         echo "CRASHDUMPS_ARTEFACT_SUFFIX=$(uuid)-$(uname -m)" | tee -a "$GITHUB_ENV"
 
-          fi
+  #         for model in $models; do
+  #           # show status here for quick debugging
+  #           juju status -m "$model"
+  #           juju-crashdump --as-root -m "$model" -u "$model-$(uname -m)" -o "$dir"
+  #         done
 
-      - name: Run TICS analysis
-        uses: tiobe/tics-github-action@v3
-        with:
-          mode: qserver
-          project: hardware-observer-operator
-          viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
-          branchdir: ${{ github.workspace }}
-          ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
-          installTics: true
+  #     - name: Upload juju crashdumps
+  #       uses: actions/upload-artifact@v4
+  #       if: always()
+  #       with:
+  #         name: "juju-crashdumps-${{ env.CRASHDUMPS_ARTEFACT_SUFFIX }}"
+  #         path: "${{ env.CRASHDUMPS_DIR }}/juju-crashdump-*.tar.xz"
+
+  # tics-analysis:
+  #   runs-on: ubuntu-22.04
+  #   if: >
+  #     (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+  #     (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+  #   needs: func
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+
+  #     - name: Install coverage tools
+  #       run: |
+  #         pip install coverage
+
+  #     - name: Determine system architecture
+  #       run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
+
+  #     - name: Download Coverage Files
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         pattern: coverage-*-${{ env.SYSTEM_ARCH }}
+  #         merge-multiple: true
+  #         path: artifacts/
+  #       continue-on-error: true
+
+  #     - name: Merge coverage reports
+  #       run: |
+  #         # Create the path that is expected to have a coverage.xml for tics
+  #         mkdir -p tests/report/
+
+  #         coverage_files=(./artifacts/.coverage*)
+
+  #         if [ -e "${coverage_files[0]}" ]; then
+  #           echo "Merging coverage files: ${coverage_files[*]}"
+  #           coverage combine "${coverage_files[@]}"
+
+  #           # Check if there is actual data to report before generating XML with merged reports
+  #           if coverage report > /dev/null 2>&1; then
+  #             coverage report --show-missing
+  #             coverage xml -o tests/report/coverage.xml
+  #           fi
+
+  #         fi
+
+  #     - name: Run TICS analysis
+  #       uses: tiobe/tics-github-action@v3
+  #       with:
+  #         mode: qserver
+  #         project: hardware-observer-operator
+  #         viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
+  #         branchdir: ${{ github.workspace }}
+  #         ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
+  #         installTics: true
