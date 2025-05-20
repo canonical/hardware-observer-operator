@@ -1,0 +1,12 @@
+# Debug Level:
+# 0 - No Debug
+# 1 - Level 1
+# 2 - Level 2
+DEBUGLEVEL=0
+DISABLELOG=1
+# Write option on startup
+# 0 - Append to existing debug file
+# 1 - create new file
+OVERWRITE=0
+# Directory where debug file will be created
+DEBUGDIR=$debug_dir
