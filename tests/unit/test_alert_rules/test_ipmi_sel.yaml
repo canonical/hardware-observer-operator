@@ -9,15 +9,20 @@ tests:
       - series: ipmi_sel_command_success{instance="ubuntu-0"}
         values: '0x15'
 
-      - series: ipmi_sel_command_success{instance="ubuntu-1"}
+      - series: ipmi_sel_command_success{instance="ubuntu-nominal"}
         values: '1x15'
-      - series: ipmi_sel_state{instance="ubuntu-1"}
-        values: '1x15'
+      - series: ipmi_sel_state_nominal{instance="ubuntu-nominal"}
+        values: '1x5 2x5 3x5'
 
-      - series: ipmi_sel_command_success{instance="ubuntu-2"}
+      - series: ipmi_sel_command_success{instance="ubuntu-warning"}
         values: '1x15'
-      - series: ipmi_sel_state{instance="ubuntu-2"}
-        values: '2x15'
+      - series: ipmi_sel_state_warning{instance="ubuntu-warning"}
+        values: '1x5 2x5 3x5'
+
+      - series: ipmi_sel_command_success{instance="ubuntu-critical"}
+        values: '1x15'
+      - series: ipmi_sel_state_critical{instance="ubuntu-critical"}
+        values: '1x5 2x5 3x5'
 
       - series: node_systemd_unit_state{name="ipmiseld.service", instance="ubuntu-3", state="failed"}
         values: '1x15'
@@ -39,29 +44,61 @@ tests:
                   VALUE = 0
                   LABELS = map[__name__:ipmi_sel_command_success instance:ubuntu-0]
 
-      - eval_time: 10m
+      - eval_time: 7m
         alertname: IPMISELStateWarning
         exp_alerts:
           - exp_labels:
               severity: warning
-              instance: ubuntu-1
+              instance: ubuntu-warning
+              event_id: 2
             exp_annotations:
-              summary: IPMI system event log in warning state. (instance ubuntu-1)
+              summary: IPMI system event log in warning state. (instance ubuntu-warning)
               description: |
                 IPMI SEL entry in warning state.
-                  LABELS = map[__name__:ipmi_sel_state instance:ubuntu-1]
+                  LABELS = map[__name__:ipmi_sel_state_warning instance:ubuntu-warning]
+                  EVENT_ID = 2
 
-      - eval_time: 10m
+      - eval_time: 13m
+        alertname: IPMISELStateWarning
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: ubuntu-warning
+              event_id: 3
+            exp_annotations:
+              summary: IPMI system event log in warning state. (instance ubuntu-warning)
+              description: |
+                IPMI SEL entry in warning state.
+                  LABELS = map[__name__:ipmi_sel_state_warning instance:ubuntu-warning]
+                  EVENT_ID = 3
+
+      - eval_time: 7m
         alertname: IPMISELStateCritical
         exp_alerts:
           - exp_labels:
               severity: critical
-              instance: ubuntu-2
+              instance: ubuntu-critical
+              event_id: 2
             exp_annotations:
-              summary: IPMI system event log in critical state. (instance ubuntu-2)
+              summary: IPMI system event log in critical state. (instance ubuntu-critical)
               description: |
                 IPMI SEL entry in critical state.
-                  LABELS = map[__name__:ipmi_sel_state instance:ubuntu-2]
+                  LABELS = map[__name__:ipmi_sel_state_critical instance:ubuntu-critical]
+                  EVENT_ID = 2
+
+      - eval_time: 13m
+        alertname: IPMISELStateCritical
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-critical
+              event_id: 3
+            exp_annotations:
+              summary: IPMI system event log in critical state. (instance ubuntu-critical)
+              description: |
+                IPMI SEL entry in critical state.
+                  LABELS = map[__name__:ipmi_sel_state_critical instance:ubuntu-critical]
+                  EVENT_ID = 3
 
       - eval_time: 10m
         alertname: IPMISELDStateWarning
