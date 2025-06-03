@@ -23,7 +23,7 @@ jobs:
 
       # prometheus snap includes promtool
       - name: Install prometheus snap
-        run: sudo snap install prometheus --channel=2/candidate
+        run: sudo snap install prometheus
 
       - name: Check validity of prometheus alert rules
         run: |

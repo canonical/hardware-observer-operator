@@ -4,7 +4,6 @@ groups:
     - alert: CollectorFailed
       expr: '{__name__=~"(.*)_collector_failed"} == 1'
       for: 5m
-      keep_firing_for: 5m
       labels:
         severity: error
       annotations:
