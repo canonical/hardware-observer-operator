@@ -10,6 +10,7 @@ import stat
 import subprocess
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
+from string import Template
 from typing import Dict, List, Set, Tuple
 
 import requests
@@ -178,6 +179,72 @@ class TPRStrategyABC(StrategyABC, metaclass=ABCMeta):
     def remove(self) -> None:
         """Remove details."""
 
+    @property
+    def _storelib_config_file_path(self) -> Path:
+        """Path to the storelib config file.
+
+        Path to the storelib config file for tools that use
+        `storelib` as backend, default is `/storelibconfit.ini`.
+        Inheriting classes should override this if the config file
+        needs to be placed somewhere else or has a different name.
+        This default setup is already tested with StorCLI.
+        """
+        return Path("/storelibconfit.ini")
+
+    @property
+    def _storelib_log_dir(self) -> Path:
+        """Default path to the storelib log directory of the tool."""
+        return Path(f"/tmp/hwo_storelib_logs/{self._name.value}")
+
+    @property
+    def _storelib_config_content(self) -> str:
+        """Content template for the storelib config file."""
+        template_path = Path(__file__).parent / "storelib_conf.template"
+        with template_path.open() as f:
+            template = Template(f.read())
+        return template.substitute(debug_dir=self._storelib_log_dir)
+
+    def _generate_storelib_config(self) -> None:
+        """Generate configuration file for storelib library logging.
+
+        Workaround to address the issue from
+        [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
+        """
+        # Create the directory for storelib logs
+        self._storelib_log_dir.mkdir(parents=True, exist_ok=True)
+
+        # Check if file exists and log warning before overwriting
+        if self._storelib_config_file_path.exists():
+            logger.warning(
+                "Storelib config file at %s already exists. Overwriting it.",
+                self._storelib_config_file_path,
+            )
+
+        # Write the config file
+        try:
+            with open(self._storelib_config_file_path, "w") as f:
+                f.write(self._storelib_config_content)
+            logger.info("Created storelib config file at %s", self._storelib_config_file_path)
+        except (IOError, PermissionError) as err:
+            logger.error("Failed to write storelib config file: %s", err)
+            raise err
+
+    def _remove_storelib_config(self) -> None:
+        """Remove the storelib configuration file."""
+        try:
+            if self._storelib_config_file_path.exists():
+                self._storelib_config_file_path.unlink()
+                logger.info(
+                    "Removed storelib configuration file at %s", self._storelib_config_file_path
+                )
+            else:
+                logger.info(
+                    "Storelib config file at %s does not exist", self._storelib_config_file_path
+                )
+        except (IOError, PermissionError) as err:
+            logger.error("Failed to remove storelib config file: %s", err)
+            raise err
+
 
 class SnapStrategy(StrategyABC):
     """Snap strategy class."""
@@ -283,12 +350,14 @@ class StorCLIStrategy(TPRStrategyABC):
             raise ResourceChecksumError
         install_deb(self.name, path)
         symlink(src=self.origin_path, dst=self.symlink_bin)
+        self._generate_storelib_config()
 
     def remove(self) -> None:
         """Remove storcli."""
         self.symlink_bin.unlink(missing_ok=True)
         logger.debug("Remove file %s", self.symlink_bin)
         remove_deb(pkg=self.name)
+        self._remove_storelib_config()
 
     def check(self) -> bool:
         """Check resource status."""
@@ -739,6 +808,7 @@ class HWToolHelper:
 
                 elif isinstance(strategy, (APTStrategyABC, SnapStrategy)):
                     strategy.install()  # pylint: disable=E1120
+
                 logger.info("Strategy %s install success", strategy)
             except (
                 ResourceFileSizeZeroError,
@@ -777,3 +847,30 @@ class HWToolHelper:
         if failed_checks:
             return False, f"Fail strategy checks: {failed_checks}"
         return True, ""
+
+    @staticmethod
+    def correct_storelib_log_permissions() -> None:
+        """Update permissions on log files created by storelib to match CIS benchmarks.
+
+        Workaround to address issue
+        [#424](https://github.com/canonical/hardware-observer-operator/issues/424).
+        """
+        file_name = "storelibdebugit.txt"
+        target_perm = 0o640
+        try:
+            log_dir = Path("/var/log")
+            target_file_paths = log_dir.rglob(f"{file_name}*")
+
+            for file_path in target_file_paths:
+                current_perm = file_path.stat().st_mode & 0o777
+                if current_perm != target_perm:
+                    file_path.chmod(target_perm)
+                    logger.warning("Correct %s permissions to %o", file_path, target_perm)
+
+        except (IOError, PermissionError) as err:
+            logger.error(
+                "Failed to correct %s file permissions: %s",
+                file_name,
+                err,
+            )
+            raise err
