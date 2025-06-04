@@ -1,7 +1,6 @@
 groups:
 - name: IpmiSel
   rules:
-
     - alert: IPMISELCommandFailed
       expr: ipmi_sel_command_success == 0
       for: 5m
@@ -13,29 +12,28 @@ groups:
           Failed to get system event logs using ipmi-sel.
             VALUE = {{ $value }}
             LABELS = {{ $labels }}
-
     - alert: IPMISELStateWarning
-      expr: ipmi_sel_state == 1
-      for: 5m
+      expr: ipmi_sel_state_warning > 0
       labels:
         severity: warning
+        event_id: '{{ $value }}'
       annotations:
         summary: IPMI system event log in warning state. (instance {{ $labels.instance }})
         description: |
           IPMI SEL entry in warning state.
             LABELS = {{ $labels }}
-
+            EVENT_ID = {{ $value }}
     - alert: IPMISELStateCritical
-      expr: ipmi_sel_state == 2
-      for: 5m
+      expr: ipmi_sel_state_critical > 0
       labels:
         severity: critical
+        event_id: '{{ $value }}'
       annotations:
         summary: IPMI system event log in critical state. (instance {{ $labels.instance }})
         description: |
           IPMI SEL entry in critical state.
             LABELS = {{ $labels }}
-
+            EVENT_ID = {{ $value }}
     - alert: IPMISELDStateWarning
       expr: node_systemd_unit_state{name="ipmiseld.service", state=~"failed|inactive"} == 1
       for: 5m
