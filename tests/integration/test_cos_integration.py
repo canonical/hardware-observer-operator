@@ -151,8 +151,8 @@ async def _deploy_cos(channel, ctl, model):
 async def _deploy_hardware_observer(base, channel, model):
     """Deploy Hardware Observer and Grafana Agent on the existing lxd cloud."""
     await asyncio.gather(
-        # Principal Ubuntu
-        model.deploy("ubuntu", num_units=1, base=base, channel=channel),
+        # Principal Ubuntu, now ubuntu charm only have one channel.
+        model.deploy("ubuntu", num_units=1, base=base, channel="latest/stable"),
         # Hardware Observer
         model.deploy("hardware-observer", base=base, num_units=0, channel=channel),
         # Grafana Agent
