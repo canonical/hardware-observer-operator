@@ -388,10 +388,16 @@ class TestHWToolHelper(unittest.TestCase):
 class TestStorCLIStrategy(unittest.TestCase):
     @mock.patch("hw_tools.validate_checksum", return_value=True)
     @mock.patch("hw_tools.file_is_empty", return_value=False)
+    @mock.patch("hw_tools.TPRStrategyABC._generate_storelib_config")
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.install_deb")
     def test_install(
-        self, mock_install_deb, mock_symlink, mock_file_is_empty, mock_validate_checksum
+        self,
+        mock_install_deb,
+        mock_symlink,
+        mock_generate_storelib_config,
+        mock_file_is_empty,
+        mock_validate_checksum,
     ):
         strategy = StorCLIStrategy()
         strategy.install(path="path-a")
@@ -400,11 +406,15 @@ class TestStorCLIStrategy(unittest.TestCase):
             src=Path("/opt/MegaRAID/storcli/storcli64"),
             dst=TOOLS_DIR / "storcli",
         )
+        mock_generate_storelib_config.assert_called_once()
 
     @mock.patch("hw_tools.validate_checksum", return_value=True)
+    @mock.patch("hw_tools.TPRStrategyABC._generate_storelib_config")
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.install_deb")
-    def test_install_empty_resource(self, mock_install_deb, mock_symlink, mock_validate_checksum):
+    def test_install_empty_resource(
+        self, mock_install_deb, mock_symlink, mock_generate_storelib_config, mock_validate_checksum
+    ):
         strategy = StorCLIStrategy()
 
         with pytest.raises(ResourceFileSizeZeroError):
@@ -412,13 +422,20 @@ class TestStorCLIStrategy(unittest.TestCase):
         mock_validate_checksum.assert_not_called()
         mock_install_deb.assert_not_called()
         mock_symlink.assert_not_called()
+        mock_generate_storelib_config.assert_not_called()
 
     @mock.patch("hw_tools.validate_checksum", return_value=False)
     @mock.patch("hw_tools.file_is_empty", return_value=False)
+    @mock.patch("hw_tools.TPRStrategyABC._generate_storelib_config")
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.install_deb")
     def test_install_checksum_fail(
-        self, mock_install_deb, mock_symlink, mock_file_is_empty, mock_validate_checksum
+        self,
+        mock_install_deb,
+        mock_symlink,
+        mock_generate_storelib_config,
+        mock_file_is_empty,
+        mock_validate_checksum,
     ):
         mock_path = mock.Mock()
         strategy = StorCLIStrategy()
@@ -427,15 +444,18 @@ class TestStorCLIStrategy(unittest.TestCase):
         mock_validate_checksum.assert_called_with(STORCLI_VERSION_INFOS, mock_path)
         mock_install_deb.assert_not_called()
         mock_symlink.assert_not_called()
+        mock_generate_storelib_config.assert_not_called()
 
+    @mock.patch("hw_tools.TPRStrategyABC._remove_storelib_config")
     @mock.patch("hw_tools.symlink")
     @mock.patch("hw_tools.remove_deb")
-    def test_remove(self, mock_remove_deb, mock_symlink):
+    def test_remove(self, mock_remove_deb, mock_symlink, mock_remove_storelib_config):
         strategy = StorCLIStrategy()
         with mock.patch.object(strategy, "symlink_bin") as mock_symlink_bin:
             strategy.remove()
             mock_symlink_bin.unlink.assert_called_with(missing_ok=True)
             mock_remove_deb.assert_called_with(pkg=strategy.name)
+            mock_remove_storelib_config.assert_called_once()
 
 
 class TestDeb(unittest.TestCase):
@@ -1248,18 +1268,155 @@ def test_remove_legacy_smartctl_exporter_exist(
     assert mock_path_unlink.call_count == 2
     mock_shutil.rmtree.assert_called_once()
 
+    @mock.patch("hw_tools.Path.unlink")
+    @mock.patch("hw_tools.Path.exists")
+    @mock.patch("hw_tools.shutil")
+    @mock.patch("hw_tools.systemd")
+    def test_remove_legacy_smartctl_exporter_not_exists(
+        mock_systemd, mock_shutil, mock_path_exists, mock_path_unlink
+    ):
+        mock_path_exists.return_value = False
+        remove_legacy_smartctl_exporter()
 
-@mock.patch("hw_tools.Path.unlink")
-@mock.patch("hw_tools.Path.exists")
-@mock.patch("hw_tools.shutil")
-@mock.patch("hw_tools.systemd")
-def test_remove_legacy_smartctl_exporter_not_exists(
-    mock_systemd, mock_shutil, mock_path_exists, mock_path_unlink
-):
-    mock_path_exists.return_value = False
-    remove_legacy_smartctl_exporter()
+        mock_systemd.service_stop.assert_not_called()
+        mock_systemd.service_disable.assert_not_called()
+        mock_path_unlink.assert_not_called()
+        mock_shutil.rmtree.assert_not_called()
 
-    mock_systemd.service_stop.assert_not_called()
-    mock_systemd.service_disable.assert_not_called()
-    mock_path_unlink.assert_not_called()
-    mock_shutil.rmtree.assert_not_called()
+
+class TestCorrectLogPermissions(unittest.TestCase):
+    """Test for `HWToolHelper.correct_storelib_log_permissions()`."""
+
+    @mock.patch("hw_tools.logger")
+    @mock.patch("hw_tools.Path")
+    def test_correct_storelib_log_permissions_success(self, mock_path_cls, mock_logger):
+        mock_log_dir = mock.Mock(spec=Path)
+        mock_file1 = mock.Mock(spec=Path)
+        mock_file2 = mock.Mock(spec=Path)
+        mock_file1.stat.return_value.st_mode = 0o600
+        mock_file2.stat.return_value.st_mode = 0o644
+        mock_path_cls.return_value = mock_log_dir
+        mock_log_dir.rglob.return_value = [mock_file1, mock_file2]
+
+        target_perm = 0o640
+        HWToolHelper.correct_storelib_log_permissions()
+
+        mock_file1.chmod.assert_called_once_with(target_perm)
+        mock_file2.chmod.assert_called_once_with(target_perm)
+
+        mock_logger.warning.assert_any_call(
+            "Correct %s permissions to %o", mock_file1, target_perm
+        )
+        mock_logger.warning.assert_any_call(
+            "Correct %s permissions to %o", mock_file2, target_perm
+        )
+
+    @mock.patch("hw_tools.logger")
+    @mock.patch("hw_tools.Path")
+    def test_correct_storelib_log_permissions_error(self, mock_path_cls, mock_logger):
+        mock_log_dir = mock.Mock(spec=Path)
+        mock_file = mock.Mock(spec=Path)
+        mock_file.name = "storelibdebugit.txt"
+        mock_file.stat.return_value.st_mode = 0o644
+        mock_path_cls.return_value = mock_log_dir
+        mock_log_dir.rglob.return_value = [mock_file]
+
+        mock_file.chmod.side_effect = OSError("Permission denied")
+        with self.assertRaises(OSError):
+            HWToolHelper.correct_storelib_log_permissions()
+
+        mock_logger.error.assert_called_once_with(
+            "Failed to correct %s file permissions: %s",
+            mock_file.name,
+            mock_file.chmod.side_effect,
+        )
+
+
+class TestTPRStrategyStorelib(unittest.TestCase):
+    """Tests for storelib-related methods in TPRStrategyABC."""
+
+    class MockTPRStrategyInheritance(TPRStrategyABC):
+        """Minimal implementation for testing the abstract base class."""
+
+        _name = mock.MagicMock()
+
+        def install(self, path: Path) -> None:
+            pass
+
+        def remove(self) -> None:
+            pass
+
+        def check(self) -> bool:
+            return True
+
+    def setUp(self):
+        """Set up the mock strategy."""
+        self.strategy = self.MockTPRStrategyInheritance()
+
+    @mock.patch("hw_tools.Path.mkdir")
+    @mock.patch("hw_tools.Path.exists", return_value=False)
+    @mock.patch("builtins.open", new_callable=mock.mock_open)
+    @mock.patch("hw_tools.logger")
+    def test_generate_storelib_config_success(
+        self, mock_logger, mock_open, mock_exists, mock_mkdir
+    ):
+        """Test successful generation of storelib config file."""
+        self.strategy._generate_storelib_config()
+
+        mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+        mock_open.assert_called_once_with(self.strategy._storelib_config_file_path, "w")
+        mock_file_handle = mock_open()
+        self.assertTrue(mock_file_handle.write.called)
+        mock_logger.info.assert_called_with(
+            "Created storelib config file at %s", self.strategy._storelib_config_file_path
+        )
+
+    @mock.patch("hw_tools.Path.mkdir")
+    @mock.patch("hw_tools.Path.exists")
+    @mock.patch("builtins.open", side_effect=PermissionError("Permission denied"))
+    @mock.patch("hw_tools.logger")
+    def test_generate_storelib_config_permission_error(
+        self, mock_logger, mock_open, mock_exists, mock_mkdir
+    ):
+        """Test error handling when creating config file fails due to permissions."""
+        with self.assertRaises(PermissionError):
+            self.strategy._generate_storelib_config()
+        mock_logger.error.assert_called_with(
+            "Failed to write storelib config file: %s", mock_open.side_effect
+        )
+
+    @mock.patch("hw_tools.Path.exists")
+    @mock.patch("hw_tools.Path.unlink")
+    @mock.patch("hw_tools.logger")
+    def test_remove_storelib_config_exists(self, mock_logger, mock_unlink, mock_exists):
+        """Test removal of existing storelib config file."""
+        mock_exists.return_value = True
+        self.strategy._remove_storelib_config()
+        mock_unlink.assert_called_once()
+        mock_logger.info.assert_called_with(
+            "Removed storelib configuration file at %s", self.strategy._storelib_config_file_path
+        )
+
+    @mock.patch("hw_tools.Path.exists")
+    @mock.patch("hw_tools.Path.unlink")
+    @mock.patch("hw_tools.logger")
+    def test_remove_storelib_config_not_exists(self, mock_logger, mock_unlink, mock_exists):
+        """Test removal when config file doesn't exist."""
+        mock_exists.return_value = False
+        self.strategy._remove_storelib_config()
+        mock_unlink.assert_not_called()
+        mock_logger.info.assert_called_with(
+            "Storelib config file at %s does not exist", self.strategy._storelib_config_file_path
+        )
+
+    @mock.patch("hw_tools.Path.exists")
+    @mock.patch("hw_tools.Path.unlink", side_effect=OSError("Permission denied"))
+    @mock.patch("hw_tools.logger")
+    def test_remove_storelib_config_error(self, mock_logger, mock_unlink, mock_exists):
+        """Test error handling when removing config file fails."""
+        mock_exists.return_value = True
+        with self.assertRaises(OSError):
+            self.strategy._remove_storelib_config()
+        mock_logger.error.assert_called_with(
+            "Failed to remove storelib config file: %s", mock_unlink.side_effect
+        )

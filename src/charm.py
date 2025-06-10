@@ -204,6 +204,9 @@ class HardwareObserverCharm(ops.CharmBase):
         # Check health of all exporters
         exporters_health = [self._check_exporter_health(exporter) for exporter in self.exporters]
 
+        # If this correction failed, the charm will be set in error status
+        self.hw_tool_helper.correct_storelib_log_permissions()
+
         if all(exporters_health):
             self.model.unit.status = ActiveStatus("Unit is ready")
 
