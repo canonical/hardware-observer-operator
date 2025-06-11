@@ -49,23 +49,9 @@ jobs:
       - release
     if: failure()
     steps:
-      - name: Comment on commit if release workflow fails
-        uses: actions/github-script@v7
+      - name: Notify release failure
+        uses: mattermost/action-mattermost-notify@master
         with:
-          script: |
-            const failedJobs = ${{ toJSON(needs) }};
-            let failedJobNames = Object.keys(failedJobs).filter(job => failedJobs[job].result === 'failure');
-            const body = [
-              "# Release workflow: ${{ github.workflow }} failed!",
-              "**Failed jobs**: " + (failedJobNames.join(', ') || 'unknown'),
-              "**Check details**: [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})",
-              "@canonical/solutions-engineering"
-            ].join('\n');
-            await github.rest.repos.createCommitComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: context.sha,
-              body: body
-            });
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MATTERMOST_WEBHOOK_URL: ${{ secrets.MATTERMOST_WEBHOOK_URL }}
+          TEXT: |
+            :rotating_light: @soleng release failed in project [${{ github.repository }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
