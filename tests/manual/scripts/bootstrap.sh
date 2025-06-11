@@ -7,6 +7,7 @@ sudo apt update
 # Set up packages
 sudo snap install juju
 sudo snap install terraform --classic
+sudo snap install charmcraft --classic
 sudo apt-get install tox jq ubuntu-drivers-common -y
 
 # Download terragrunt
