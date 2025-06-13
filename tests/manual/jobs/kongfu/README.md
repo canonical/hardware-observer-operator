@@ -24,3 +24,18 @@ the resource, you can attach the resource using
 ```shell
 juju attach-resource hardware-observer storcli-deb=<PATH-TO-STORCLI-DEB>
 ```
+
+## Running the tests
+
+You can run the functional tests for real hardware by following these steps:
+
+```shell
+# Adding relation will be tested as part of the test case, so we need to remove it before running the tests
+juju -m hw-obs remove-relation hardware-observer grafana-agent
+
+# We don't have redfish credential for this machine
+juju -m hw-obs config hardware-observer redfish-disable=true
+
+# Running the tests
+tox -e func -- -v --realhw --model hw-obs --no-deploy  --collectors ipmi_dcmi ipmi_sel ipmi_sensor mega_raid  --keep-models
+```
