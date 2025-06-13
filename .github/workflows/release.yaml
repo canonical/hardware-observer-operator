@@ -47,7 +47,7 @@ jobs:
     needs:
       - check
       - release
-    if: failure()
+    if: ${{ failure() && github.run_attempt == 1 }}
     steps:
       - name: Notify release failure
         uses: mattermost/action-mattermost-notify@master
