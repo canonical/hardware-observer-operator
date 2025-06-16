@@ -36,6 +36,6 @@ juju remove-relation -m hw-obs hardware-observer grafana-agent
 # We don't have redfish credential for this machine
 juju config -m hw-obs hardware-observer redfish-disable=true
 
-# Running the tests
-tox -e func -- -v --realhw --model hw-obs --no-deploy  --collectors ipmi_dcmi ipmi_sel ipmi_sensor mega_raid  --keep-models
+# If you already attach the `storcli-deb` resource
+tox -e func -- -v -k 'not test_required_resources' --realhw --model hw-obs --no-deploy  --collectors ipmi_dcmi ipmi_sel ipmi_sensor mega_raid  --keep-models
 ```
