@@ -265,4 +265,6 @@ def parse_hardware_exporter_metrics(metrics_input: str) -> dict[str, list[Metric
             parsed_metrics["poweredge_raid"].append(metric)
         elif name.startswith("megaraid") or name.startswith("storcli"):
             parsed_metrics["mega_raid"].append(metric)
+        elif name.startswith("ssacli"):
+            parsed_metrics["hpe_ssa"].append(metric)
     return parsed_metrics

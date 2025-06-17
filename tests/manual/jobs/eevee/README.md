@@ -15,3 +15,17 @@
 - [x] Smartctl Exporter (require S.M.A.R.T disks)
   - [x] smartctl
 
+## Running the tests
+
+You can run the functional tests for real hardware by following these steps:
+
+```shell
+# Adding relation will be tested as part of the test case, so we need to remove it before running the tests
+juju remove-relation -m hw-obs hardware-observer grafana-agent
+
+# We don't have redfish credential for this machine
+juju config -m hw-obs hardware-observer redfish-disable=true
+
+# Running the tests
+tox -e func -- -v --realhw --model hw-obs --no-deploy  --collectors ipmi_dcmi ipmi_sel ipmi_sensor hpe_ssa  --keep-models
+```
