@@ -49,6 +49,19 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     proxied_endpoints = json.loads(json_data["traefik/0"]["results"]["proxied-endpoints"])
     prometheus_url = proxied_endpoints["prometheus/0"]["url"]
     prometheus_alerts_endpoint = f"{prometheus_url}/api/v1/alerts"
+    prometheus_metrics_endpoint = f"{prometheus_url}/metrics"
+
+    try:
+        async for attempt in AsyncRetrying(stop=stop_after_attempt(45), wait=wait_fixed(20)):
+            with attempt:
+                try:
+                    metrics_response = subprocess.check_output(["curl", prometheus_metrics_endpoint])
+                except subprocess.CalledProcessError:
+                    logger.error("Failed to fetch metrics data from Prometheus")
+                    raise
+                assert "ipmi_dcmi" in str(metrics_response), "Not able to get mock metrics from prometheus"
+    except RetryError:
+        pytest.fail("Expected metrics not found in Prometheus.")
 
     cmd = ["curl", prometheus_alerts_endpoint]
 
@@ -88,7 +101,7 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
                     assert any(
                         expected_alert.is_same_alert(received_alert)
                         for received_alert in received_alerts
-                    )
+                    ), f"Expected alert {expected_alert} not found, received_alerts: {alerts}"
 
     except RetryError:
         pytest.fail("Expected alerts not found in COS.")
@@ -150,13 +163,27 @@ async def _deploy_cos(channel, ctl, model):
 
 async def _deploy_hardware_observer(base, channel, model):
     """Deploy Hardware Observer and Grafana Agent on the existing lxd cloud."""
+    base_series_mapping = {
+        "ubuntu@20.04": "focal",
+        "ubuntu@22.04": "jammy",
+        "ubuntu@24.04": "noble",
+    }
     await asyncio.gather(
         # Principal Ubuntu
-        model.deploy("ubuntu", num_units=1, base=base, channel=channel),
+        model.deploy(
+            "ubuntu", num_units=1, base=base, channel=channel,
+            series=base_series_mapping[base],
+        ),
         # Hardware Observer
-        model.deploy("hardware-observer", base=base, num_units=0, channel=channel),
+        model.deploy(
+            "hardware-observer", base=base, num_units=0, channel=channel,
+            series=base_series_mapping[base],
+        ),
         # Grafana Agent
-        model.deploy("grafana-agent", num_units=0, base=base, channel=channel),
+        model.deploy(
+            "grafana-agent", num_units=0, base=base, channel=channel,
+            series=base_series_mapping[base],
+        ),
     )
 
     await model.add_relation("ubuntu:juju-info", "hardware-observer:general-info")
