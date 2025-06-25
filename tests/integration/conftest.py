@@ -25,7 +25,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--channel",
         type=str,
-        default="edge",
+        default="stable",
         choices=["edge", "candidate", "stable"],
         help="Charmhub channel to use during charms deployment",
     )
