@@ -59,7 +59,9 @@ jobs:
         run: chmod -R ugo+rwX ~/.kube
 
       - name: Run integration tests
-        run: tox -e integration
+        run: |
+          pip install -r ./tests/integration/requirements.txt 
+          pytest ./tests/integration -vv --log-cli-level=INFO
         env:
           K8S_CONTROLLER: ${{ steps.k8s-controller.outputs.name }}
           LXD_CONTROLLER: ${{ steps.lxd-controller.outputs.name }}
