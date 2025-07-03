@@ -4,14 +4,20 @@
 
 # This file is supposed to run on the hardware observer unit.
 
+import logging
+import socket
+import sys
 import time
 
 from mock_data import SAMPLE_METRICS
 from prometheus_client import REGISTRY, start_http_server
 from prometheus_client.core import GaugeMetricFamily
+from prometheus_client.registry import Collector
+
+logger = logging.getLogger(__name__)
 
 
-class SyntheticCollector:
+class SyntheticCollector(Collector):
     """Collector for creating synthetic(mock) metrics."""
 
     def collect(self):
@@ -28,8 +34,25 @@ class SyntheticCollector:
 
 
 if __name__ == "__main__":
-    start_http_server(10200)  # start at default port (see config.yaml)
-    REGISTRY.register(SyntheticCollector())
+    port = 10200  # Default port for the mock metrics server (see `config.yaml`)
 
-    while True:
-        time.sleep(10)  # Keep the server running
+    try:
+        start_http_server(port)
+        REGISTRY.register(SyntheticCollector())
+
+        hostname = socket.gethostname()
+        ip_address = socket.gethostbyname(hostname)
+        logger.info(f"Mock metrics server started on {ip_address}:{port}")
+
+        for sample_metric in SAMPLE_METRICS:
+            logger.info(
+                f"Exposing metric: {sample_metric['name']} with value: {sample_metric['value']} "
+                f"and labels: {sample_metric['labels']}"
+            )
+
+        while True:
+            time.sleep(10)  # Keep the server running
+
+    except Exception as e:
+        logger.error(f"Failed to start mock metrics server: {e}")
+        sys.exit(1)
