@@ -59,7 +59,7 @@ jobs:
         run: chmod -R ugo+rwX ~/.kube
 
       - name: Run integration tests
-        run: tox -e integration
+        run: tox -c ./tox-weekly-test.ini -e integration
         env:
           K8S_CONTROLLER: ${{ steps.k8s-controller.outputs.name }}
           LXD_CONTROLLER: ${{ steps.lxd-controller.outputs.name }}
