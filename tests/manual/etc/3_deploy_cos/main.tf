@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     juju = {
-      version = "~> 0.17.0"
+      version = "~> 0.20.0"
       source  = "juju/juju"
     }
   }
@@ -24,6 +24,13 @@ module "cos-lite-terraform" {
   config = {
     workload-storage = "microk8s-hostpath"
   }
+
+  # Add some temporary overrides, can remove when these channels are updated to latest/stable
+  alertmanager-channel = "1/stable"
+  prometheus-channel = "1/stable"
+  grafana-channel = "1/stable"
+  catalogue-channel = "1/stable"
+  loki-channel = "1/stable"
 }
 
 resource "juju_application" "metallb" {
