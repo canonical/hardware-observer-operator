@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     juju = {
-      version = "~> 0.17.0"
+      version = "~> 0.20.0"
       source  = "juju/juju"
     }
   }
@@ -13,7 +13,7 @@ module "grafana-agent" {
   source = "git::https://github.com/canonical/snap-openstack.git//sunbeam-python/sunbeam/features/observability/etc/deploy-grafana-agent"
 
   grafana-agent-base             = var.grafana_agent_base
-  grafana-agent-channel          = "latest/stable"
+  grafana-agent-channel          = "1/stable" # Can move back to latest/stable when the charm is updated
   principal-application-model    = var.machine_model
   receive-remote-write-offer-url = var.receive-remote-write-offer-url
   grafana-dashboard-offer-url    = var.grafana-dashboard-offer-url
