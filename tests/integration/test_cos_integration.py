@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from mock_data import EXPECTED_ALERTS
+from mock_data import EXPECTED_ALERTS, SAMPLE_METRICS
 from pytest_operator.plugin import OpsTest
 from tenacity import AsyncRetrying, RetryError, stop_after_attempt, wait_fixed
 from utils import Alert
@@ -47,49 +47,9 @@ async def test_hardware_observer_metrics_in_prometheus(ops_test: OpsTest, lxd_mo
     prometheus_url = proxied_endpoints["prometheus/0"]["url"]
     prometheus_metrics_endpoint = f"{prometheus_url}/metrics"
 
-    # Get hardware observer unit
-    hardware_observer = lxd_model.applications.get("hardware-observer")
-    hardware_observer_unit = hardware_observer.units[0]
-
-    # Check hardware-exporter service status
-    service_status_cmd = "sudo systemctl is-active hardware-exporter.service"
-    service_status_action = await hardware_observer_unit.run(service_status_cmd)
-    await service_status_action.wait()
-    logger.info(f"Hardware exporter service status: {service_status_action.results}")
-
-    # Check metrics are available on the correct port
-    test_local_metrics_cmd = "curl -s http://localhost:10200/metrics | head -20"
-    local_test_action = await hardware_observer_unit.run(test_local_metrics_cmd)
-    await local_test_action.wait()
-    logger.info(f"Local hardware observer metrics sample: {local_test_action.results}")
-
-    # Check if hardware observer metrics are flowing through to Prometheus
     try:
         async for attempt in AsyncRetrying(stop=stop_after_attempt(30), wait=wait_fixed(20)):
             with attempt:
-                # Check Grafana target availability in Prometheus
-                try:
-                    targets_response = subprocess.check_output(
-                        ["curl", f"{prometheus_url}/api/v1/targets"]
-                    )
-                    targets_data = json.loads(targets_response)["data"]["activeTargets"]
-                    grafana_target = [
-                        target for target in targets_data if "grafana" in str(target)
-                    ][0]
-                    grafana_scrape_url = grafana_target["scrapeUrl"]
-                    health = grafana_target.get("health", "N/A")
-                    logger.info(
-                        f"Grafana scrape URL: {grafana_scrape_url}, \
-                                Health: {health}"
-                    )
-
-                except subprocess.CalledProcessError as e:
-                    logger.error(f"Failed to fetch targets from Prometheus: {e}")
-                    raise
-                except Exception as e:
-                    logger.error(f"Error processing targets data: {e}")
-                    raise
-
                 # Check if hardware observer metrics are available in Prometheus
                 try:
                     metrics_response = subprocess.check_output(
@@ -103,30 +63,41 @@ async def test_hardware_observer_metrics_in_prometheus(ops_test: OpsTest, lxd_mo
                     ]
 
                     if metric_lines:
-                        logger.info(
-                            f"Found {len(metric_lines)} metrics from Hardware Observer:"
-                        )
+                        logger.info(f"Found {len(metric_lines)} metrics from Hardware Observer:")
                         num_show = min(5, len(metric_lines))
                         for metric_line in metric_lines[:num_show]:
                             logger.info(f"  {metric_line}")
                         if len(metric_lines) > num_show:
-                            logger.info(
-                                f"  ... and {len(metric_lines) - num_show} more metrics"
-                            )
-
-                        logger.info("Hardware Observer can access COS!")
+                            logger.info(f"  ... and {len(metric_lines) - num_show} more metrics")
+                        logger.info("COS can read from Hardware Observer!")
                         break
                     else:
-                        raise AssertionError("No metrics found in Prometheus")
+                        raise AssertionError("No HWO metrics found in Prometheus")
                 except subprocess.CalledProcessError as e:
-                    logger.error(f"Failed to fetch metrics from Prometheus: {e}")
+                    logger.error(f"Failed to fetch HWO metrics from Prometheus: {e}")
                     raise
-                except AssertionError as e:
+                except AssertionError:
                     raise
 
     except RetryError:
+        # Get hardware observer unit
+        hardware_observer = lxd_model.applications.get("hardware-observer")
+        hardware_observer_unit = hardware_observer.units[0]
+
+        # Show hardware-exporter service status
+        service_status_cmd = "sudo systemctl is-active hardware-exporter.service"
+        service_status_action = await hardware_observer_unit.run(service_status_cmd)
+        await service_status_action.wait()
+        logger.debug(f"Hardware exporter service status: {service_status_action.results}")
+
+        # Show metrics are available on the correct port
+        test_local_metrics_cmd = "curl -s http://localhost:10200/metrics | head -20"
+        local_test_action = await hardware_observer_unit.run(test_local_metrics_cmd)
+        await local_test_action.wait()
+        logger.debug(f"Local hardware observer metrics sample: {local_test_action.results}")
+
         pytest.fail(
-            "No IPMI metrics found in Prometheus after retries. "
+            "No Hardware Observer metrics found in Prometheus after retries. "
             "Hardware Observer may not be connected to COS properly."
         )
 
@@ -139,7 +110,9 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     # Check if hardware-exporter service is actually stopped
     hardware_observer = lxd_model.applications.get("hardware-observer")
     hardware_observer_unit = hardware_observer.units[0]
-    service_check_cmd = "sudo systemctl is-active hardware-exporter.service || echo 'Service stopped'"
+    service_check_cmd = (
+        "sudo systemctl is-active hardware-exporter.service || echo 'Service stopped'"
+    )
     service_action = await hardware_observer_unit.run(service_check_cmd)
     await service_action.wait()
     logger.info(f"Hardware-exporter service status: {service_action.results}")
@@ -148,7 +121,7 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     test_mock_cmd = "curl -s http://localhost:10200/metrics | grep -E '(ipmi_dcmi_command_success|ipmi_temperature_celsius)'"
     mock_test_action = await hardware_observer_unit.run(test_mock_cmd)
     await mock_test_action.wait()
-    logger.info(f"Mock metrics from localhost:10200:")
+    logger.info("Mock metrics from localhost:10200:")
     logger.info(f"{mock_test_action.results}")
 
     # Run juju action to get the ip address that traefik is configured to serve on
@@ -163,79 +136,83 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     json_data = json.loads(stdout)
     proxied_endpoints = json.loads(json_data["traefik/0"]["results"]["proxied-endpoints"])
     prometheus_url = proxied_endpoints["prometheus/0"]["url"]
+    prometheus_query_url = f"{prometheus_url}/api/v1/query"
     prometheus_alerts_endpoint = f"{prometheus_url}/api/v1/alerts"
 
-    # Check if mock metrics appear in Prometheus using the QUERY API (not /metrics)
-    logger.info("=== CHECKING MOCK METRICS VIA PROMETHEUS QUERY API ===")
+    # Metrics need to validate against
+    required_metrics = {
+        metric["name"]: metric["value"]
+        for metric in SAMPLE_METRICS
+        if metric["name"] in ["ipmi_dcmi_command_success", "ipmi_temperature_celsius"]
+    }
+
+    logger.info("=== Verifying mock metrics in Prometheus ===")
+
     try:
-        await asyncio.sleep(30)  # Wait longer for scrape to happen
+        async for attempt in AsyncRetrying(stop=stop_after_attempt(60), wait=wait_fixed(20)):
+            with attempt:
+                all_metrics_found = True
 
-        # Query API to check for our mock metrics
-        prometheus_query_url = f"{prometheus_url}/api/v1/query"
+                for metric_name, expected_value in required_metrics.items():
+                    logger.info(
+                        f"Attempt {attempt.retry_state.attempt_number}/60: Checking for `{metric_name}`={expected_value}"
+                    )
 
-        # Check for ipmi_dcmi_command_success
-        query1 = "ipmi_dcmi_command_success"
-        cmd1 = ["curl", "-s", f"{prometheus_query_url}?query={query1}"]
-        response1 = subprocess.check_output(cmd1)
-        result1 = json.loads(response1.decode("utf-8"))
+                    try:
+                        cmd = ["curl", "-s", f"{prometheus_query_url}?query={metric_name}"]
+                        response = subprocess.check_output(cmd)
+                        result = json.loads(response.decode("utf-8"))
 
-        logger.info(f"Query for '{query1}':")
-        logger.info(f"  Status: {result1.get('status', 'unknown')}")
-        if result1.get('data', {}).get('result'):
-            logger.info(f"  Found {len(result1['data']['result'])} results:")
-            for metric in result1['data']['result']:
-                logger.info(f"    Metric: {metric.get('metric', {})}")
-                logger.info(f"    Value: {metric.get('value', [])}")
-        else:
-            logger.info("  No results found")
+                        if not result.get("data", {}).get("result"):
+                            logger.info(f"`{metric_name}` not found")
+                            all_metrics_found = False
+                        else:
+                            found_value = float(result["data"]["result"][0]["value"][1])
+                            if found_value != expected_value:
+                                logger.info(
+                                    f"`{metric_name}` found but wrong value: {found_value} (expected {expected_value})"
+                                )
+                                all_metrics_found = False
+                            else:
+                                logger.info(
+                                    f"`{metric_name}` found with correct value: {found_value}"
+                                )
 
-        # Check for ipmi_temperature_celsius
-        query2 = "ipmi_temperature_celsius"
-        cmd2 = ["curl", "-s", f"{prometheus_query_url}?query={query2}"]
-        response2 = subprocess.check_output(cmd2)
-        result2 = json.loads(response2.decode("utf-8"))
+                    except (
+                        subprocess.CalledProcessError,
+                        json.JSONDecodeError,
+                        KeyError,
+                        IndexError,
+                    ) as e:
+                        logger.info(f"  Error checking `{metric_name}`: {e}")
+                        all_metrics_found = False
 
-        logger.info(f"Query for '{query2}':")
-        logger.info(f"  Status: {result2.get('status', 'unknown')}")
-        if result2.get('data', {}).get('result'):
-            logger.info(f"  Found {len(result2['data']['result'])} results:")
-            for metric in result2['data']['result']:
-                logger.info(f"    Metric: {metric.get('metric', {})}")
-                logger.info(f"    Value: {metric.get('value', [])}")
-        else:
-            logger.info("  No results found")
+                if not all_metrics_found:
+                    raise AssertionError("Required metrics not found with expected values")
 
-        # Check what juju_application labels exist for any hardware-observer metrics
-        query3 = '{juju_application="hardware-observer"}'
-        cmd3 = ["curl", "-s", f"{prometheus_query_url}?query={query3}"]
-        response3 = subprocess.check_output(cmd3)
-        result3 = json.loads(response3.decode("utf-8"))
+                logger.info("All required metrics found with expected values!")
+                break
 
-        logger.info(f"Query for hardware-observer metrics:")
-        logger.info(f"  Status: {result3.get('status', 'unknown')}")
-        if result3.get('data', {}).get('result'):
-            logger.info(f"  Found {len(result3['data']['result'])} hardware-observer metrics")
-            for metric in result3['data']['result'][:3]:  # Show first 3
-                logger.info(f"    {metric.get('metric', {})}")
-        else:
-            logger.info("  No hardware-observer metrics found")
+    except RetryError:
+        metric_descriptions = [f"`{name}`={value}" for name, value in required_metrics.items()]
+        pytest.fail(
+            f"Required metrics ({', '.join(metric_descriptions)}) not found in Prometheus after retries."
+            ""
+        )
 
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to query Prometheus: {e}")
-    except Exception as e:
-        logger.error(f"Error querying metrics: {e}")
-
-    logger.info("=== END PROMETHEUS QUERY API CHECK ===")
-
+    logger.info("=== Verifying alerts are firing ===")
     cmd = ["curl", prometheus_alerts_endpoint]
 
     # Sometimes alerts take some time to show after the metrics are exposed on the host.
     # Additionally, some alerts longer duration like 5m, and they take some time to
     # transition to `firing` state.
-    # So retrying for upto 15 minutes.
+    # So retrying for up to 20 minutes.
     try:
-        async for attempt in AsyncRetrying(stop=stop_after_attempt(45), wait=wait_fixed(20)):
+        async for attempt in AsyncRetrying(stop=stop_after_attempt(60), wait=wait_fixed(20)):
             with attempt:
+                logger.info(
+                    f"Attempt {attempt.retry_state.attempt_number}/20: Checking for firing alerts"
+                )
                 try:
                     alerts_response = subprocess.check_output(cmd)
                 except subprocess.CalledProcessError:
@@ -261,14 +238,23 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
                     for expected_alert in EXPECTED_ALERTS
                 ]
 
+                missing_alerts = []
                 for expected_alert in expected_alerts:
-                    assert any(
+                    if not any(
                         expected_alert.is_same_alert(received_alert)
                         for received_alert in received_alerts
-                    ), f"Expected alert {expected_alert} not found, received_alerts: {alerts}"
+                    ):
+                        missing_alerts.append(expected_alert)
+
+                if missing_alerts:
+                    logger.info(f"Missing alerts: {missing_alerts}")
+                    raise AssertionError(f"Expected alerts not found: {missing_alerts}")
+
+                logger.info("All expected alerts are firing!")
+                break
 
     except RetryError:
-        pytest.fail("Expected alerts not found in COS.")
+        pytest.fail("Expected alerts not found in COS after metrics were confirmed in Prometheus.")
 
 
 async def _disable_hardware_exporter(ops_test: OpsTest, lxd_model):
