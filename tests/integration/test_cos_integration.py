@@ -106,6 +106,7 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     """Verify that the required alerts are fired."""
     await _disable_hardware_exporter(ops_test, lxd_model)
     await _export_mock_metrics(lxd_model)
+    await _restart_grafana_agent(ops_test, lxd_model)
 
     # Check if hardware-exporter service is actually stopped
     hardware_observer = lxd_model.applications.get("hardware-observer")
@@ -116,6 +117,12 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     service_action = await hardware_observer_unit.run(service_check_cmd)
     await service_action.wait()
     logger.info(f"Hardware-exporter service status: {service_action.results}")
+
+    # Check if Grafana Agent is running
+    agent_check_cmd = "sudo systemctl is-active snap.grafana-agent.grafana-agent.service"
+    agent_action = await hardware_observer_unit.run(agent_check_cmd)
+    await agent_action.wait()
+    logger.info(f"Grafana Agent service status: {agent_action.results}")
 
     # Check mock server is actually serving mock metrics
     test_mock_cmd = "curl -s http://localhost:10200/metrics | grep -E '(ipmi_dcmi_command_success|ipmi_temperature_celsius)'"
@@ -149,7 +156,7 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     logger.info("=== Verifying mock metrics in Prometheus ===")
 
     try:
-        async for attempt in AsyncRetrying(stop=stop_after_attempt(60), wait=wait_fixed(20)):
+        async for attempt in AsyncRetrying(stop=stop_after_attempt(60), wait=wait_fixed(30)):
             with attempt:
                 all_metrics_found = True
 
@@ -208,7 +215,7 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     # transition to `firing` state.
     # So retrying for up to 20 minutes.
     try:
-        async for attempt in AsyncRetrying(stop=stop_after_attempt(60), wait=wait_fixed(20)):
+        async for attempt in AsyncRetrying(stop=stop_after_attempt(60), wait=wait_fixed(30)):
             with attempt:
                 logger.info(
                     f"Attempt {attempt.retry_state.attempt_number}/20: Checking for firing alerts"
@@ -255,6 +262,19 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
 
     except RetryError:
         pytest.fail("Expected alerts not found in COS after metrics were confirmed in Prometheus.")
+
+
+async def _restart_grafana_agent(ops_test: OpsTest, lxd_model):
+    """Restart Grafana Agent to ensure it picks up new metrics."""
+    restart_cmd = "sudo systemctl restart snap.grafana-agent.grafana-agent.service"
+
+    hardware_observer = lxd_model.applications.get("hardware-observer")
+    hardware_observer_unit = hardware_observer.units[0]
+
+    restart_action = await hardware_observer_unit.run(restart_cmd)
+    await restart_action.wait()
+
+    logger.info(f"Grafana Agent restart status: {restart_action.results}")
 
 
 async def _disable_hardware_exporter(ops_test: OpsTest, lxd_model):
