@@ -293,41 +293,63 @@ async def _export_mock_metrics(lxd_model):
     hardware_observer = lxd_model.applications.get("hardware-observer")
     hardware_observer_unit = hardware_observer.units[0]
 
-    # Create an executable from `export_mock_metrics.py`
-    bundle_cmd = [
-        "pyinstaller",
-        "--onefile",
-        "--hidden-import=mock_data",
-        str(Path(__file__).parent.resolve() / "export_mock_metrics.py"),
-    ]
-    try:
-        subprocess.run(bundle_cmd)
-    except subprocess.CalledProcessError:
-        logger.error("Failed to bundle export_mock_metrics")
-        raise
+    scripts_dir = Path(__file__).parent.resolve()
+    export_script = scripts_dir / "export_mock_metrics.py"
+    mock_data_script = scripts_dir / "mock_data.py"
 
-    # Verify the bundle was created successfully
-    if not Path("./dist/export_mock_metrics").exists():
-        logger.error("PyInstaller failed to create the executable")
-        raise FileNotFoundError("Mock metrics executable not found")
+    # Verify scripts exist locally
+    if not export_script.exists():
+        raise FileNotFoundError(f"Export script not found: {export_script}")
+    if not mock_data_script.exists():
+        raise FileNotFoundError(f"Mock data script not found: {mock_data_script}")
 
-    # Log bundle creation success
-    logger.info(
-        f"PyInstaller bundle created successfully at: {Path('./dist/export_mock_metrics').resolve()}"
-    )
+    # Copy Python scripts to hardware-observer unit
+    await hardware_observer_unit.scp_to(str(export_script), "/home/ubuntu/")
+    await hardware_observer_unit.scp_to(str(mock_data_script), "/home/ubuntu/")
 
-    # scp the executable to hardware-observer unit
-    await hardware_observer_unit.scp_to("./dist/export_mock_metrics", "/home/ubuntu")
-
-    # Verify the executable was copied successfully and check permissions
-    check_file_cmd = "ls -la /home/ubuntu/export_mock_metrics"
-    file_check_action = await hardware_observer_unit.run(check_file_cmd)
+    # Verify the scripts were copied successfully
+    check_files_cmd = "ls -la /home/ubuntu/export_mock_metrics.py /home/ubuntu/mock_data.py"
+    file_check_action = await hardware_observer_unit.run(check_files_cmd)
     await file_check_action.wait()
-    logger.info(f"Mock executable file check: {file_check_action.results}")
+    logger.info(f"Mock scripts file check: {file_check_action.results}")
 
-    # Run the executable with explicit logging to see startup issues
-    run_export_mock_metrics_cmd = "/home/ubuntu/export_mock_metrics > /tmp/mock_server.log 2>&1 &"
-    await hardware_observer_unit.run(run_export_mock_metrics_cmd)
+    # Setup Python environment on the remote unit
+    await _setup_python_environment(hardware_observer_unit)
+
+    # Run the export mock metrics script as subprocess
+    run_export_mock_metrics_cmd = """
+cd /home/ubuntu
+python3 -c "
+import subprocess
+import sys
+import time
+
+try:
+    proc = subprocess.Popen(
+        [sys.executable, 'export_mock_metrics.py'],
+        stdout=open('/tmp/mock_server.log', 'w'),
+        stderr=subprocess.STDOUT,
+        start_new_session=True
+    )
+    
+    with open('/tmp/mock_server.pid', 'w') as f:
+        f.write(str(proc.pid))
+    
+    print(f'Started mock server PID: {proc.pid}')
+    
+    time.sleep(5)
+    if proc.poll() is not None:
+        print(f'ERROR: Process exited with code {proc.poll()}')
+        sys.exit(1)
+        
+except Exception as e:
+    print(f'ERROR: {e}')
+    sys.exit(1)
+"
+"""
+    mock_start_action = await hardware_observer_unit.run(run_export_mock_metrics_cmd)
+    await mock_start_action.wait()
+    logger.info(f"Mock server start result: {mock_start_action.results}")
 
     # Wait a moment and check the log
     await asyncio.sleep(5)
@@ -337,7 +359,7 @@ async def _export_mock_metrics(lxd_model):
     logger.info(f"Mock server startup log: {log_action.results}")
 
     # Check if the mock server process is running
-    check_process_cmd = "ps aux | grep export_mock_metrics"
+    check_process_cmd = "ps aux | grep 'python3 export_mock_metrics.py' | grep -v grep"
     process_check_action = await hardware_observer_unit.run(check_process_cmd)
     await process_check_action.wait()
     logger.info(f"Mock server process check: {process_check_action.results}")
@@ -446,3 +468,20 @@ async def _add_cross_controller_relations(k8s_ctl, lxd_ctl, k8s_model, lxd_model
         lxd_model.wait_for_idle(status="active", timeout=7200, idle_period=180),
         k8s_model.wait_for_idle(status="active", timeout=7200, idle_period=180),
     )
+
+
+async def _setup_python_environment(unit):
+    """Set up Python environment on the input unit."""
+    logger.info("Setting up Python environment on input unit")
+
+    # Install pip
+    install_pip_cmd = "sudo apt update && sudo apt install -y python3-pip"
+    pip_action = await unit.run(install_pip_cmd)
+    await pip_action.wait()
+    logger.info(f"Pip installation: {pip_action.results}")
+
+    # Install prometheus_client
+    install_deps_cmd = "python3 -m pip install prometheus_client"
+    deps_action = await unit.run(install_deps_cmd)
+    await deps_action.wait()
+    logger.info(f"Dependencies installation: {deps_action.results}")

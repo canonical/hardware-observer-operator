@@ -22,15 +22,18 @@ class SyntheticCollector(Collector):
 
     def collect(self):
         for sample_metric in SAMPLE_METRICS:
-            metric = GaugeMetricFamily(
-                name=sample_metric["name"],
-                documentation=sample_metric["documentation"],
+            gauge = GaugeMetricFamily(
+                sample_metric["name"],
+                sample_metric["documentation"],
                 labels=list(sample_metric["labels"].keys()),
             )
-            metric.add_metric(  # type: ignore[attr-defined]
-                labels=list(sample_metric["labels"].values()), value=sample_metric["value"]
-            )
-            yield metric
+
+            if sample_metric["labels"]:
+                gauge.add_metric(list(sample_metric["labels"].values()), sample_metric["value"])
+            else:
+                gauge.add_metric([], sample_metric["value"])
+
+            yield gauge
 
 
 if __name__ == "__main__":
@@ -41,13 +44,17 @@ if __name__ == "__main__":
         REGISTRY.register(SyntheticCollector())
 
         hostname = socket.gethostname()
-        ip_address = socket.gethostbyname(hostname)
+        try:
+            ip_address = socket.gethostbyname(hostname)
+        except socket.gaierror:
+            ip_address = "localhost"
+
         logger.info(f"Mock metrics server started on {ip_address}:{port}")
 
         for sample_metric in SAMPLE_METRICS:
             logger.info(
-                f"Exposing metric: {sample_metric['name']} with value: {sample_metric['value']} "
-                f"and labels: {sample_metric['labels']}"
+                f"Exposing metric: {sample_metric['name']} = {sample_metric['value']} "
+                f"(labels: {sample_metric['labels']})"
             )
 
         while True:
