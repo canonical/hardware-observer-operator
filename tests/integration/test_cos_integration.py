@@ -104,6 +104,12 @@ async def test_hardware_observer_metrics_in_prometheus(ops_test: OpsTest, lxd_mo
 
 async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     """Verify that the required alerts are fired."""
+
+    # Debug hardware detection and services before starting
+    hardware_observer = lxd_model.applications.get("hardware-observer")
+    hardware_observer_unit = hardware_observer.units[0]
+    await _debug_hardware_detection_and_services(hardware_observer_unit)
+
     await _disable_hardware_exporter(ops_test, lxd_model)
     await _export_mock_metrics(lxd_model)
     await _restart_grafana_agent(ops_test, lxd_model)
@@ -288,6 +294,97 @@ async def _disable_hardware_exporter(ops_test: OpsTest, lxd_model):
     await disable_action.wait()
 
 
+async def _debug_hardware_detection_and_services(hardware_observer_unit):
+    """Debug hardware detection and service status in CI environment."""
+    logger.info("=== DEBUGGING: Hardware Detection & Services ===")
+
+    # Check what hardware tools are detected
+    debug_tools_cmd = """
+python3 -c "
+import sys
+sys.path.append('/var/lib/juju/agents/unit-hardware-observer-0/charm')
+try:
+    from hw_tools import detect_available_tools, raid_hw_verifier, bmc_hw_verifier, disk_hw_verifier, nvidia_gpu_verifier
+    tools = detect_available_tools()
+    print(f'All detected tools: {[tool.value for tool in tools]}')
+    print(f'Tools count: {len(tools)}')
+    print(f'RAID tools: {[t.value for t in raid_hw_verifier()]}')
+    print(f'BMC tools: {[t.value for t in bmc_hw_verifier()]}')
+    print(f'Disk tools: {[t.value for t in disk_hw_verifier()]}')
+    print(f'GPU tools: {[t.value for t in nvidia_gpu_verifier()]}')
+except Exception as e:
+    print(f'ERROR detecting tools: {e}')
+"
+"""
+    tools_debug_action = await hardware_observer_unit.run(debug_tools_cmd)
+    await tools_debug_action.wait()
+    logger.info(f"Hardware tools detection: {tools_debug_action.results}")
+
+    # Check if hardware-exporter service exists and its status
+    service_debug_cmd = """
+echo "=== Service Status ==="
+if systemctl list-unit-files | grep -q hardware-exporter.service; then
+    echo "hardware-exporter.service EXISTS"
+    echo "Status: $(systemctl is-active hardware-exporter.service)"
+    echo "Enabled: $(systemctl is-enabled hardware-exporter.service)"
+    if [ -f /etc/systemd/system/hardware-exporter.service ]; then
+        echo "Service file exists: /etc/systemd/system/hardware-exporter.service"
+    else
+        echo "Service file missing: /etc/systemd/system/hardware-exporter.service"
+    fi
+else
+    echo "hardware-exporter.service DOES NOT EXIST"
+fi
+"""
+    service_debug_action = await hardware_observer_unit.run(service_debug_cmd)
+    await service_debug_action.wait()
+    logger.info(f"Service existence: {service_debug_action.results}")
+
+    # Check what's listening on port 10200 and other ports
+    port_debug_cmd = """
+echo "=== Port Status ==="
+echo "Port 10200 specific:"
+ss -tulpn | grep :10200 || echo "Nothing listening on port 10200"
+echo "All listening ports:"
+ss -tulpn | grep LISTEN | head -10
+"""
+    port_debug_action = await hardware_observer_unit.run(port_debug_cmd)
+    await port_debug_action.wait()
+    logger.info(f"Port status: {port_debug_action.results}")
+
+    # Check Grafana Agent configuration
+    grafana_config_cmd = """
+echo "=== Grafana Agent Config ==="
+config_file="/etc/grafana-agent.yaml"
+echo "Checking config file: $config_file"
+if [ -f "$config_file" ]; then
+    echo "Config file exists. Checking for port 10200:"
+    grep -A 5 -B 5 "10200" "$config_file" || echo "Port 10200 not found in $config_file"
+    echo "Hardware-observer jobs:"
+    grep -A 15 "hardware-observer.*default" "$config_file" || echo "No hardware-observer jobs found"
+    echo "All targets in this file:"
+    grep -A 2 -B 1 "targets:" "$config_file" | head -20 || echo "No targets found"
+    echo "--- End of $config_file ---"
+else
+    echo "Config file $config_file not found"
+fi
+"""
+    grafana_debug_action = await hardware_observer_unit.run(grafana_config_cmd)
+    await grafana_debug_action.wait()
+    logger.info(f"Grafana Agent config: {grafana_debug_action.results}")
+
+    # Check if there are any exporter processes running
+    process_debug_cmd = """
+echo "=== Running Processes ==="
+ps aux | grep -E "(hardware|exporter|prometheus)" | grep -v grep || echo "No exporter processes found"
+"""
+    process_debug_action = await hardware_observer_unit.run(process_debug_cmd)
+    await process_debug_action.wait()
+    logger.info(f"Running processes: {process_debug_action.results}")
+
+    logger.info("=== END DEBUGGING ===")
+
+
 async def _export_mock_metrics(lxd_model):
     """Expose the mock metrics for further testing."""
     hardware_observer = lxd_model.applications.get("hardware-observer")
@@ -331,17 +428,17 @@ try:
         stderr=subprocess.STDOUT,
         start_new_session=True
     )
-    
+
     with open('/tmp/mock_server.pid', 'w') as f:
         f.write(str(proc.pid))
-    
+
     print(f'Started mock server PID: {proc.pid}')
-    
+
     time.sleep(5)
     if proc.poll() is not None:
         print(f'ERROR: Process exited with code {proc.poll()}')
         sys.exit(1)
-        
+
 except Exception as e:
     print(f'ERROR: {e}')
     sys.exit(1)
