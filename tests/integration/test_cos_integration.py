@@ -105,14 +105,44 @@ async def test_hardware_observer_metrics_in_prometheus(ops_test: OpsTest, lxd_mo
 async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     """Verify that the required alerts are fired."""
 
-    # Debug hardware detection and services before starting
     hardware_observer = lxd_model.applications.get("hardware-observer")
     hardware_observer_unit = hardware_observer.units[0]
-    await _debug_hardware_detection_and_services(hardware_observer_unit)
 
-    await _disable_hardware_exporter(ops_test, lxd_model)
-    await _export_mock_metrics(lxd_model)
-    await _restart_grafana_agent(ops_test, lxd_model)
+    try:
+        # Debug hardware detection and services before starting
+        await _debug_hardware_detection_and_services(hardware_observer_unit)
+
+        # Stop existing hardware-exporter service (may or may not exist)
+        await _disable_hardware_exporter(ops_test, lxd_model)
+
+        # Start mock server
+        await _export_mock_metrics(lxd_model)
+
+        # Patch Grafana Agent config to scrape the mock server
+        await _patch_grafana_agent_for_mock_server(hardware_observer_unit)
+
+        # Restart Grafana Agent to pick up the new config
+        await _restart_grafana_agent(ops_test, lxd_model)
+
+        # Verify Grafana Agent is now scraping the mock server
+        verify_config_cmd = """
+echo "=== Verifying Grafana Agent is configured for mock server ==="
+grep -A 10 "hardware-observer_1_default" /etc/grafana-agent.yaml
+echo "=== Checking if port 10200 is in config ==="
+grep "10200" /etc/grafana-agent.yaml && echo "Port 10200 found in config" || echo "Port 10200 NOT found in config"
+"""
+        verify_action = await hardware_observer_unit.run(verify_config_cmd)
+        await verify_action.wait()
+        logger.info(f"Grafana Agent config verification: {verify_action.results}")
+
+    except Exception as e:
+        logger.error(f"Error in test setup: {e}")
+        # Attempt to restore config even if setup failed
+        try:
+            await _restore_grafana_agent_config(hardware_observer_unit)
+        except:
+            pass
+        raise
 
     # Check if hardware-exporter service is actually stopped
     hardware_observer = lxd_model.applications.get("hardware-observer")
@@ -269,6 +299,13 @@ async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
     except RetryError:
         pytest.fail("Expected alerts not found in COS after metrics were confirmed in Prometheus.")
 
+    finally:
+        # Cleanup: Restore original Grafana Agent configuration
+        try:
+            await _restore_grafana_agent_config(hardware_observer_unit)
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to restore Grafana Agent config during cleanup: {cleanup_error}")
+
 
 async def _restart_grafana_agent(ops_test: OpsTest, lxd_model):
     """Restart Grafana Agent to ensure it picks up new metrics."""
@@ -294,31 +331,194 @@ async def _disable_hardware_exporter(ops_test: OpsTest, lxd_model):
     await disable_action.wait()
 
 
+async def _patch_grafana_agent_for_mock_server(hardware_observer_unit):
+    """Patch Grafana Agent configuration to scrape mock server on port 10200."""
+    logger.info("Patching Grafana Agent configuration for mock server...")
+
+    patch_config_cmd = """
+#!/bin/bash
+set -e
+
+CONFIG_FILE="/etc/grafana-agent.yaml"
+BACKUP_FILE="/etc/grafana-agent.yaml.backup"
+
+# Create backup
+sudo cp "$CONFIG_FILE" "$BACKUP_FILE"
+echo "Created backup: $BACKUP_FILE"
+
+# Patch the YAML
+echo "Patching Grafana Agent config to point to mock server..."
+sudo python3 -c "
+import yaml
+import sys
+import subprocess
+import tempfile
+
+CONFIG_FILE = '/etc/grafana-agent.yaml'
+
+# Read the config with proper permissions
+try:
+    result = subprocess.run(['cat', CONFIG_FILE], capture_output=True, text=True, check=True)
+    config = yaml.safe_load(result.stdout)
+except Exception as e:
+    print(f'ERROR: Failed to read config file: {e}')
+    sys.exit(1)
+
+# Find the metrics config
+metrics_config = config.get('metrics', {}).get('configs', [])
+if not metrics_config:
+    print('ERROR: No metrics config found')
+    sys.exit(1)
+
+# Find the scrape configs
+scrape_configs = metrics_config[0].get('scrape_configs', [])
+
+# Extract juju_model_uuid from existing job
+juju_model_uuid = None
+for job in scrape_configs:
+    if job.get('static_configs'):
+        for static_config in job['static_configs']:
+            if static_config.get('labels', {}).get('juju_model_uuid'):
+                juju_model_uuid = static_config['labels']['juju_model_uuid']
+                print(f'Found juju_model_uuid: {juju_model_uuid}')
+                break
+        if juju_model_uuid:
+            break
+
+# If no juju_model_uuid found in jobs, try to find it in other parts of config
+if not juju_model_uuid:
+    logs_config = config.get('logs', {}).get('configs', [])
+    for log_config in logs_config:
+        for scrape_config in log_config.get('scrape_configs', []):
+            if scrape_config.get('static_configs'):
+                for static_config in scrape_config['static_configs']:
+                    if static_config.get('labels', {}).get('juju_model_uuid'):
+                        juju_model_uuid = static_config['labels']['juju_model_uuid']
+                        print(f'Found juju_model_uuid in logs config: {juju_model_uuid}')
+                        break
+            elif scrape_config.get('journal', {}).get('labels', {}).get('juju_model_uuid'):
+                juju_model_uuid = scrape_config['journal']['labels']['juju_model_uuid']
+                print(f'Found juju_model_uuid in journal config: {juju_model_uuid}')
+                break
+        if juju_model_uuid:
+            break
+
+if not juju_model_uuid:
+    print('WARNING: Could not find juju_model_uuid in config, using placeholder')
+    juju_model_uuid = 'unknown-model-uuid'
+
+# Find and patch the hardware-observer job, or create it if missing
+job_found = False
+for job in scrape_configs:
+    if job.get('job_name') == 'hardware-observer_1_default':
+        job_found = True
+        current_targets = job.get('static_configs', [{}])[0].get('targets', []) if job.get('static_configs') else []
+        print(f'Found existing hardware-observer_1_default job with current targets: {current_targets}')
+
+        # Ensure static_configs exists and is properly structured
+        if not job.get('static_configs') or len(job['static_configs']) == 0:
+            job['static_configs'] = [{}]
+
+        static_config = job['static_configs'][0]
+
+        # Update targets
+        static_config['targets'] = ['localhost:10200']
+
+        # Ensure labels exist and update/preserve them
+        if 'labels' not in static_config:
+            static_config['labels'] = {}
+
+        # Update labels with required values, preserving existing ones
+        static_config['labels'].update({
+            'juju_application': 'hardware-observer',
+            'juju_model': 'hw-obs',
+            'juju_model_uuid': juju_model_uuid,
+            'juju_unit': 'hardware-observer/0'
+        })
+
+        print('Updated existing job targets to [localhost:10200] for mock server')
+        break
+
+if not job_found:
+    print('hardware-observer_1_default job not found, creating new job...')
+    # Create the new job configuration
+    new_job = {
+        'job_name': 'hardware-observer_1_default',
+        'metrics_path': '/metrics',
+        'static_configs': [{
+            'targets': ['localhost:10200'],
+            'labels': {
+                'juju_application': 'hardware-observer',
+                'juju_model': 'hw-obs',
+                'juju_model_uuid': juju_model_uuid,
+                'juju_unit': 'hardware-observer/0'
+            }
+        }]
+    }
+    scrape_configs.append(new_job)
+    print('Created new hardware-observer_1_default job with mock server target')
+
+# Write back the config with proper permissions
+try:
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.yaml') as temp_file:
+        yaml.dump(config, temp_file, default_flow_style=False, sort_keys=False)
+        temp_path = temp_file.name
+
+    subprocess.run(['mv', temp_path, CONFIG_FILE], check=True)
+    print('Successfully patched Grafana Agent config')
+except Exception as e:
+    print(f'ERROR: Failed to write config file: {e}')
+    sys.exit(1)
+"
+
+if [ $? -eq 0 ]; then
+    echo "Grafana Agent config patched successfully"
+else
+    echo "Failed to patch Grafana Agent config"
+    exit 1
+fi
+
+# Verify the patch
+echo "=== Verifying patch ==="
+grep -A 10 "hardware-observer_1_default" "$CONFIG_FILE" || echo "Job not found after patch"
+"""
+
+    patch_action = await hardware_observer_unit.run(patch_config_cmd)
+    await patch_action.wait()
+
+    if patch_action.results.get("return-code", 1) == 0:
+        logger.info("Grafana Agent config patched successfully")
+        logger.info(f"Patch result: {patch_action.results.get('stdout', '')}")
+    else:
+        logger.error(f"Failed to patch Grafana Agent config: {patch_action.results}")
+        raise Exception("Grafana Agent config patching failed")
+
+
+async def _restore_grafana_agent_config(hardware_observer_unit):
+    """Restore original Grafana Agent configuration."""
+    logger.info("Restoring original Grafana Agent configuration...")
+
+    restore_cmd = """
+BACKUP_FILE="/etc/grafana-agent.yaml.backup"
+CONFIG_FILE="/etc/grafana-agent.yaml"
+
+if [ -f "$BACKUP_FILE" ]; then
+    sudo cp "$BACKUP_FILE" "$CONFIG_FILE"
+    sudo rm "$BACKUP_FILE"
+    echo "Restored original Grafana Agent config"
+else
+    echo "No backup file found, skipping restore"
+fi
+"""
+
+    restore_action = await hardware_observer_unit.run(restore_cmd)
+    await restore_action.wait()
+    logger.info(f"Config restore result: {restore_action.results}")
+
+
 async def _debug_hardware_detection_and_services(hardware_observer_unit):
     """Debug hardware detection and service status in CI environment."""
     logger.info("=== DEBUGGING: Hardware Detection & Services ===")
-
-    # Check what hardware tools are detected
-    debug_tools_cmd = """
-python3 -c "
-import sys
-sys.path.append('/var/lib/juju/agents/unit-hardware-observer-0/charm')
-try:
-    from hw_tools import detect_available_tools, raid_hw_verifier, bmc_hw_verifier, disk_hw_verifier, nvidia_gpu_verifier
-    tools = detect_available_tools()
-    print(f'All detected tools: {[tool.value for tool in tools]}')
-    print(f'Tools count: {len(tools)}')
-    print(f'RAID tools: {[t.value for t in raid_hw_verifier()]}')
-    print(f'BMC tools: {[t.value for t in bmc_hw_verifier()]}')
-    print(f'Disk tools: {[t.value for t in disk_hw_verifier()]}')
-    print(f'GPU tools: {[t.value for t in nvidia_gpu_verifier()]}')
-except Exception as e:
-    print(f'ERROR detecting tools: {e}')
-"
-"""
-    tools_debug_action = await hardware_observer_unit.run(debug_tools_cmd)
-    await tools_debug_action.wait()
-    logger.info(f"Hardware tools detection: {tools_debug_action.results}")
 
     # Check if hardware-exporter service exists and its status
     service_debug_cmd = """
@@ -575,10 +775,16 @@ async def _setup_python_environment(unit):
     install_pip_cmd = "sudo apt update && sudo apt install -y python3-pip"
     pip_action = await unit.run(install_pip_cmd)
     await pip_action.wait()
-    logger.info(f"Pip installation: {pip_action.results}")
+    if pip_action.results.get("return-code") == 0:
+        logger.info("Pip installation: SUCCESS")
+    else:
+        logger.error(f"Pip installation failed: {pip_action.results}")
 
     # Install prometheus_client
     install_deps_cmd = "python3 -m pip install prometheus_client"
     deps_action = await unit.run(install_deps_cmd)
     await deps_action.wait()
-    logger.info(f"Dependencies installation: {deps_action.results}")
+    if deps_action.results.get("return-code") == 0:
+        logger.info("Dependencies installation: SUCCESS")
+    else:
+        logger.error(f"Dependencies installation failed: {deps_action.results}")
