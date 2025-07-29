@@ -289,15 +289,33 @@ async def _reconfigure_hardware_observer(ops_test: OpsTest, lxd_model):
     """Reconfigure Hardware Observer charm to detect mocked hardware and start services."""
     logger.info("Reconfiguring Hardware Observer charm to detect mocked hardware...")
 
-    # Trigger charm reconfiguration by updating config (this forces hardware detection)
-    returncode, stdout, stderr = await ops_test.run(
-        "juju", "config", "hardware-observer", "collect-timeout=15", "-m", lxd_model.name
-    )
-    if returncode != 0:
-        logger.error(f"Failed to update HWO config: {stderr}")
-        raise Exception("Failed to trigger HWO reconfiguration")
+    # Get the hardware-observer unit
+    hardware_observer = lxd_model.applications.get("hardware-observer")
+    hardware_observer_unit = hardware_observer.units[0]
 
-    logger.info("Triggered Hardware Observer reconfiguration")
+    logger.info("Triggering config-changed hook on HWO unit...")
+
+    # Trigger charm reconfiguration by running config-changed hook directly
+    hook_cmd = "JUJU_DISPATCH_PATH=hooks/config-changed ./dispatch"
+    hook_action = await hardware_observer_unit.run(hook_cmd)
+    await hook_action.wait()
+
+    if hook_action.results.get("return-code", 1) == 0:
+        logger.info("Successfully triggered Hardware Observer config-changed hook")
+        logger.info(f"Hook execution output: {hook_action.results.get('stdout', '')}")
+    else:
+        # Try the other charm approach as fallback
+        logger.info("Trying other charm hook approach...")
+        fallback_cmd = "hooks/config-changed"
+        fallback_action = await hardware_observer_unit.run(fallback_cmd)
+        await fallback_action.wait()
+
+        if fallback_action.results.get("return-code", 1) == 0:
+            logger.info("Successfully triggered config-changed hook (fallback)")
+            logger.info(f"Fallback hook output: {fallback_action.results.get('stdout', '')}")
+        else:
+            logger.error(f"Failed to run config-changed hook: {fallback_action.results}")
+            raise Exception("Failed to trigger HWO reconfiguration")
 
     # Wait for charm to settle and detect hardware
     await lxd_model.wait_for_idle(status="active", timeout=300, idle_period=30)
