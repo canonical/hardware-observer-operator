@@ -299,9 +299,8 @@ class HardwareObserverCharm(ops.CharmBase):
         """Generate the scrape config as needed."""
         # Setting scrape_timeout as collect_timeout in the `duration` format specified in
         # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration
-        scrape_config: List[Dict[str, Any]] = [
-            {"scrape_timeout": f"{self.model.config['collect-timeout']}s"}
-        ]
+        scrape_config: List[Dict[str, Any]] = []
+        timeout = f"{self.model.config['collect-timeout']}s"
 
         for exporter in self.exporters:
             if isinstance(exporter, HardwareExporter):
@@ -310,6 +309,7 @@ class HardwareObserverCharm(ops.CharmBase):
                     {
                         "metrics_path": "/metrics",
                         "static_configs": [{"targets": [f"localhost:{port}"]}],
+                        "scrape_timeout": timeout,
                     }
                 )
             if isinstance(exporter, SmartCtlExporter):
@@ -318,6 +318,7 @@ class HardwareObserverCharm(ops.CharmBase):
                     {
                         "metrics_path": "/metrics",
                         "static_configs": [{"targets": [f"localhost:{port}"]}],
+                        "scrape_timeout": timeout,
                     }
                 )
             if isinstance(exporter, DCGMExporter):
@@ -326,6 +327,7 @@ class HardwareObserverCharm(ops.CharmBase):
                     {
                         "metrics_path": "/metrics",
                         "static_configs": [{"targets": [f"localhost:{port}"]}],
+                        "scrape_timeout": timeout,
                     }
                 )
         return scrape_config

@@ -822,10 +822,21 @@ class TestCharm(unittest.TestCase):
         mock_exporters.return_value = [hw_exporter, smartctl_exporter, dcgm_exporter]
 
         assert self.harness.charm._scrape_config() == [
-            {"scrape_timeout": "10s"},
-            {"metrics_path": "/metrics", "static_configs": [{"targets": ["localhost:10200"]}]},
-            {"metrics_path": "/metrics", "static_configs": [{"targets": ["localhost:10201"]}]},
-            {"metrics_path": "/metrics", "static_configs": [{"targets": ["localhost:9400"]}]},
+            {
+                "metrics_path": "/metrics",
+                "static_configs": [{"targets": ["localhost:10200"]}],
+                "scrape_timeout": "10s",
+            },
+            {
+                "metrics_path": "/metrics",
+                "static_configs": [{"targets": ["localhost:10201"]}],
+                "scrape_timeout": "10s",
+            },
+            {
+                "metrics_path": "/metrics",
+                "static_configs": [{"targets": ["localhost:9400"]}],
+                "scrape_timeout": "10s",
+            },
         ]
 
     @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
@@ -841,8 +852,11 @@ class TestCharm(unittest.TestCase):
         mock_exporters.return_value = [smartctl_exporter]
 
         assert self.harness.charm._scrape_config() == [
-            {"scrape_timeout": "10s"},
-            {"metrics_path": "/metrics", "static_configs": [{"targets": ["localhost:10201"]}]},
+            {
+                "metrics_path": "/metrics",
+                "static_configs": [{"targets": ["localhost:10201"]}],
+                "scrape_timeout": "10s",
+            },
         ]
 
     @mock.patch("service.get_bmc_address")
