@@ -259,5 +259,5 @@ tests:
               summary: IPMI monitoring command success metrics missing. (instance )
               description: |
                 The ipmimonitoring_command_success metric has been missing for over 5 minutes.
-                This may indicate IPMI monitoring command timeouts.
+                This may indicate IPMI monitoring command timeouts, or that IPMI tools/services are not installed or supported on this hardware.
                   LABELS = map[]

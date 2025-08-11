@@ -142,5 +142,5 @@ tests:
               summary: IPMI SEL command success metrics missing. (instance )
               description: |
                 The ipmi_sel_command_success metric has been missing for over 5 minutes.
-                This may indicate IPMI SEL command timeouts.
+                This may indicate IPMI SEL command timeouts, or that IPMI tools/services are not installed or supported on this hardware.
                   LABELS = map[]
