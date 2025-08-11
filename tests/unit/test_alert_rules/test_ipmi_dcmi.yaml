@@ -45,3 +45,21 @@ tests:
                 IPMI DCMI power consumption percentage is high for over 5 minutes.
                   POWER_CONSUMPTION_PERCENTAGE = 0.85
                   LABELS = map[__name__:ipmi_dcmi_power_consumption_percentage instance:ubuntu-2]
+
+  - interval: 1m
+    input_series:
+      - series: some_other_metric{instance="ubuntu-0"}
+        values: '1x10'
+
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: IPMIDCMICommandSuccessMetricsMissing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: IPMI DCMI command success metrics missing. (instance )
+              description: |
+                The ipmi_dcmi_command_success metric has been missing for over 5 minutes.
+                This may indicate IPMI DCMI command timeouts.
+                  LABELS = map[]

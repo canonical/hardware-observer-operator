@@ -1,6 +1,17 @@
 groups:
 - name: IpmiSel
   rules:
+    - alert: IPMISELCommandSuccessMetricsMissing
+      expr: absent_over_time(ipmi_sel_command_success[5m])
+      labels:
+        severity: critical
+      annotations:
+        summary: IPMI SEL command success metrics missing. (instance {{ $labels.instance }})
+        description: |
+          The ipmi_sel_command_success metric has been missing for over 5 minutes.
+          This may indicate IPMI SEL command timeouts.
+            LABELS = {{ $labels }}
+
     - alert: IPMISELCommandFailed
       expr: ipmi_sel_command_success == 0
       for: 5m
@@ -12,6 +23,7 @@ groups:
           Failed to get system event logs using ipmi-sel.
             VALUE = {{ $value }}
             LABELS = {{ $labels }}
+
     - alert: IPMISELStateWarning
       expr: ipmi_sel_state_warning > 0
       labels:
@@ -23,6 +35,7 @@ groups:
           IPMI SEL entry in warning state.
             LABELS = {{ $labels }}
             EVENT_ID = {{ $value }}
+
     - alert: IPMISELStateCritical
       expr: ipmi_sel_state_critical > 0
       labels:
@@ -34,6 +47,7 @@ groups:
           IPMI SEL entry in critical state.
             LABELS = {{ $labels }}
             EVENT_ID = {{ $value }}
+
     - alert: IPMISELDStateWarning
       expr: node_systemd_unit_state{name="ipmiseld.service", state=~"failed|inactive"} == 1
       for: 5m
