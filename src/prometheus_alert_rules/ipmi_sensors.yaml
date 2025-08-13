@@ -1,6 +1,16 @@
 groups:
 - name: IpmiSensors
   rules:
+    - alert: IPMIMonitoringCommandSuccessMetricsMissing
+      expr: absent_over_time(ipmimonitoring_command_success[5m])
+      labels:
+        severity: critical
+      annotations:
+        summary: IPMI monitoring command success metrics missing. (instance {{ $labels.instance }})
+        description: |
+          The ipmimonitoring_command_success metric has been missing for over 5 minutes.
+          This may indicate IPMI monitoring command timeouts, or that IPMI tools/services are not installed or supported on this hardware.
+            LABELS = {{ $labels }}
 
     - alert: IPMIMonitoringCommandFailed
       expr: ipmimonitoring_command_success == 0
@@ -17,7 +27,7 @@ groups:
     - alert: IPMITemperatureStateNotOk
       expr: ipmi_temperature_celsius{state=~"Warning|Critical"}
       for: 5m
-      labels: 
+      labels:
         severity: "{{ toLower $labels.state }}"
       annotations:
         summary: Temperature in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
@@ -29,7 +39,7 @@ groups:
     - alert: IPMIPowerStateNotOk
       expr: ipmi_power_watts{state=~"Warning|Critical"}
       for: 5m
-      labels: 
+      labels:
         severity: "{{ toLower $labels.state }}"
       annotations:
         summary: Power in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
@@ -41,7 +51,7 @@ groups:
     - alert: IPMIVoltageStateNotOk
       expr: ipmi_voltage_volts{state=~"Warning|Critical"}
       for: 5m
-      labels: 
+      labels:
         severity: "{{ toLower $labels.state }}"
       annotations:
         summary: Voltage in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
@@ -53,7 +63,7 @@ groups:
     - alert: IPMICurrentStateNotOk
       expr: ipmi_current_amperes{state=~"Warning|Critical"}
       for: 5m
-      labels: 
+      labels:
         severity: "{{ toLower $labels.state }}"
       annotations:
         summary: Current in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})
@@ -65,7 +75,7 @@ groups:
     - alert: IPMIFanSpeedStateNotOk
       expr: ipmi_fan_speed_rpm{state=~"Warning|Critical"}
       for: 5m
-      labels: 
+      labels:
         severity: "{{ toLower $labels.state }}"
       annotations:
         summary: Fan speed in {{ toLower $labels.state }} state. (instance {{ $labels.instance }})

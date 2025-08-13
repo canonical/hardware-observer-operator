@@ -1,6 +1,16 @@
 groups:
 - name: IpmiDcmi
   rules:
+    - alert: IPMIDCMICommandSuccessMetricsMissing
+      expr: absent_over_time(ipmi_dcmi_command_success[5m])
+      labels:
+        severity: critical
+      annotations:
+        summary: IPMI DCMI command success metrics missing. (instance {{ $labels.instance }})
+        description: |
+          The ipmi_dcmi_command_success metric has been missing for over 5 minutes.
+          This may indicate IPMI DCMI command timeouts, or that IPMI tools/services are not installed or supported on this hardware.
+            LABELS = {{ $labels }}
 
     - alert: IPMIDCMICommandFailed
       expr: ipmi_dcmi_command_success == 0

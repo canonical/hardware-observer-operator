@@ -126,3 +126,21 @@ tests:
                 The ipmiseld service is not active, indicating a potential problem.
                   VALUE = 1
                   LABELS = map[__name__:node_systemd_unit_state instance:ubuntu-4 name:ipmiseld.service state:inactive]
+
+  - interval: 1m
+    input_series:
+      - series: some_other_metric{instance="ubuntu-0"}
+        values: '1x10'
+
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: IPMISELCommandSuccessMetricsMissing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: IPMI SEL command success metrics missing. (instance )
+              description: |
+                The ipmi_sel_command_success metric has been missing for over 5 minutes.
+                This may indicate IPMI SEL command timeouts, or that IPMI tools/services are not installed or supported on this hardware.
+                  LABELS = map[]
