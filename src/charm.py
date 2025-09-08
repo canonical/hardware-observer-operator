@@ -6,6 +6,8 @@
 
 import logging
 from typing import Any, Dict, List, Set, Tuple
+import shutil
+from pathlib import Path
 
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -16,6 +18,11 @@ from hw_tools import HWTool, HWToolHelper, detect_available_tools, remove_legacy
 from service import BaseExporter, DCGMExporter, ExporterError, HardwareExporter, SmartCtlExporter
 
 logger = logging.getLogger(__name__)
+
+# Base path = folder where charm.py lives
+BASE_DIR = Path(__file__).resolve().parent
+PROM_RULES = BASE_DIR / "prometheus_alert_rules"
+PROM_RULES_DYNAMIC = BASE_DIR / "prometheus_alert_rules_dynamic"
 
 
 class HardwareObserverCharm(ops.CharmBase):
@@ -51,6 +58,7 @@ class HardwareObserverCharm(ops.CharmBase):
         # Add refresh_events to COSAgentProvider to update relation data when
         # config changed (default behavior) and upgrade charm. This is useful
         # for updating alert rules.
+        self._set_prometheus_alert_rules()
         self.cos_agent_provider = COSAgentProvider(
             self,
             refresh_events=[self.on.config_changed, self.on.upgrade_charm],
@@ -348,6 +356,18 @@ class HardwareObserverCharm(ops.CharmBase):
     def cos_agent_related(self) -> bool:
         """Return True if cos-agent relation is present."""
         return self.num_cos_agent_relations != 0
+
+
+    def _set_prometheus_alert_rules(self) -> None:
+        """Set Prometheus alert rules based on enabled exporters."""
+        if HWTool.REDFISH in self.stored_tools and self.config["redfish-disable"] is False:
+            logger.info("Enabling Redfish alert rules.")
+            shutil.copy(PROM_RULES_DYNAMIC / "redfish.yaml", PROM_RULES)
+        else:
+            logger.info("Disabling Redfish alert rules.")
+            (PROM_RULES / "redfish.yaml").unlink(missing_ok=True)
+
+
 
 
 if __name__ == "__main__":  # pragma: nocover
