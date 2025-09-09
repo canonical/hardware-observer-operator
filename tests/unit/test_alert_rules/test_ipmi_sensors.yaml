@@ -243,3 +243,21 @@ tests:
                 A sensor value, recorded by ipmi sensor, in critical state. Entity Presence and Slot Connector sensors are ignored.
                   VALUE = 50
                   LABELS = map[__name__:ipmi_generic_sensor_value instance:ubuntu-12 state:Critical]
+
+  - interval: 1m
+    input_series:
+      - series: some_other_metric{instance="ubuntu-0"}
+        values: '1x10'
+
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: IPMIMonitoringCommandSuccessMetricsMissing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: IPMI monitoring command success metrics missing. (instance )
+              description: |
+                The ipmimonitoring_command_success metric has been missing for over 5 minutes.
+                This may indicate IPMI monitoring command timeouts, or that IPMI tools/services are not installed or supported on this hardware.
+                  LABELS = map[]
