@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent
 PROM_RULES = BASE_DIR / "prometheus_alert_rules"
 PROM_RULES_DYNAMIC = BASE_DIR / "prometheus_alert_rules_dynamic"
+PROM_RULES_REDFISH = PROM_RULES / "redfish.yaml"
 
 
 class HardwareObserverCharm(ops.CharmBase):
@@ -361,10 +362,10 @@ class HardwareObserverCharm(ops.CharmBase):
         """Set Prometheus alert rules based on enabled exporters."""
         if HWTool.REDFISH in self.stored_tools and self.config["redfish-disable"] is False:
             logger.info("Enabling Redfish alert rules.")
-            shutil.copy(PROM_RULES_DYNAMIC / "redfish.yaml", PROM_RULES)
+            shutil.copy(PROM_RULES_REDFISH, PROM_RULES)
         else:
             logger.info("Disabling Redfish alert rules.")
-            (PROM_RULES / "redfish.yaml").unlink(missing_ok=True)
+            PROM_RULES_REDFISH.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":  # pragma: nocover
