@@ -5,9 +5,9 @@
 """Charm the application."""
 
 import logging
-from typing import Any, Dict, List, Set, Tuple
 import shutil
 from pathlib import Path
+from typing import Any, Dict, List, Set, Tuple
 
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -357,7 +357,6 @@ class HardwareObserverCharm(ops.CharmBase):
         """Return True if cos-agent relation is present."""
         return self.num_cos_agent_relations != 0
 
-
     def _set_prometheus_alert_rules(self) -> None:
         """Set Prometheus alert rules based on enabled exporters."""
         if HWTool.REDFISH in self.stored_tools and self.config["redfish-disable"] is False:
@@ -366,8 +365,6 @@ class HardwareObserverCharm(ops.CharmBase):
         else:
             logger.info("Disabling Redfish alert rules.")
             (PROM_RULES / "redfish.yaml").unlink(missing_ok=True)
-
-
 
 
 if __name__ == "__main__":  # pragma: nocover
