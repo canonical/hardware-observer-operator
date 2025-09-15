@@ -8,6 +8,8 @@ This library can be used to manage the cos_agent relation interface:
 - `COSAgentProvider`: Use in machine charms that need to have a workload's metrics
   or logs scraped, or forward rule files or dashboards to Prometheus, Loki or Grafana through
   the Grafana Agent machine charm.
+  NOTE: Be sure to add `limit: 1` in your charm for the cos-agent relation. That is the only
+   way we currently have to prevent two different grafana agent apps deployed on the same VM.
 
 - `COSAgentConsumer`: Used in the Grafana Agent machine charm to manage the requirer side of
   the `cos_agent` interface.
@@ -22,7 +24,6 @@ this charm library.
 Using the `COSAgentProvider` object only requires instantiating it,
 typically in the `__init__` method of your charm (the one which sends telemetry).
 
-The constructor of `COSAgentProvider` has only one required and nine optional parameters:
 
 ```python
     def __init__(
@@ -36,6 +37,7 @@ The constructor of `COSAgentProvider` has only one required and nine optional pa
         log_slots: Optional[List[str]] = None,
         dashboard_dirs: Optional[List[str]] = None,
         refresh_events: Optional[List] = None,
+        tracing_protocols: Optional[List[str]] = None,
         scrape_configs: Optional[Union[List[Dict], Callable]] = None,
     ):
 ```
@@ -64,6 +66,8 @@ The constructor of `COSAgentProvider` has only one required and nine optional pa
 - `dashboard_dirs`: List of directories where the dashboards are stored in the Charmed Operator.
 
 - `refresh_events`: List of events on which to refresh relation data.
+
+- `tracing_protocols`: List of requested tracing protocols that the charm requires to send traces.
 
 - `scrape_configs`: List of standard scrape_configs dicts or a callable that returns the list in
     case the configs need to be generated dynamically. The contents of this list will be merged
@@ -108,6 +112,7 @@ class TelemetryProviderCharm(CharmBase):
             log_slots=["my-app:slot"],
             dashboard_dirs=["./src/dashboards_1", "./src/dashboards_2"],
             refresh_events=["update-status", "upgrade-charm"],
+            tracing_protocols=["otlp_http", "otlp_grpc"],
             scrape_configs=[
                 {
                     "job_name": "custom_job",
@@ -206,19 +211,34 @@ class GrafanaAgentMachineCharm(GrafanaAgentCharm)
 ```
 """
 
+import enum
 import json
 import logging
+import socket
 from collections import namedtuple
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional, Set, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    List,
+    Literal,
+    MutableMapping,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 import pydantic
-from cosl import GrafanaDashboard, JujuTopology
-from cosl.rules import AlertRules
+from cosl import DashboardPath40UID, JujuTopology, LZMABase64
+from cosl.rules import AlertRules, generic_alert_groups
 from ops.charm import RelationChangedEvent
 from ops.framework import EventBase, EventSource, Object, ObjectEvents
-from ops.model import Relation, Unit
+from ops.model import ModelError, Relation
 from ops.testing import CharmType
 
 if TYPE_CHECKING:
@@ -234,22 +254,221 @@ if TYPE_CHECKING:
 
 LIBID = "dc15fa84cef84ce58155fb84f6c6213a"
 LIBAPI = 0
-LIBPATCH = 7
+LIBPATCH = 22
 
-PYDEPS = ["cosl", "pydantic < 2"]
+PYDEPS = ["cosl >= 0.0.50", "pydantic"]
 
 DEFAULT_RELATION_NAME = "cos-agent"
 DEFAULT_PEER_RELATION_NAME = "peers"
-DEFAULT_SCRAPE_CONFIG = {
-    "static_configs": [{"targets": ["localhost:80"]}],
-    "metrics_path": "/metrics",
-}
 
 logger = logging.getLogger(__name__)
 SnapEndpoint = namedtuple("SnapEndpoint", "owner, name")
 
+# Note: MutableMapping is imported from the typing module and not collections.abc
+# because subscripting collections.abc.MutableMapping was added in python 3.9, but
+# most of our charms are based on 20.04, which has python 3.8.
 
-class CosAgentProviderUnitData(pydantic.BaseModel):
+_RawDatabag = MutableMapping[str, str]
+
+
+class TransportProtocolType(str, enum.Enum):
+    """Receiver Type."""
+
+    http = "http"
+    grpc = "grpc"
+
+
+receiver_protocol_to_transport_protocol = {
+    "zipkin": TransportProtocolType.http,
+    "kafka": TransportProtocolType.http,
+    "tempo_http": TransportProtocolType.http,
+    "tempo_grpc": TransportProtocolType.grpc,
+    "otlp_grpc": TransportProtocolType.grpc,
+    "otlp_http": TransportProtocolType.http,
+    "jaeger_thrift_http": TransportProtocolType.http,
+}
+
+_tracing_receivers_ports = {
+    # OTLP receiver: see
+    #   https://github.com/open-telemetry/opentelemetry-collector/tree/v0.96.0/receiver/otlpreceiver
+    "otlp_http": 4318,
+    "otlp_grpc": 4317,
+    # Jaeger receiver: see
+    #   https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.96.0/receiver/jaegerreceiver
+    "jaeger_grpc": 14250,
+    "jaeger_thrift_http": 14268,
+    # Zipkin receiver: see
+    #   https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.96.0/receiver/zipkinreceiver
+    "zipkin": 9411,
+}
+
+ReceiverProtocol = Literal["otlp_grpc", "otlp_http", "zipkin", "jaeger_thrift_http", "jaeger_grpc"]
+
+
+class TracingError(Exception):
+    """Base class for custom errors raised by tracing."""
+
+
+class NotReadyError(TracingError):
+    """Raised by the provider wrapper if a requirer hasn't published the required data (yet)."""
+
+
+class ProtocolNotFoundError(TracingError):
+    """Raised if the user doesn't receive an endpoint for a protocol it requested."""
+
+
+class ProtocolNotRequestedError(ProtocolNotFoundError):
+    """Raised if the user attempts to obtain an endpoint for a protocol it did not request."""
+
+
+class DataValidationError(TracingError):
+    """Raised when data validation fails on IPU relation data."""
+
+
+class AmbiguousRelationUsageError(TracingError):
+    """Raised when one wrongly assumes that there can only be one relation on an endpoint."""
+
+
+# TODO we want to eventually use `DatabagModel` from cosl but it likely needs a move to common package first
+if int(pydantic.version.VERSION.split(".")[0]) < 2:  # type: ignore
+
+    class DatabagModel(pydantic.BaseModel):  # type: ignore
+        """Base databag model."""
+
+        class Config:
+            """Pydantic config."""
+
+            # ignore any extra fields in the databag
+            extra = "ignore"
+            """Ignore any extra fields in the databag."""
+            allow_population_by_field_name = True
+            """Allow instantiating this class by field name (instead of forcing alias)."""
+
+        _NEST_UNDER = None
+
+        @classmethod
+        def load(cls, databag: MutableMapping):
+            """Load this model from a Juju databag."""
+            if cls._NEST_UNDER:
+                return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
+
+            try:
+                data = {
+                    k: json.loads(v)
+                    for k, v in databag.items()
+                    # Don't attempt to parse model-external values
+                    if k in {f.alias for f in cls.__fields__.values()}
+                }
+            except json.JSONDecodeError as e:
+                msg = f"invalid databag contents: expecting json. {databag}"
+                logger.error(msg)
+                raise DataValidationError(msg) from e
+
+            try:
+                return cls.parse_raw(json.dumps(data))  # type: ignore
+            except pydantic.ValidationError as e:
+                msg = f"failed to validate databag: {databag}"
+                logger.debug(msg, exc_info=True)
+                raise DataValidationError(msg) from e
+
+        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+            """Write the contents of this model to Juju databag.
+
+            :param databag: the databag to write the data to.
+            :param clear: ensure the databag is cleared before writing it.
+            """
+            if clear and databag:
+                databag.clear()
+
+            if databag is None:
+                databag = {}
+
+            if self._NEST_UNDER:
+                databag[self._NEST_UNDER] = self.json(by_alias=True)
+                return databag
+
+            dct = self.dict()
+            for key, field in self.__fields__.items():  # type: ignore
+                value = dct[key]
+                databag[field.alias or key] = json.dumps(value)
+
+            return databag
+
+else:
+    from pydantic import ConfigDict
+
+    class DatabagModel(pydantic.BaseModel):
+        """Base databag model."""
+
+        model_config = ConfigDict(
+            # ignore any extra fields in the databag
+            extra="ignore",
+            # Allow instantiating this class by field name (instead of forcing alias).
+            populate_by_name=True,
+            # Custom config key: whether to nest the whole datastructure (as json)
+            # under a field or spread it out at the toplevel.
+            _NEST_UNDER=None,  # type: ignore
+            arbitrary_types_allowed=True,
+        )
+        """Pydantic config."""
+
+        @classmethod
+        def load(cls, databag: MutableMapping):
+            """Load this model from a Juju databag."""
+            nest_under = cls.model_config.get("_NEST_UNDER")  # type: ignore
+            if nest_under:
+                return cls.model_validate(json.loads(databag[nest_under]))  # type: ignore
+
+            try:
+                data = {
+                    k: json.loads(v)
+                    for k, v in databag.items()
+                    # Don't attempt to parse model-external values
+                    if k in {(f.alias or n) for n, f in cls.__fields__.items()}
+                }
+            except json.JSONDecodeError as e:
+                msg = f"invalid databag contents: expecting json. {databag}"
+                logger.error(msg)
+                raise DataValidationError(msg) from e
+
+            try:
+                return cls.model_validate_json(json.dumps(data))  # type: ignore
+            except pydantic.ValidationError as e:
+                msg = f"failed to validate databag: {databag}"
+                logger.debug(msg, exc_info=True)
+                raise DataValidationError(msg) from e
+
+        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+            """Write the contents of this model to Juju databag.
+
+            :param databag: the databag to write the data to.
+            :param clear: ensure the databag is cleared before writing it.
+            """
+            if clear and databag:
+                databag.clear()
+
+            if databag is None:
+                databag = {}
+            nest_under = self.model_config.get("_NEST_UNDER")
+            if nest_under:
+                databag[nest_under] = self.model_dump_json(  # type: ignore
+                    by_alias=True,
+                    # skip keys whose values are default
+                    exclude_defaults=True,
+                )
+                return databag
+
+            dct = self.model_dump()  # type: ignore
+            for key, field in self.model_fields.items():  # type: ignore
+                value = dct[key]
+                if value == field.default:
+                    continue
+                databag[field.alias or key] = json.dumps(value)
+
+            return databag
+
+
+class CosAgentProviderUnitData(DatabagModel):  # type: ignore
     """Unit databag model for `cos-agent` relation."""
 
     # The following entries are the same for all units of the same principal.
@@ -257,13 +476,18 @@ class CosAgentProviderUnitData(pydantic.BaseModel):
     # this needs to make its way to the gagent leader
     metrics_alert_rules: dict
     log_alert_rules: dict
-    dashboards: List[GrafanaDashboard]
-    subordinate: Optional[bool]
+    dashboards: List[str]
+    # subordinate is no longer used but we should keep it until we bump the library to ensure
+    # we don't break compatibility.
+    subordinate: Optional[bool] = None
 
     # The following entries may vary across units of the same principal app.
     # this data does not need to be forwarded to the gagent leader
     metrics_scrape_jobs: List[Dict]
     log_slots: List[str]
+
+    # Requested tracing protocols.
+    tracing_protocols: Optional[List[str]] = None
 
     # when this whole datastructure is dumped into a databag, it will be nested under this key.
     # while not strictly necessary (we could have it 'flattened out' into the databag),
@@ -271,21 +495,21 @@ class CosAgentProviderUnitData(pydantic.BaseModel):
     KEY: ClassVar[str] = "config"
 
 
-class CosAgentPeersUnitData(pydantic.BaseModel):
+class CosAgentPeersUnitData(DatabagModel):  # type: ignore
     """Unit databag model for `peers` cos-agent machine charm peer relation."""
 
     # We need the principal unit name and relation metadata to be able to render identifiers
     # (e.g. topology) on the leader side, after all the data moves into peer data (the grafana
     # agent leader can only see its own principal, because it is a subordinate charm).
-    principal_unit_name: str
-    principal_relation_id: str
-    principal_relation_name: str
+    unit_name: str
+    relation_id: str
+    relation_name: str
 
     # The only data that is forwarded to the leader is data that needs to go into the app databags
     # of the outgoing o11y relations.
     metrics_alert_rules: Optional[dict]
     log_alert_rules: Optional[dict]
-    dashboards: Optional[List[GrafanaDashboard]]
+    dashboards: Optional[List[str]]
 
     # when this whole datastructure is dumped into a databag, it will be nested under this key.
     # while not strictly necessary (we could have it 'flattened out' into the databag),
@@ -299,7 +523,84 @@ class CosAgentPeersUnitData(pydantic.BaseModel):
         TODO: Switch to using `model_post_init` when pydantic v2 is released?
           https://github.com/pydantic/pydantic/issues/1729#issuecomment-1300576214
         """
-        return self.principal_unit_name.split("/")[0]
+        return self.unit_name.split("/")[0]
+
+
+if int(pydantic.version.VERSION.split(".")[0]) < 2:  # type: ignore
+
+    class ProtocolType(pydantic.BaseModel):  # type: ignore
+        """Protocol Type."""
+
+        class Config:
+            """Pydantic config."""
+
+            use_enum_values = True
+            """Allow serializing enum values."""
+
+        name: str = pydantic.Field(
+            ...,
+            description="Receiver protocol name. What protocols are supported (and what they are called) "
+            "may differ per provider.",
+            examples=["otlp_grpc", "otlp_http", "tempo_http"],
+        )
+
+        type: TransportProtocolType = pydantic.Field(
+            ...,
+            description="The transport protocol used by this receiver.",
+            examples=["http", "grpc"],
+        )
+
+else:
+
+    class ProtocolType(pydantic.BaseModel):
+        """Protocol Type."""
+
+        model_config = pydantic.ConfigDict(
+            # Allow serializing enum values.
+            use_enum_values=True
+        )
+        """Pydantic config."""
+
+        name: str = pydantic.Field(
+            ...,
+            description="Receiver protocol name. What protocols are supported (and what they are called) "
+            "may differ per provider.",
+            examples=["otlp_grpc", "otlp_http", "tempo_http"],
+        )
+
+        type: TransportProtocolType = pydantic.Field(
+            ...,
+            description="The transport protocol used by this receiver.",
+            examples=["http", "grpc"],
+        )
+
+
+class Receiver(pydantic.BaseModel):
+    """Specification of an active receiver."""
+
+    protocol: ProtocolType = pydantic.Field(..., description="Receiver protocol name and type.")
+    url: Optional[str] = pydantic.Field(
+        ...,
+        description="""URL at which the receiver is reachable. If there's an ingress, it would be the external URL.
+        Otherwise, it would be the service's fqdn or internal IP.
+        If the protocol type is grpc, the url will not contain a scheme.""",
+        examples=[
+            "http://traefik_address:2331",
+            "https://traefik_address:2331",
+            "http://tempo_public_ip:2331",
+            "https://tempo_public_ip:2331",
+            "tempo_public_ip:2331",
+        ],
+    )
+
+
+class CosAgentRequirerUnitData(DatabagModel):  # type: ignore
+    """Application databag model for the COS-agent requirer."""
+
+    receivers: List[Receiver] = pydantic.Field(
+        ...,
+        description="List of all receivers enabled on the tracing provider.",
+    )
 
 
 class COSAgentProvider(Object):
@@ -316,6 +617,7 @@ class COSAgentProvider(Object):
         log_slots: Optional[List[str]] = None,
         dashboard_dirs: Optional[List[str]] = None,
         refresh_events: Optional[List] = None,
+        tracing_protocols: Optional[List[str]] = None,
         *,
         scrape_configs: Optional[Union[List[dict], Callable]] = None,
     ):
@@ -334,6 +636,7 @@ class COSAgentProvider(Object):
                 in the form ["snap-name:slot", ...].
             dashboard_dirs: Directory where the dashboards are stored.
             refresh_events: List of events on which to refresh relation data.
+            tracing_protocols: List of protocols that the charm will be using for sending traces.
             scrape_configs: List of standard scrape_configs dicts or a callable
                 that returns the list in case the configs need to be generated dynamically.
                 The contents of this list will be merged with the contents of `metrics_endpoints`.
@@ -351,6 +654,8 @@ class COSAgentProvider(Object):
         self._log_slots = log_slots or []
         self._dashboard_dirs = dashboard_dirs
         self._refresh_events = refresh_events or [self._charm.on.config_changed]
+        self._tracing_protocols = tracing_protocols
+        self._is_single_endpoint = charm.meta.relations[relation_name].limit == 1
 
         events = self._charm.on[relation_name]
         self.framework.observe(events.relation_joined, self._on_refresh)
@@ -375,7 +680,7 @@ class COSAgentProvider(Object):
                         dashboards=self._dashboards,
                         metrics_scrape_jobs=self._scrape_jobs,
                         log_slots=self._log_slots,
-                        subordinate=self._charm.meta.subordinate,
+                        tracing_protocols=self._tracing_protocols,
                     )
                     relation.data[self._charm.unit][data.KEY] = data.json()
                 except (
@@ -405,7 +710,7 @@ class COSAgentProvider(Object):
                 }
             )
 
-        scrape_configs = scrape_configs or [DEFAULT_SCRAPE_CONFIG]
+        scrape_configs = scrape_configs or []
 
         # Augment job name to include the app name and a unique id (index)
         for idx, scrape_config in enumerate(scrape_configs):
@@ -422,6 +727,10 @@ class COSAgentProvider(Object):
             query_type="promql", topology=JujuTopology.from_charm(self._charm)
         )
         alert_rules.add_path(self._metrics_rules, recursive=self._recursive)
+        alert_rules.add(
+            generic_alert_groups.application_rules,
+            group_name_prefix=JujuTopology.from_charm(self._charm).identifier,
+        )
         return alert_rules.as_dict()
 
     @property
@@ -432,13 +741,143 @@ class COSAgentProvider(Object):
         return alert_rules.as_dict()
 
     @property
-    def _dashboards(self) -> List[GrafanaDashboard]:
-        dashboards: List[GrafanaDashboard] = []
+    def _dashboards(self) -> List[str]:
+        dashboards: List[str] = []
         for d in self._dashboard_dirs:
             for path in Path(d).glob("*"):
-                dashboard = GrafanaDashboard._serialize(path.read_bytes())
-                dashboards.append(dashboard)
+                with open(path, "rt") as fp:
+                    dashboard = json.load(fp)
+                rel_path = str(
+                    path.relative_to(self._charm.charm_dir) if path.is_absolute() else path
+                )
+                # COSAgentProvider is somewhat analogous to GrafanaDashboardProvider. We need to overwrite the uid here
+                # because there is currently no other way to communicate the dashboard path separately.
+                # https://github.com/canonical/grafana-k8s-operator/pull/363
+                dashboard["uid"] = DashboardPath40UID.generate(self._charm.meta.name, rel_path)
+
+                # Add tags
+                tags: List[str] = dashboard.get("tags", [])
+                if not any(tag.startswith("charm: ") for tag in tags):
+                    tags.append(f"charm: {self._charm.meta.name}")
+                dashboard["tags"] = tags
+
+                dashboards.append(LZMABase64.compress(json.dumps(dashboard)))
         return dashboards
+
+    @property
+    def relations(self) -> List[Relation]:
+        """The tracing relations associated with this endpoint."""
+        return self._charm.model.relations[self._relation_name]
+
+    @property
+    def _relation(self) -> Optional[Relation]:
+        """If this wraps a single endpoint, the relation bound to it, if any."""
+        if not self._is_single_endpoint:
+            objname = type(self).__name__
+            raise AmbiguousRelationUsageError(
+                f"This {objname} wraps a {self._relation_name} endpoint that has "
+                "limit != 1. We can't determine what relation, of the possibly many, you are "
+                f"referring to. Please pass a relation instance while calling {objname}, "
+                "or set limit=1 in the charm metadata."
+            )
+        relations = self.relations
+        return relations[0] if relations else None
+
+    def is_ready(self, relation: Optional[Relation] = None):
+        """Is this endpoint ready?"""
+        relation = relation or self._relation
+        if not relation:
+            logger.debug(f"no relation on {self._relation_name!r}: tracing not ready")
+            return False
+        if relation.data is None:
+            logger.error(f"relation data is None for {relation}")
+            return False
+        if not relation.app:
+            logger.error(f"{relation} event received but there is no relation.app")
+            return False
+        try:
+            unit = next(iter(relation.units), None)
+            if not unit:
+                return False
+            databag = dict(relation.data[unit])
+            CosAgentRequirerUnitData.load(databag)
+
+        except (json.JSONDecodeError, pydantic.ValidationError, DataValidationError):
+            logger.info(f"failed validating relation data for {relation}")
+            return False
+        return True
+
+    def get_all_endpoints(
+        self, relation: Optional[Relation] = None
+    ) -> Optional[CosAgentRequirerUnitData]:
+        """Unmarshalled relation data."""
+        relation = relation or self._relation
+        if not relation or not self.is_ready(relation):
+            return None
+        unit = next(iter(relation.units), None)
+        if not unit:
+            return None
+        return CosAgentRequirerUnitData.load(relation.data[unit])  # type: ignore
+
+    def _get_tracing_endpoint(
+        self, relation: Optional[Relation], protocol: ReceiverProtocol
+    ) -> str:
+        """Return a tracing endpoint URL if it is available or raise a ProtocolNotFoundError."""
+        unit_data = self.get_all_endpoints(relation)
+        if not unit_data:
+            # we didn't find the protocol because the remote end didn't publish any data yet
+            # it might also mean that grafana-agent doesn't have a relation to the tracing backend
+            raise ProtocolNotFoundError(protocol)
+        receivers: List[Receiver] = [i for i in unit_data.receivers if i.protocol.name == protocol]
+        if not receivers:
+            # we didn't find the protocol because grafana-agent didn't return us the protocol that we requested
+            # the caller might want to verify that we did indeed request this protocol
+            raise ProtocolNotFoundError(protocol)
+        if len(receivers) > 1:
+            logger.warning(
+                f"too many receivers with protocol={protocol!r}; using first one. Found: {receivers}"
+            )
+
+        receiver = receivers[0]
+        if not receiver.url:
+            # grafana-agent isn't connected to the tracing backend yet
+            raise ProtocolNotFoundError(protocol)
+        return receiver.url
+
+    def get_tracing_endpoint(
+        self, protocol: ReceiverProtocol, relation: Optional[Relation] = None
+    ) -> str:
+        """Receiver endpoint for the given protocol.
+
+        It could happen that this function gets called before the provider publishes the endpoints.
+        In such a scenario, if a non-leader unit calls this function, a permission denied exception will be raised due to
+        restricted access. To prevent this, this function needs to be guarded by the `is_ready` check.
+
+        Raises:
+        ProtocolNotRequestedError:
+            If the charm unit is the leader unit and attempts to obtain an endpoint for a protocol it did not request.
+        ProtocolNotFoundError:
+            If the charm attempts to obtain an endpoint when grafana-agent isn't related to a tracing backend.
+        """
+        try:
+            return self._get_tracing_endpoint(relation or self._relation, protocol=protocol)
+        except ProtocolNotFoundError:
+            # let's see if we didn't find it because we didn't request the endpoint
+            requested_protocols = set()
+            relations = [relation] if relation else self.relations
+            for relation in relations:
+                try:
+                    databag = CosAgentProviderUnitData.load(relation.data[self._charm.unit])
+                except DataValidationError:
+                    continue
+
+                if databag.tracing_protocols:
+                    requested_protocols.update(databag.tracing_protocols)
+
+            if protocol not in requested_protocols:
+                raise ProtocolNotRequestedError(protocol, relation)
+
+            raise
 
 
 class COSAgentDataChanged(EventBase):
@@ -468,12 +907,6 @@ class COSAgentRequirerEvents(ObjectEvents):
     validation_error = EventSource(COSAgentValidationError)
 
 
-class MultiplePrincipalsError(Exception):
-    """Custom exception for when there are multiple principal applications."""
-
-    pass
-
-
 class COSAgentRequirer(Object):
     """Integration endpoint wrapper for the Requirer side of the cos_agent interface."""
 
@@ -486,6 +919,7 @@ class COSAgentRequirer(Object):
         relation_name: str = DEFAULT_RELATION_NAME,
         peer_relation_name: str = DEFAULT_PEER_RELATION_NAME,
         refresh_events: Optional[List[str]] = None,
+        is_tracing_ready: Optional[Callable] = None,
     ):
         """Create a COSAgentRequirer instance.
 
@@ -494,18 +928,22 @@ class COSAgentRequirer(Object):
             relation_name: The name of the relation to communicate over.
             peer_relation_name: The name of the peer relation to communicate over.
             refresh_events: List of events on which to refresh relation data.
+            is_tracing_ready: Custom function to evaluate whether the trace receiver url should be sent.
         """
         super().__init__(charm, relation_name)
         self._charm = charm
         self._relation_name = relation_name
         self._peer_relation_name = peer_relation_name
         self._refresh_events = refresh_events or [self._charm.on.config_changed]
+        self._is_tracing_ready = is_tracing_ready
 
         events = self._charm.on[relation_name]
         self.framework.observe(
             events.relation_joined, self._on_relation_data_changed
         )  # TODO: do we need this?
         self.framework.observe(events.relation_changed, self._on_relation_data_changed)
+        self.framework.observe(events.relation_departed, self._on_relation_departed)
+
         for event in self._refresh_events:
             self.framework.observe(event, self.trigger_refresh)  # pyright: ignore
 
@@ -533,6 +971,26 @@ class COSAgentRequirer(Object):
         if self._charm.unit.is_leader():
             self.on.data_changed.emit()  # pyright: ignore
 
+    def _on_relation_departed(self, event):
+        """Remove provider's (principal's) alert rules and dashboards from peer data when the cos-agent relation to the principal is removed."""
+        if not self.peer_relation:
+            event.defer()
+            return
+        # empty the departing unit's alert rules and dashboards from peer data
+        data = CosAgentPeersUnitData(
+            unit_name=event.unit.name,
+            relation_id=str(event.relation.id),
+            relation_name=event.relation.name,
+            metrics_alert_rules={},
+            log_alert_rules={},
+            dashboards=[],
+        )
+        self.peer_relation.data[self._charm.unit][
+            f"{CosAgentPeersUnitData.KEY}-{event.unit.name}"
+        ] = data.json()
+
+        self.on.data_changed.emit()  # pyright: ignore
+
     def _on_relation_data_changed(self, event: RelationChangedEvent):
         # Peer data is the only means of communication between subordinate units.
         if not self.peer_relation:
@@ -559,13 +1017,19 @@ class COSAgentRequirer(Object):
         if not (provider_data := self._validated_provider_data(raw)):
             return
 
-        # Copy data from the principal relation to the peer relation, so the leader could
+        # write enabled receivers to cos-agent relation
+        try:
+            self.update_tracing_receivers()
+        except ModelError:
+            raise
+
+        # Copy data from the cos_agent relation to the peer relation, so the leader could
         # follow up.
         # Save the originating unit name, so it could be used for topology later on by the leader.
         data = CosAgentPeersUnitData(  # peer relation databag model
-            principal_unit_name=event.unit.name,
-            principal_relation_id=str(event.relation.id),
-            principal_relation_name=event.relation.name,
+            unit_name=event.unit.name,
+            relation_id=str(event.relation.id),
+            relation_name=event.relation.name,
             metrics_alert_rules=provider_data.metrics_alert_rules,
             log_alert_rules=provider_data.log_alert_rules,
             dashboards=provider_data.dashboards,
@@ -579,6 +1043,49 @@ class COSAgentRequirer(Object):
         # need to emit `on.data_changed`), so we're emitting `on.data_changed` either way.
         self.on.data_changed.emit()  # pyright: ignore
 
+    def update_tracing_receivers(self):
+        """Updates the list of exposed tracing receivers in all relations."""
+        tracing_ready = (
+            self._is_tracing_ready if self._is_tracing_ready else self._charm.tracing.is_ready  # type: ignore
+        )
+        try:
+            for relation in self._charm.model.relations[self._relation_name]:
+                CosAgentRequirerUnitData(
+                    receivers=[
+                        Receiver(
+                            # if tracing isn't ready, we don't want the wrong receiver URLs present in the databag.
+                            # however, because of the backwards compatibility requirements, we need to still provide
+                            # the protocols list so that the charm with older cos_agent version doesn't error its hooks.
+                            # before this change was added, the charm with old cos_agent version threw exceptions with
+                            # connections to grafana-agent timing out. After the change, the charm will fail validating
+                            # databag contents (as it expects a string in URL) but that won't cause any errors as
+                            # tracing endpoints are the only content in the grafana-agent's side of the databag.
+                            url=f"{self._get_tracing_receiver_url(protocol)}"
+                            if tracing_ready()
+                            else None,
+                            protocol=ProtocolType(
+                                name=protocol,
+                                type=receiver_protocol_to_transport_protocol[protocol],
+                            ),
+                        )
+                        for protocol in self.requested_tracing_protocols()
+                    ],
+                ).dump(relation.data[self._charm.unit])
+
+        except ModelError as e:
+            # args are bytes
+            msg = e.args[0]
+            if isinstance(msg, bytes):
+                if msg.startswith(
+                    b"ERROR cannot read relation application settings: permission denied"
+                ):
+                    logger.error(
+                        f"encountered error {e} while attempting to update_relation_data."
+                        f"The relation must be gone."
+                    )
+                    return
+            raise
+
     def _validated_provider_data(self, raw) -> Optional[CosAgentProviderUnitData]:
         try:
             return CosAgentProviderUnitData(**json.loads(raw))
@@ -591,40 +1098,56 @@ class COSAgentRequirer(Object):
         # FIXME: Figure out what we should do here
         self.on.data_changed.emit()  # pyright: ignore
 
-    @property
-    def _principal_unit(self) -> Optional[Unit]:
-        """Return the principal unit for a relation.
-
-        Assumes that the relation is of type subordinate.
-        Relies on the fact that, for subordinate relations, the only remote unit visible to
-        *this unit* is the principal unit that this unit is attached to.
-        """
-        if relations := self._principal_relations:
-            # Technically it's a list, but for subordinates there can only be one relation
-            principal_relation = next(iter(relations))
-            if units := principal_relation.units:
-                # Technically it's a list, but for subordinates there can only be one
-                return next(iter(units))
-
-        return None
-
-    @property
-    def _principal_relations(self):
-        relations = []
-        for relation in self._charm.model.relations[self._relation_name]:
-            if not json.loads(relation.data[next(iter(relation.units))]["config"]).get(
-                ["subordinate"], False
-            ):
-                relations.append(relation)
-        if len(relations) > 1:
-            logger.error(
-                "Multiple applications claiming to be principal. Update the cos-agent library in the client application charms."
+    def _get_requested_protocols(self, relation: Relation):
+        # Coherence check
+        units = relation.units
+        if len(units) > 1:
+            # should never happen
+            raise ValueError(
+                f"unexpected error: subordinate relation {relation} should have exactly one unit"
             )
-            raise MultiplePrincipalsError("Multiple principal applications.")
-        return relations
+
+        unit = next(iter(units), None)
+
+        if not unit:
+            return None
+
+        if not (raw := relation.data[unit].get(CosAgentProviderUnitData.KEY)):
+            return None
+
+        if not (provider_data := self._validated_provider_data(raw)):
+            return None
+
+        return provider_data.tracing_protocols
+
+    def requested_tracing_protocols(self):
+        """All receiver protocols that have been requested by our related apps."""
+        requested_protocols = set()
+        for relation in self._charm.model.relations[self._relation_name]:
+            try:
+                protocols = self._get_requested_protocols(relation)
+            except NotReadyError:
+                continue
+            if protocols:
+                requested_protocols.update(protocols)
+        return requested_protocols
+
+    def _get_tracing_receiver_url(self, protocol: str):
+        scheme = "http"
+        try:
+            if self._charm.cert.enabled:  # type: ignore
+                scheme = "https"
+        # not only Grafana Agent can implement cos_agent. If the charm doesn't have the `cert` attribute
+        # using our cert_handler, it won't have the `enabled` parameter. In this case, we pass and assume http.
+        except AttributeError:
+            pass
+        # the assumption is that a subordinate charm will always be accessible to its principal charm under its fqdn
+        if receiver_protocol_to_transport_protocol[protocol] == TransportProtocolType.grpc:
+            return f"{socket.getfqdn()}:{_tracing_receivers_ports[protocol]}"
+        return f"{scheme}://{socket.getfqdn()}:{_tracing_receivers_ports[protocol]}"
 
     @property
-    def _remote_data(self) -> List[CosAgentProviderUnitData]:
+    def _remote_data(self) -> List[Tuple[CosAgentProviderUnitData, JujuTopology]]:
         """Return a list of remote data from each of the related units.
 
         Assumes that the relation is of type subordinate.
@@ -641,7 +1164,15 @@ class COSAgentRequirer(Object):
                 continue
             if not (provider_data := self._validated_provider_data(raw)):
                 continue
-            all_data.append(provider_data)
+
+            topology = JujuTopology(
+                model=self._charm.model.name,
+                model_uuid=self._charm.model.uuid,
+                application=unit.app.name,
+                unit=unit.name,
+            )
+
+            all_data.append((provider_data, topology))
 
         return all_data
 
@@ -711,7 +1242,7 @@ class COSAgentRequirer(Object):
     def metrics_jobs(self) -> List[Dict]:
         """Parse the relation data contents and extract the metrics jobs."""
         scrape_jobs = []
-        for data in self._remote_data:
+        for data, topology in self._remote_data:
             for job in data.metrics_scrape_jobs:
                 # In #220, relation schema changed from a simplified dict to the standard
                 # `scrape_configs`.
@@ -727,6 +1258,22 @@ class COSAgentRequirer(Object):
                         "tls_config": {"insecure_skip_verify": True},
                     }
 
+                # Apply labels to the scrape jobs
+                for static_config in job.get("static_configs", []):
+                    topo_as_dict = topology.as_dict(excluded_keys=["charm_name"])
+                    static_config["labels"] = {
+                        # Be sure to keep labels from static_config
+                        **static_config.get("labels", {}),
+                        # TODO: We should add a new method in juju_topology.py
+                        # that like `as_dict` method, returns the keys with juju_ prefix
+                        # https://github.com/canonical/cos-lib/issues/18
+                        **{
+                            "juju_{}".format(key): value
+                            for key, value in topo_as_dict.items()
+                            if value
+                        },
+                    }
+
                 scrape_jobs.append(job)
 
         return scrape_jobs
@@ -734,8 +1281,18 @@ class COSAgentRequirer(Object):
     @property
     def snap_log_endpoints(self) -> List[SnapEndpoint]:
         """Fetch logging endpoints exposed by related snaps."""
+        endpoints = []
+        endpoints_with_topology = self.snap_log_endpoints_with_topology
+        for endpoint, _ in endpoints_with_topology:
+            endpoints.append(endpoint)
+
+        return endpoints
+
+    @property
+    def snap_log_endpoints_with_topology(self) -> List[Tuple[SnapEndpoint, JujuTopology]]:
+        """Fetch logging endpoints and charm topology for each related snap."""
         plugs = []
-        for data in self._remote_data:
+        for data, topology in self._remote_data:
             targets = data.log_slots
             if targets:
                 for target in targets:
@@ -746,15 +1303,16 @@ class COSAgentRequirer(Object):
                             "endpoints; this should not happen."
                         )
                     else:
-                        plugs.append(target)
+                        plugs.append((target, topology))
 
         endpoints = []
-        for plug in plugs:
+        for plug, topology in plugs:
             if ":" not in plug:
                 logger.error(f"invalid plug definition received: {plug}. Ignoring...")
             else:
                 endpoint = SnapEndpoint(*plug.split(":"))
-                endpoints.append(endpoint)
+                endpoints.append((endpoint, topology))
+
         return endpoints
 
     @property
@@ -775,7 +1333,7 @@ class COSAgentRequirer(Object):
                     model=self._charm.model.name,
                     model_uuid=self._charm.model.uuid,
                     application=app_name,
-                    # For the topology unit, we could use `data.principal_unit_name`, but that unit
+                    # For the topology unit, we could use `data.unit_name`, but that unit
                     # name may not be very stable: `_gather_peer_data` de-duplicates by app name so
                     # the exact unit name that turns up first in the iterator may vary from time to
                     # time. So using the grafana-agent unit name instead.
@@ -802,18 +1360,70 @@ class COSAgentRequirer(Object):
             seen_apps.append(app_name)
 
             for encoded_dashboard in data.dashboards or ():
-                content = GrafanaDashboard(encoded_dashboard)._deserialize()
+                content = json.loads(LZMABase64.decompress(encoded_dashboard))
 
                 title = content.get("title", "no_title")
 
                 dashboards.append(
                     {
-                        "relation_id": data.principal_relation_id,
+                        "relation_id": data.relation_id,
                         # We have the remote charm name - use it for the identifier
-                        "charm": f"{data.principal_relation_name}-{app_name}",
+                        "charm": f"{data.relation_name}-{app_name}",
                         "content": content,
                         "title": title,
                     }
                 )
 
         return dashboards
+
+
+def charm_tracing_config(
+    endpoint_requirer: COSAgentProvider, cert_path: Optional[Union[Path, str]]
+) -> Tuple[Optional[str], Optional[str]]:
+    """Utility function to determine the charm_tracing config you will likely want.
+
+    If no endpoint is provided:
+     disable charm tracing.
+    If https endpoint is provided but cert_path is not found on disk:
+     disable charm tracing.
+    If https endpoint is provided and cert_path is None:
+     raise TracingError
+    Else:
+     proceed with charm tracing (with or without tls, as appropriate)
+
+    Usage:
+    >>> from lib.charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
+    >>> from lib.charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
+    >>> @trace_charm(tracing_endpoint="my_endpoint", cert_path="cert_path")
+    >>> class MyCharm(...):
+    >>>     _cert_path = "/path/to/cert/on/charm/container.crt"
+    >>>     def __init__(self, ...):
+    >>>         self.tracing = TracingEndpointRequirer(...)
+    >>>         self.my_endpoint, self.cert_path = charm_tracing_config(
+    ...             self.tracing, self._cert_path)
+    """
+    if not endpoint_requirer.is_ready():
+        return None, None
+
+    try:
+        endpoint = endpoint_requirer.get_tracing_endpoint("otlp_http")
+    except ProtocolNotFoundError:
+        logger.warn(
+            "Endpoint for tracing wasn't provided as tracing backend isn't ready yet. If grafana-agent isn't connected to a tracing backend, integrate it. Otherwise this issue should resolve itself in a few events."
+        )
+        return None, None
+
+    if not endpoint:
+        return None, None
+
+    is_https = endpoint.startswith("https://")
+
+    if is_https:
+        if cert_path is None:
+            raise TracingError("Cannot send traces to an https endpoint without a certificate.")
+        if not Path(cert_path).exists():
+            # if endpoint is https BUT we don't have a server_cert yet:
+            # disable charm tracing until we do to prevent tls errors
+            return None, None
+        return endpoint, str(cert_path)
+    return endpoint, None
