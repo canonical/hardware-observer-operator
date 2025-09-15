@@ -15,6 +15,7 @@ from redfish import redfish_client
 from redfish.rest.v1 import InvalidCredentialsError
 
 from config import (
+    DEFAULT_BIND_ADDRESS,
     HARDWARE_EXPORTER_COLLECTOR_MAPPING,
     HARDWARE_EXPORTER_SETTINGS,
     ExporterSettings,
@@ -462,7 +463,7 @@ class SmartCtlExporter(SnapExporter):
         return super().configure() and self.set(
             {
                 "log.level": self.log_level.lower(),
-                "web.listen-address": f":{self.port}",
+                "web.listen-address": f"{DEFAULT_BIND_ADDRESS}:{self.port}",
             }
         )
 

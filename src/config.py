@@ -6,6 +6,8 @@ from pathlib import Path
 
 from pydantic import BaseModel  # pylint: disable = no-name-in-module
 
+DEFAULT_BIND_ADDRESS = "127.0.0.1"
+
 
 class ExporterSettings(BaseModel):  # pylint: disable = too-few-public-methods
     """Constant settings common across exporters."""
