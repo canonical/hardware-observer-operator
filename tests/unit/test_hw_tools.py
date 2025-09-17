@@ -126,12 +126,17 @@ class TestMakeExecutable(unittest.TestCase):
 class TestHWToolHelper(unittest.TestCase):
     def setUp(self):
         mock_dashboards = mock.patch.object(HardwareObserverCharm, "_dashboards")
+        mock_stored_tools = mock.patch.object(
+            HardwareObserverCharm, "stored_tools", new_callable=mock.PropertyMock
+        )
         self.mock_dashboards = mock_dashboards.start()
+        self.mock_stored_tools = mock_stored_tools.start()
 
         self.harness = ops.testing.Harness(HardwareObserverCharm)
         self.harness.begin()
 
         self.addCleanup(self.harness.cleanup)
+        self.addCleanup(mock_stored_tools.stop)
         self.addCleanup(mock_dashboards.stop)
 
         self.hw_tool_helper = HWToolHelper()

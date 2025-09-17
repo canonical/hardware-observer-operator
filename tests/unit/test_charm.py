@@ -889,3 +889,30 @@ class TestCharm(unittest.TestCase):
         mock_exporters.return_value = [smartctl_exporter]
 
         assert self.harness.charm._dashboards() == ["./src/dashboards_smart_ctl"]
+
+    @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
+    @mock.patch.object(HardwareObserverCharm, "stored_tools", new_callable=mock.PropertyMock)
+    @mock.patch("src.charm.shutil.copy")
+    def test_enable_redfish_alert_rules(self, mock_copy, mock_stored_tools, mock_exporters):
+        mock_stored_tools.return_value = {HWTool.REDFISH}
+
+        self.harness.begin()
+        self.harness.update_config({"redfish-disable": False})
+
+        self.harness.charm._set_prometheus_alert_rules()
+
+        mock_copy.assert_called_once_with(charm.PROM_RULES_REDFISH, charm.PROM_RULES)
+
+    @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
+    @mock.patch.object(HardwareObserverCharm, "stored_tools", new_callable=mock.PropertyMock)
+    @mock.patch("pathlib.Path.unlink")
+    def test_disable_redfish_alert_rules(self, mock_unlink, mock_stored_tools, mock_exporters):
+        # Case: REDFISH disabled in config
+        mock_stored_tools.return_value = {HWTool.REDFISH}
+
+        self.harness.begin()
+        self.harness.update_config({"redfish-disable": True})
+
+        self.harness.charm._set_prometheus_alert_rules()
+
+        mock_unlink.assert_called_with(missing_ok=True)
