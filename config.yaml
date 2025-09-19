@@ -17,10 +17,10 @@ options:
       it will start at port 10201.
   dcgm-snap-channel:
     type: string
-    default: "latest/stable"
+    default: ""
     description: |
-      Channel to install the DCGM snap if the hardware has NVIDIA GPU. By default, it will install
-      from latest/stable
+      Channel to install the DCGM snap if the hardware has NVIDIA GPU. By default, the empty value
+      will let the charm to decide the channel based in the NVIDIA driver version.
   smartctl-exporter-snap-channel:
     type: string
     default: "latest/stable"
