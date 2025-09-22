@@ -415,11 +415,9 @@ class DCGMExporter(SnapExporter):
     exporter_name: str = "dcgm"
     port: int = 9400
 
-    def __init__(self, config: ConfigData):
+    def __init__(self, config: ConfigData) -> None:
         """Init."""
-        self.strategies = [
-            DCGMExporterStrategy(str(config["dcgm-snap-channel"])),
-        ]
+        self.strategies = [DCGMExporterStrategy(str(config["dcgm-snap-channel"]))]
         super().__init__(config)
 
     @staticmethod

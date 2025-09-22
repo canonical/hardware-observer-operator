@@ -360,7 +360,6 @@ class DCGMExporterStrategy(SnapStrategy):
             return "v3/stable"
 
 
-
 class SmartCtlExporterStrategy(SnapStrategy):
     """SmartCtl strategy class."""
 

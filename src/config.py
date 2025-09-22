@@ -94,14 +94,22 @@ TOOLS_DIR = Path("/usr/sbin")
 # SNAP environment
 SNAP_COMMON = Path(f"/var/snap/{HARDWARE_EXPORTER_SETTINGS.name}/common")
 
-class DcgmConfig(pydantic.BaseModel):
-    channel: str = pydantic.Field("")
 
-    @pydantic.validator("channel")
+class DcgmConfig(pydantic.BaseModel):
+    class Config:
+        """Pydantic model configuration."""
+
+        allow_population_by_field_name = True
+
+    dcgm_snap_channel: str = pydantic.Field(
+        default="", description="Snap channel for DCGM", alias="dcgm-snap-channel"
+    )
+
+    @pydantic.validator("dcgm_snap_channel", pre=True)
+    @classmethod
     def validate_channel(cls, value):
         if value == "":
             return value
-
         try:
             track, risk = value.split("/", 1)
         except ValueError:
@@ -113,6 +121,8 @@ class DcgmConfig(pydantic.BaseModel):
         if track not in valid_tracks:
             raise ValueError(f'Invalid track "{track}". Must be one of {sorted(valid_tracks)}')
         if risk not in valid_risks:
-            raise ValueError(f'Invalid channel risk "{risk}". Must be one of {sorted(valid_risks)}')
+            raise ValueError(
+                f'Invalid channel risk "{risk}". Must be one of {sorted(valid_risks)}'
+            )
 
         return value
