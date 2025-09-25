@@ -21,7 +21,12 @@ from config import (
     ExporterSettings,
     HWTool,
 )
-from hardware import get_bmc_address, is_nvidia_driver_loaded
+from hardware import (
+    get_bmc_address,
+    get_nvidia_driver_version,
+    installed_nvidia_driver_to_cuda,
+    is_nvidia_driver_loaded,
+)
 from hw_tools import APTStrategyABC, DCGMExporterStrategy, SmartCtlExporterStrategy, SnapStrategy
 
 logger = getLogger(__name__)
@@ -417,8 +422,25 @@ class DCGMExporter(SnapExporter):
 
     def __init__(self, config: ConfigData) -> None:
         """Init."""
-        self.strategies = [DCGMExporterStrategy(str(config["dcgm-snap-channel"]))]
+        self.channel = str(config["dcgm-snap-channel"])
+        self.strategies = [DCGMExporterStrategy(self.channel)]
         super().__init__(config)
+
+    @property
+    def channel(self):
+        return self._channel
+
+    @channel.setter
+    def channel(self, value):
+        if value == "auto":
+            self._channel = self._automatic_channel_selection()
+        else:
+            self._channel = value
+
+    def _automatic_channel_selection(self) -> None:
+        """Automatically select the snap channel based on the NVIDIA driver version."""
+        cuda_version = installed_nvidia_driver_to_cuda()
+        return f"v4-{cuda_version}/stable" if cuda_version != "cuda10" else "v3/stable"
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
@@ -436,6 +458,16 @@ class DCGMExporter(SnapExporter):
                 False,
                 "The NVIDIA driver isn't installed or loaded. See more details in the logs",
             )
+
+        cuda_version = installed_nvidia_driver_to_cuda()
+        driver_version = get_nvidia_driver_version()
+        if cuda_version not in self.snap_client.channel:
+            return (
+                False,
+                f"DCGM '{self.snap_client.channel}' is outdated for driver {driver_version}. "
+                f"The recommended is '{self._automatic_channel_selection()}'.",
+            )
+
         return valid, msg
 
 

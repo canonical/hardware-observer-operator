@@ -12,8 +12,8 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
-from config import DcgmConfig
 from hw_tools import HWTool, HWToolHelper, detect_available_tools, remove_legacy_smartctl_exporter
+from literals import HwoConfig
 from service import BaseExporter, DCGMExporter, ExporterError, HardwareExporter, SmartCtlExporter
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,6 @@ class HardwareObserverCharm(ops.CharmBase):
             resource_installed=False,
             stored_tools=set(),
         )
-        self.dcgm_config = self.load_config(DcgmConfig, errors="blocked")
 
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.install, self._on_install_or_upgrade)
@@ -61,6 +60,12 @@ class HardwareObserverCharm(ops.CharmBase):
         )
 
         self.num_cos_agent_relations = self.get_num_cos_agent_relations("cos-agent")
+
+        try:
+            self.typed_config = self.load_config(HwoConfig)
+        except ValueError as e:
+            logger.error("Invalid dcgm-snap-channel config: %s", e)
+            self.setup_failure = ops.BlockedStatus(str(e))
 
     @property
     def exporters(self) -> List[BaseExporter]:

@@ -17,10 +17,20 @@ options:
       it will start at port 10201.
   dcgm-snap-channel:
     type: string
-    default: ""
+    default: "auto"
     description: |
-      Channel to install the DCGM snap if the hardware has NVIDIA GPU. By default, the empty value
-      will let the charm to decide the channel based in the NVIDIA driver version.
+      Valid inputs are "auto", v3/stable, v3/candidate, v3/edge, v4/stable, v4/candidate, v4/edge.
+
+      When set to auto, the charm automatically checks the installed NVIDIA driver version and
+      selects the most appropriate channel. For example, with driver 580, it will install from
+      v4-cuda13/stable.
+
+      The v3 channels are compatible with CUDA 10, 11, and 12; you simply choose the desired
+      release risk (stable, candidate, or edge).
+
+      The v4 channels provide more flexibility. Even if you select v4/edge, the charm still
+      detects the driver version and installs the matching CUDA build. For example,
+      with driver 570, it will install from v4-cuda12/edge.
   smartctl-exporter-snap-channel:
     type: string
     default: "latest/stable"

@@ -5,7 +5,6 @@ Define strategy for install, remove and verifier for different hardware.
 
 import logging
 import os
-import re
 import shutil
 import stat
 import subprocess
@@ -310,17 +309,6 @@ class DCGMExporterStrategy(SnapStrategy):
         """Init."""
         self.channel = channel
 
-    @property
-    def channel(self):
-        return self._channel
-
-    @channel.setter
-    def channel(self, value):
-        if not value:
-            self._channel = self._automatic_channel_selection()
-        else:
-            self._channel = value
-
     def install(self) -> None:
         """Install the snap and the custom metrics."""
         super().install()
@@ -334,30 +322,6 @@ class DCGMExporterStrategy(SnapStrategy):
         except Exception as err:  # pylint: disable=broad-except
             logger.error("Failed to configure custom DCGM metrics: %s", err)
             raise err
-
-    def _get_driver_version(self) -> str:
-        """Get the NVIDIA driver version installed on the system."""
-        try:
-            with open("/proc/driver/nvidia/version") as f:
-                nvidia_driver_version = f.read()
-            match = re.search(r"NVRM version:.*?(\d+\.\d+(?:\.\d+)*)", nvidia_driver_version)
-            if match:
-                return int(match.group(1).split(".")[0])
-        except FileNotFoundError:
-            logger.error("NVIDIA driver version file not found.")
-
-    def _automatic_channel_selection(self) -> None:
-        """Automatically select the snap channel based on the NVIDIA driver version."""
-        driver_version = self._get_driver_version()
-
-        if driver_version >= 580:
-            return "v4-cuda13/stable"
-        elif driver_version >= 525:
-            return "v4-cuda12/stable"
-        elif driver_version >= 450:
-            return "v4-cuda11/stable"
-        elif driver_version < 450:
-            return "v3/stable"
 
 
 class SmartCtlExporterStrategy(SnapStrategy):

@@ -7,9 +7,12 @@ import json
 import unittest
 from pathlib import Path
 from unittest import mock
+from unittest.mock import MagicMock, patch
 
 import ops
 import ops.testing
+import pytest
+from ops import testing
 from ops.model import ActiveStatus, BlockedStatus
 from parameterized import parameterized
 
@@ -889,3 +892,28 @@ class TestCharm(unittest.TestCase):
         mock_exporters.return_value = [smartctl_exporter]
 
         assert self.harness.charm._dashboards() == ["./src/dashboards_smart_ctl"]
+
+
+@pytest.mark.parametrize(
+    "dcgm_channel, exp_msg",
+    [
+        ("v3/stable", "Channel must be in the form '<track>/<risk>'"),
+        # ("v3", "Channel must be in the form '<track>/<risk>'"),
+        # ("v4", "Channel must be in the form '<track>/<risk>'"),
+        # ("foo/stable", "Invalid track 'foo'. Must be one of: auto, v3, v4"),
+        # ("v3/bar", "Invalid channel risk 'bar'. Must be one of: candidate, edge, stable"),
+    ],
+    ids=[
+        "Empty config",
+        # "v3 missing risk",
+        # "v4 missing risk",
+        # "invalid track",
+        # "invalid risk",
+    ],
+)
+def test_wrong_dcgm_snap_channel_config(dcgm_channel: str, exp_msg: str) -> None:
+    ctx = testing.Context(HardwareObserverCharm)
+    state_in = testing.State(config={"dcgm-snap-channel": dcgm_channel})
+    # # breakpoint()
+    state_out = ctx.run(ctx.on.config_changed(), state_in)
+    # assert state_out.unit_status == testing.BlockedStatus(exp_msg)

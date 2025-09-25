@@ -1,5 +1,6 @@
 """Config."""
 
+import logging
 import typing as t
 from enum import Enum
 from pathlib import Path
@@ -7,6 +8,8 @@ from pathlib import Path
 import pydantic
 
 DEFAULT_BIND_ADDRESS = "127.0.0.1"
+
+logger = logging.getLogger(__name__)
 
 
 class ExporterSettings(pydantic.BaseModel):  # pylint: disable = too-few-public-methods
@@ -93,36 +96,3 @@ TOOLS_DIR = Path("/usr/sbin")
 
 # SNAP environment
 SNAP_COMMON = Path(f"/var/snap/{HARDWARE_EXPORTER_SETTINGS.name}/common")
-
-
-class DcgmConfig(pydantic.BaseModel):
-    class Config:
-        """Pydantic model configuration."""
-
-        allow_population_by_field_name = True
-
-    dcgm_snap_channel: str = pydantic.Field(
-        default="", description="Snap channel for DCGM", alias="dcgm-snap-channel"
-    )
-
-    @pydantic.validator("dcgm_snap_channel", pre=True)
-    @classmethod
-    def validate_channel(cls, value):
-        if value == "":
-            return value
-        try:
-            track, risk = value.split("/", 1)
-        except ValueError:
-            raise ValueError('Channel must be in the form "<track>/<risk>"')
-
-        valid_tracks = {"v3", "v4-cuda11", "v4-cuda12", "v4-cuda13"}
-        valid_risks = {"stable", "edge", "candidate"}
-
-        if track not in valid_tracks:
-            raise ValueError(f'Invalid track "{track}". Must be one of {sorted(valid_tracks)}')
-        if risk not in valid_risks:
-            raise ValueError(
-                f'Invalid channel risk "{risk}". Must be one of {sorted(valid_risks)}'
-            )
-
-        return value

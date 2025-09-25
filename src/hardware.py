@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import subprocess
 import typing as t
 from pathlib import Path
@@ -11,6 +12,8 @@ from charms.operator_libs_linux.v0 import apt
 from config import HWTool
 
 logger = logging.getLogger(__name__)
+
+NVIDIA_DRIVER_PATH = Path("/proc/driver/nvidia/version")
 
 
 LSHW_SUPPORTED_STORAGES = {
@@ -107,4 +110,40 @@ def hwinfo(*args: str) -> t.Dict[str, str]:
 
 def is_nvidia_driver_loaded() -> bool:
     """Determine if an NVIDIA driver has been loaded."""
-    return Path("/proc/driver/nvidia/version").exists()
+    return NVIDIA_DRIVER_PATH.exists()
+
+
+def get_nvidia_driver_version() -> int:
+    """Get the NVIDIA driver version installed on the system."""
+    try:
+        nvidia_driver_version = NVIDIA_DRIVER_PATH.read_text()
+        match = re.search(r"NVRM version:.*?(\d+\.\d+(?:\.\d+)*)", nvidia_driver_version)
+        if match:
+            return int(match.group(1).split(".")[0])
+    except FileNotFoundError:
+        logger.error("NVIDIA driver version file not found.")
+        raise
+
+
+def installed_nvidia_driver_to_cuda() -> str:
+    """Map the installed NVIDIA driver version to CUDA version."""
+    driver_version = get_nvidia_driver_version()
+
+    if driver_version >= 580:
+        return "cuda13"
+    elif driver_version >= 525:
+        return "cuda12"
+    elif driver_version >= 450:
+        logger.warning(
+            "The installed NVIDIA driver version '%s' might not be supported in next DCGM "
+            "releases. Consider updating the NVIDIA driver.",
+            driver_version,
+        )
+        return "cuda11"
+    else:
+        logger.warning(
+            "The installed NVIDIA driver version '%s' is quite old and might not be supported "
+            "by recent DCGM versions. Consider updating the NVIDIA driver.",
+            driver_version,
+        )
+        return "cuda10"
