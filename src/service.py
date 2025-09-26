@@ -461,7 +461,8 @@ class DCGMExporter(SnapExporter):
 
         cuda_version = installed_nvidia_driver_to_cuda()
         driver_version = get_nvidia_driver_version()
-        if cuda_version not in self.snap_client.channel:
+
+        if str(cuda_version) not in self.snap_client.channel:
             return (
                 False,
                 f"DCGM '{self.snap_client.channel}' is outdated for driver {driver_version}. "

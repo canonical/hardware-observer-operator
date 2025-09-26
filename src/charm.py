@@ -65,7 +65,7 @@ class HardwareObserverCharm(ops.CharmBase):
             self.typed_config = self.load_config(HwoConfig)
         except ValueError as e:
             logger.error("Invalid dcgm-snap-channel config: %s", e)
-            self.setup_failure = ops.BlockedStatus(str(e))
+            self.model.unit.status = ops.BlockedStatus(str(e))
 
     @property
     def exporters(self) -> List[BaseExporter]:
