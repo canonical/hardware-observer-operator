@@ -440,7 +440,8 @@ class DCGMExporter(SnapExporter):
     def _automatic_channel_selection(self) -> None:
         """Automatically select the snap channel based on the NVIDIA driver version."""
         cuda_version = installed_nvidia_driver_to_cuda()
-        return f"v4-{cuda_version}/stable" if cuda_version != "cuda10" else "v3/stable"
+        # TODO: change to stable when v4 is released as stable
+        return f"v4-{cuda_version}/edge" if cuda_version != "cuda10" else "v3/stable"
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
@@ -462,6 +463,7 @@ class DCGMExporter(SnapExporter):
         cuda_version = installed_nvidia_driver_to_cuda()
         driver_version = get_nvidia_driver_version()
 
+        # This should catch user upgrading the driver, but not changing the dcgm channel
         if str(cuda_version) not in self.snap_client.channel:
             return (
                 False,
