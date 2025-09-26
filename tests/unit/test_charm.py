@@ -39,6 +39,16 @@ class TestCharm(unittest.TestCase):
         requests_patcher.start()
         self.addCleanup(requests_patcher.stop)
 
+        driver_patcher = mock.patch("literals.installed_nvidia_driver_to_cuda")
+        driver_patcher.start()
+        driver_patcher.return_value = 12
+        self.addCleanup(driver_patcher.stop)
+
+        driver_patcher_service = mock.patch("service.installed_nvidia_driver_to_cuda")
+        driver_patcher_service.start()
+        driver_patcher_service.return_value = 12
+        self.addCleanup(driver_patcher_service.stop)
+
     def _get_notice_count(self, hook):
         """Return the notice count for a given charm hook."""
         notice_count = 0
