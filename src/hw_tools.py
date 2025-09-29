@@ -8,6 +8,7 @@ import os
 import shutil
 import stat
 import subprocess
+import time
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from string import Template
@@ -291,12 +292,18 @@ class SnapStrategy(StrategyABC):
             logger.error("Failed to remove %s: %s", self.snap_name, err)
             raise err
 
-    def check(self) -> bool:
+    def check(self, retries: int = 5, delay: float = 2.0) -> bool:
         """Check if all services are active."""
-        return all(
-            service.get("active", False)
-            for service in snap.SnapCache()[self.snap_name].services.values()
-        )
+        for attempt in range(1, retries + 1):
+            if all(
+                service.get("active", False)
+                for service in snap.SnapCache()[self.snap_name].services.values()
+            ):
+                return True
+            if attempt < retries:
+                time.sleep(delay * attempt)
+
+        return False
 
 
 class DCGMExporterStrategy(SnapStrategy):

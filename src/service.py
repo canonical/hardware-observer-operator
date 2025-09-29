@@ -422,7 +422,8 @@ class DCGMExporter(SnapExporter):
 
     def __init__(self, config: ConfigData) -> None:
         """Init."""
-        self.channel = str(config["dcgm-snap-channel"])
+        self.config = config
+        self.channel = str(self.config["dcgm-snap-channel"])
         self.strategies = [DCGMExporterStrategy(self.channel)]
         super().__init__(config)
 
@@ -441,7 +442,7 @@ class DCGMExporter(SnapExporter):
         """Automatically select the snap channel based on the NVIDIA driver version."""
         cuda_version = installed_nvidia_driver_to_cuda()
         # TODO: change to stable when v4 is released as stable
-        return f"v4-{cuda_version}/edge" if cuda_version != "cuda10" else "v3/stable"
+        return f"v4-cuda{cuda_version}/edge" if cuda_version != 10 else "v3/stable"
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
@@ -462,16 +463,33 @@ class DCGMExporter(SnapExporter):
 
         cuda_version = installed_nvidia_driver_to_cuda()
         driver_version = get_nvidia_driver_version()
+        track, *_ = self.config["dcgm-snap-channel"].split("/", 1)
 
-        # This should catch user upgrading the driver, but not changing the dcgm channel
-        if str(cuda_version) not in self.snap_client.channel:
-            return (
-                False,
-                f"DCGM '{self.snap_client.channel}' is outdated for driver {driver_version}. "
-                f"The recommended is '{self._automatic_channel_selection()}'.",
-            )
+        if self._v3_compatible(cuda_version, track):
+            return valid, msg
 
-        return valid, msg
+        if self._v4_compatible(cuda_version, track):
+            return valid, msg
+
+        recommended_channel = self._automatic_channel_selection()
+        return (
+            False,
+            f"DCGM '{self.snap_client.channel}' does not match with driver {driver_version} and "
+            f"config '{self.config["dcgm-snap-channel"]}'. "
+            f"Recommended channel is '{recommended_channel}'",
+        )
+
+    def _v3_compatible(self, cuda_version: int, track: str) -> bool:
+        """Check if the installed DCGM snap is v3 compatible."""
+        return "v3" in self.snap_client.channel and cuda_version < 13 and {"v3", "auto"} in track
+
+    def _v4_compatible(self, cuda_version: int, track: str) -> bool:
+        """Check if the installed DCGM snap is v4 compatible."""
+        return (
+            f"v4-cuda{cuda_version}" in self.snap_client.channel
+            and cuda_version > 10
+            and track in {"v4", "auto"}
+        )
 
 
 class SmartCtlExporter(SnapExporter):

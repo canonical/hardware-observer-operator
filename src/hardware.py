@@ -125,25 +125,25 @@ def get_nvidia_driver_version() -> int:
         raise
 
 
-def installed_nvidia_driver_to_cuda() -> str:
+def installed_nvidia_driver_to_cuda() -> int:
     """Map the installed NVIDIA driver version to CUDA version."""
     driver_version = get_nvidia_driver_version()
 
     if driver_version >= 580:
-        return "cuda13"
+        return 13
     elif driver_version >= 525:
-        return "cuda12"
+        return 12
     elif driver_version >= 450:
         logger.warning(
             "The installed NVIDIA driver version '%s' might not be supported in next DCGM "
             "releases. Consider updating the NVIDIA driver.",
             driver_version,
         )
-        return "cuda11"
+        return 11
     else:
         logger.warning(
             "The installed NVIDIA driver version '%s' is quite old and might not be supported "
             "by recent DCGM versions. Consider updating the NVIDIA driver.",
             driver_version,
         )
-        return "cuda10"
+        return 10

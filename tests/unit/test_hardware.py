@@ -209,14 +209,14 @@ def test_get_nvidia_driver_version_file_not_found(mock_driver_path):
 @pytest.mark.parametrize(
     "driver_version, expected",
     [
-        (590, "cuda13"),
-        (580, "cuda13"),
-        (570, "cuda12"),
-        (525, "cuda12"),
-        (500, "cuda11"),
-        (450, "cuda11"),
-        (400, "cuda10"),
-        (390, "cuda10"),
+        (590, 13),
+        (580, 13),
+        (570, 12),
+        (525, 12),
+        (500, 11),
+        (450, 11),
+        (400, 10),
+        (390, 10),
     ],
 )
 @mock.patch("hardware.get_nvidia_driver_version")
