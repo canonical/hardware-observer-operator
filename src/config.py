@@ -5,14 +5,12 @@ import typing as t
 from enum import Enum
 from pathlib import Path
 
-import pydantic
+from pydantic import BaseModel  # pylint: disable = no-name-in-module
 
 DEFAULT_BIND_ADDRESS = "127.0.0.1"
 
-logger = logging.getLogger(__name__)
 
-
-class ExporterSettings(pydantic.BaseModel):  # pylint: disable = too-few-public-methods
+class ExporterSettings(BaseModel):  # pylint: disable = too-few-public-methods
     """Constant settings common across exporters."""
 
     health_retry_count: int = 3
