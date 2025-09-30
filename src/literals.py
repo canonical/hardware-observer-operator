@@ -3,10 +3,10 @@
 """Literals for the charm."""
 import pydantic
 
-from hardware import installed_nvidia_driver_to_cuda
+from hardware import get_cuda_version_from_driver
 
 
-class HwoConfig(pydantic.BaseModel):
+class HWObserverConfig(pydantic.BaseModel):
     class Config:
         """Pydantic config."""
 
@@ -27,7 +27,7 @@ class HwoConfig(pydantic.BaseModel):
         except ValueError:
             raise ValueError("Channel must be in the form '<track>/<risk>'")
 
-        valid_tracks = {"auto", "v3", "v4"}
+        valid_tracks = {"v3", "v4"}
         valid_risks = {"stable", "edge", "candidate"}
 
         if track not in valid_tracks:
@@ -37,12 +37,12 @@ class HwoConfig(pydantic.BaseModel):
                 f"Invalid channel risk '{risk}'. Must be one of: {sorted(valid_risks)}"
             )
 
-        cls.check_driver_compatibility(track)
+        cls.check_cuda_compatibility_with_dcgm(track)
 
         return value
 
     @staticmethod
-    def check_driver_compatibility(track: str) -> None:
+    def check_cuda_compatibility_with_dcgm(track: str) -> None:
         """Check if the NVIDIA driver is compatible with the selected DCGM track.
 
         v3 is compatible with cuda versions 10, 11 and 12.
@@ -50,7 +50,7 @@ class HwoConfig(pydantic.BaseModel):
         See https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html for
         more details.
         """
-        cuda_version = installed_nvidia_driver_to_cuda()
+        cuda_version = get_cuda_version_from_driver()
 
         if cuda_version == 13 and track == "v3":
             raise ValueError("DCGM v3 is not compatible with NVIDIA driver version 580 or higher.")

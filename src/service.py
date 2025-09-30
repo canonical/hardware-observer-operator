@@ -23,8 +23,8 @@ from config import (
 )
 from hardware import (
     get_bmc_address,
+    get_cuda_version_from_driver,
     get_nvidia_driver_version,
-    installed_nvidia_driver_to_cuda,
     is_nvidia_driver_loaded,
 )
 from hw_tools import APTStrategyABC, DCGMExporterStrategy, SmartCtlExporterStrategy, SnapStrategy
@@ -435,14 +435,17 @@ class DCGMExporter(SnapExporter):
     def channel(self, value):
         if value == "auto":
             self._channel = self._automatic_channel_selection()
-        else:
+        elif "v4" in value:
+            _, risk = value.split("/", 1)
+            self._channel = self._automatic_channel_selection(risk=risk)
+        elif "v3" in value:
             self._channel = value
 
-    def _automatic_channel_selection(self) -> None:
+    # TODO: change the default stable when v4 is released as stable
+    def _automatic_channel_selection(self, risk: str = "edge") -> None:
         """Automatically select the snap channel based on the NVIDIA driver version."""
-        cuda_version = installed_nvidia_driver_to_cuda()
-        # TODO: change to stable when v4 is released as stable
-        return f"v4-cuda{cuda_version}/edge" if cuda_version != 10 else "v3/stable"
+        cuda_version = get_cuda_version_from_driver()
+        return f"v4-cuda{cuda_version}/{risk}" if cuda_version != 10 else "v3/stable"
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
@@ -461,7 +464,7 @@ class DCGMExporter(SnapExporter):
                 "The NVIDIA driver isn't installed or loaded. See more details in the logs",
             )
 
-        cuda_version = installed_nvidia_driver_to_cuda()
+        cuda_version = get_cuda_version_from_driver()
         driver_version = get_nvidia_driver_version()
         track, *_ = self.config["dcgm-snap-channel"].split("/", 1)
 
@@ -474,14 +477,14 @@ class DCGMExporter(SnapExporter):
         recommended_channel = self._automatic_channel_selection()
         return (
             False,
-            f"DCGM '{self.snap_client.channel}' does not match with driver {driver_version} and "
-            f"config '{self.config["dcgm-snap-channel"]}'. "
-            f"Recommended channel is '{recommended_channel}'",
+            f"Snap DCGM channel '{self.snap_client.channel}' doesn't match with driver version "
+            f"{driver_version} and dcgm-snap-channel config '{self.config["dcgm-snap-channel"]}'. "
+            f"Recommended channel is: '{recommended_channel}'",
         )
 
     def _v3_compatible(self, cuda_version: int, track: str) -> bool:
         """Check if the installed DCGM snap is v3 compatible."""
-        return "v3" in self.snap_client.channel and cuda_version < 13 and {"v3", "auto"} in track
+        return "v3" in self.snap_client.channel and cuda_version < 13 and track in {"v3", "auto"}
 
     def _v4_compatible(self, cuda_version: int, track: str) -> bool:
         """Check if the installed DCGM snap is v4 compatible."""

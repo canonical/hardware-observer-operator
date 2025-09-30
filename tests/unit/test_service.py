@@ -728,7 +728,7 @@ class TestDCGMSnapExporter(unittest.TestCase):
         self.mock_snap = mock.MagicMock()
         self.mock_snap_cache_cls.return_value.__getitem__.return_value = self.mock_snap
 
-        driver_patcher = mock.patch("service.installed_nvidia_driver_to_cuda")
+        driver_patcher = mock.patch("service.get_cuda_version_from_driver")
         self.nvidia_driver_to_cuda = driver_patcher.start()
         self.nvidia_driver_to_cuda.return_value = 12
         self.addCleanup(driver_patcher.stop)
@@ -748,16 +748,25 @@ class TestDCGMSnapExporter(unittest.TestCase):
         self.assertEqual(self.exporter.hw_tools(), {HWTool.DCGM})
 
     @mock.patch("service.get_nvidia_driver_version", return_value=570)
-    @mock.patch("service.installed_nvidia_driver_to_cuda", return_value=12)
+    @mock.patch("service.get_cuda_version_from_driver", return_value=12)
     @mock.patch("service.is_nvidia_driver_loaded", return_value=True)
-    def test_validate_exporter_configs_success(self, _, mock_driver_to_cuda, mock_driver):
+    def test_validate_exporter_configs_success_v4(self, _, mock_driver_to_cuda, mock_driver):
         type(self.mock_snap).channel = PropertyMock(return_value="v4-cuda12/edge")
         valid, msg = self.exporter.validate_exporter_configs()
         self.assertTrue(valid)
         self.assertEqual(msg, "Exporter config is valid.")
 
+    @mock.patch("service.get_nvidia_driver_version", return_value=500)
+    @mock.patch("service.get_cuda_version_from_driver", return_value=11)
+    @mock.patch("service.is_nvidia_driver_loaded", return_value=True)
+    def test_validate_exporter_configs_success_v3(self, _, mock_driver_to_cuda, mock_driver):
+        type(self.mock_snap).channel = PropertyMock(return_value="v3/stable")
+        valid, msg = self.exporter.validate_exporter_configs()
+        self.assertTrue(valid)
+        self.assertEqual(msg, "Exporter config is valid.")
+
     @mock.patch("service.get_nvidia_driver_version", return_value=570)
-    @mock.patch("service.installed_nvidia_driver_to_cuda", return_value=12)
+    @mock.patch("service.get_cuda_version_from_driver", return_value=12)
     @mock.patch("service.is_nvidia_driver_loaded", return_value=False)
     def test_validate_exporter_configs_fails_driver_not_loaded(
         self, _, mock_driver_to_cuda, mock_driver
@@ -771,7 +780,7 @@ class TestDCGMSnapExporter(unittest.TestCase):
         )
 
     @mock.patch("service.get_nvidia_driver_version", return_value=580)
-    @mock.patch("service.installed_nvidia_driver_to_cuda", return_value=13)
+    @mock.patch("service.get_cuda_version_from_driver", return_value=13)
     @mock.patch("service.is_nvidia_driver_loaded", return_value=True)
     def test_validate_exporter_configs_fails_channel_mismatch(
         self, _, mock_driver_to_cuda, mock_driver
@@ -783,7 +792,9 @@ class TestDCGMSnapExporter(unittest.TestCase):
         type(self.mock_snap).channel = PropertyMock(return_value="v4-cuda12/stable")
         valid, msg = self.exporter.validate_exporter_configs()
         self.assertFalse(valid)
-        self.assertIn("DCGM 'v4-cuda12/stable' does not match with driver 580", msg)
+        self.assertIn(
+            "Snap DCGM channel 'v4-cuda12/stable' doesn't match with driver version 580", msg
+        )
 
     @mock.patch.object(service.BaseExporter, "validate_exporter_configs")
     def test_validate_exporter_configs_fails_parent(self, mock_parent_validate):
@@ -801,8 +812,14 @@ class TestDCGMSnapExporter(unittest.TestCase):
         self.assertEqual(self.exporter._automatic_channel_selection(), "v3/stable")
 
     def test_channel_dcgm_exporter(self):
+        self.nvidia_driver_to_cuda.return_value = 13
         exporter = service.DCGMExporter({"dcgm-snap-channel": "v4-cuda13/edge"})
         self.assertEqual(exporter.channel, "v4-cuda13/edge")
+
+    def test_channel_dcgm_exporter_v3(self):
+        self.nvidia_driver_to_cuda.return_value = 11
+        exporter = service.DCGMExporter({"dcgm-snap-channel": "v3/edge"})
+        self.assertEqual(exporter.channel, "v3/edge")
 
 
 class TestWriteToFile(unittest.TestCase):

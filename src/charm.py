@@ -15,7 +15,7 @@ from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
 from hw_tools import HWTool, HWToolHelper, detect_available_tools, remove_legacy_smartctl_exporter
-from literals import HwoConfig
+from literals import HWObserverConfig
 from service import BaseExporter, DCGMExporter, ExporterError, HardwareExporter, SmartCtlExporter
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class HardwareObserverCharm(ops.CharmBase):
         self.num_cos_agent_relations = self.get_num_cos_agent_relations("cos-agent")
 
         try:
-            self.typed_config = self.load_config(HwoConfig)
+            self.typed_config = self.load_config(HWObserverConfig)
         except ValueError as e:
             logger.error("Invalid dcgm-snap-channel config: %s", e)
             self.model.unit.status = ops.BlockedStatus(str(e))

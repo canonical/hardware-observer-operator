@@ -13,6 +13,7 @@ from config import HWTool
 
 logger = logging.getLogger(__name__)
 
+# File path that contains the NVIDIA driver that is loaded and its version
 NVIDIA_DRIVER_PATH = Path("/proc/driver/nvidia/version")
 
 
@@ -125,7 +126,7 @@ def get_nvidia_driver_version() -> int:
         raise
 
 
-def installed_nvidia_driver_to_cuda() -> int:
+def get_cuda_version_from_driver() -> int:
     """Map the installed NVIDIA driver version to CUDA version."""
     driver_version = get_nvidia_driver_version()
 

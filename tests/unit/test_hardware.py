@@ -6,9 +6,9 @@ import pytest
 
 from hardware import (
     get_bmc_address,
+    get_cuda_version_from_driver,
     get_nvidia_driver_version,
     hwinfo,
-    installed_nvidia_driver_to_cuda,
     is_nvidia_driver_loaded,
     lshw,
 )
@@ -220,6 +220,6 @@ def test_get_nvidia_driver_version_file_not_found(mock_driver_path):
     ],
 )
 @mock.patch("hardware.get_nvidia_driver_version")
-def test_installed_nvidia_driver_to_cuda(mock_nvidia_driver, driver_version, expected):
+def test_get_cuda_version_from_driver(mock_nvidia_driver, driver_version, expected):
     mock_nvidia_driver.return_value = driver_version
-    assert installed_nvidia_driver_to_cuda() == expected
+    assert get_cuda_version_from_driver() == expected
