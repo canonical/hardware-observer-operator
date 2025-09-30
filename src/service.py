@@ -475,10 +475,11 @@ class DCGMExporter(SnapExporter):
             return valid, msg
 
         recommended_channel = self._automatic_channel_selection()
+        dcgm_snap_channel = self.config["dcgm-snap-channel"]
         return (
             False,
             f"Snap DCGM channel '{self.snap_client.channel}' doesn't match with driver version "
-            f"{driver_version} and dcgm-snap-channel config '{self.config["dcgm-snap-channel"]}'. "
+            f"{driver_version} and dcgm-snap-channel config '{dcgm_snap_channel}'. "
             f"Recommended channel is: '{recommended_channel}'",
         )
 
