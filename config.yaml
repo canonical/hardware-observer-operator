@@ -19,11 +19,11 @@ options:
     type: string
     default: "auto"
     description: |
-      Valid inputs are "auto", v3/stable, v3/candidate, v3/edge, v4/stable, v4/candidate, v4/edge.
+      Valid inputs are auto, v3/stable, v3/candidate, v3/edge, v4/stable, v4/candidate, v4/edge.
 
       When set to auto, the charm automatically checks the installed NVIDIA driver version and
       selects the most appropriate channel. For example, with driver 580, it will install from
-      v4-cuda13/stable.
+      v4-cuda13/stable. The charm won't block if the driver is not installed or loaded.
 
       The v3 channels are compatible with CUDA 10, 11, and 12; you simply choose the desired
       release risk (stable, candidate, or edge).
