@@ -28,6 +28,7 @@ from hardware import (
     is_nvidia_driver_loaded,
 )
 from hw_tools import APTStrategyABC, DCGMExporterStrategy, SmartCtlExporterStrategy, SnapStrategy
+from literals import HWObserverConfig
 
 logger = getLogger(__name__)
 
@@ -420,10 +421,10 @@ class DCGMExporter(SnapExporter):
     exporter_name: str = "dcgm"
     port: int = 9400
 
-    def __init__(self, config: ConfigData) -> None:
+    def __init__(self, config: HWObserverConfig) -> None:
         """Init."""
         self.config = config
-        self.channel = str(self.config["dcgm-snap-channel"])
+        self.channel = self.config.dcgm_snap_channel
         self.strategies = [DCGMExporterStrategy(self.channel)]
         super().__init__(config)
 
@@ -466,7 +467,7 @@ class DCGMExporter(SnapExporter):
 
         cuda_version = get_cuda_version_from_driver()
         driver_version = get_nvidia_driver_version()
-        track, *_ = self.config["dcgm-snap-channel"].split("/", 1)
+        track, *_ = self.config.dcgm_snap_channel.split("/", 1)
 
         if self._v3_compatible(cuda_version, track):
             return valid, msg
@@ -475,7 +476,7 @@ class DCGMExporter(SnapExporter):
             return valid, msg
 
         recommended_channel = self._automatic_channel_selection()
-        dcgm_snap_channel = self.config["dcgm-snap-channel"]
+        dcgm_snap_channel = self.config.dcgm_snap_channel
         return (
             False,
             f"Snap DCGM channel '{self.snap_client.channel}' doesn't match with driver version "

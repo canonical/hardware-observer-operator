@@ -15,6 +15,7 @@ from redfish.rest.v1 import InvalidCredentialsError
 
 import service
 from config import HARDWARE_EXPORTER_SETTINGS, HWTool
+from literals import HWObserverConfig
 
 
 class TestRenderableExporter(unittest.TestCase):
@@ -721,6 +722,7 @@ class TestDCGMSnapExporter(unittest.TestCase):
 
     def setUp(self) -> None:
         """Set up harness for each test case."""
+        typed_config = HWObserverConfig(dcgm_snap_channel="auto")
         snap_cache_patcher = mock.patch("service.snap.SnapCache", autospec=True)
         self.mock_snap_cache_cls = snap_cache_patcher.start()
         self.addCleanup(snap_cache_patcher.stop)
@@ -733,11 +735,7 @@ class TestDCGMSnapExporter(unittest.TestCase):
         self.nvidia_driver_to_cuda.return_value = 12
         self.addCleanup(driver_patcher.stop)
 
-        self.exporter = service.DCGMExporter(
-            {
-                "dcgm-snap-channel": "auto",
-            }
-        )
+        self.exporter = service.DCGMExporter(typed_config)
         self.snap_strategy = mock.MagicMock(spec=service.DCGMExporterStrategy)
         self.exporter.strategies = [self.snap_strategy]
 
@@ -813,12 +811,14 @@ class TestDCGMSnapExporter(unittest.TestCase):
 
     def test_channel_dcgm_exporter(self):
         self.nvidia_driver_to_cuda.return_value = 13
-        exporter = service.DCGMExporter({"dcgm-snap-channel": "v4-cuda13/edge"})
+        typed_config = HWObserverConfig(dcgm_snap_channel="v4/edge")
+        exporter = service.DCGMExporter(typed_config)
         self.assertEqual(exporter.channel, "v4-cuda13/edge")
 
     def test_channel_dcgm_exporter_v3(self):
         self.nvidia_driver_to_cuda.return_value = 11
-        exporter = service.DCGMExporter({"dcgm-snap-channel": "v3/edge"})
+        typed_config = HWObserverConfig(dcgm_snap_channel="v3/edge")
+        exporter = service.DCGMExporter(typed_config)
         self.assertEqual(exporter.channel, "v3/edge")
 
 

@@ -121,9 +121,10 @@ def get_nvidia_driver_version() -> int:
         match = re.search(r"NVRM version:.*?(\d+\.\d+(?:\.\d+)*)", nvidia_driver_version)
         if match:
             return int(match.group(1).split(".")[0])
-    except FileNotFoundError:
-        logger.error("NVIDIA driver version file not found.")
-        raise
+    except FileNotFoundError as e:
+        msg = "NVIDIA driver version file not found."
+        logger.error(msg)
+        raise FileNotFoundError(msg) from e
 
 
 def get_cuda_version_from_driver() -> int:

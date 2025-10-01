@@ -37,6 +37,12 @@ class HardwareObserverCharm(ops.CharmBase):
         super().__init__(*args)
         self.hw_tool_helper = HWToolHelper()
 
+        try:
+            self.typed_config = self.load_config(HWObserverConfig)
+        except ValueError as e:
+            logger.error("Invalid dcgm-snap-channel config: %s", e)
+            self.model.unit.status = ops.BlockedStatus(str(e))
+
         self._stored.set_default(
             # resource_installed is a flag that tracks the installation state for
             # the juju resources and also the different exporters
@@ -70,12 +76,6 @@ class HardwareObserverCharm(ops.CharmBase):
 
         self.num_cos_agent_relations = self.get_num_cos_agent_relations("cos-agent")
 
-        try:
-            self.typed_config = self.load_config(HWObserverConfig)
-        except ValueError as e:
-            logger.error("Invalid dcgm-snap-channel config: %s", e)
-            self.model.unit.status = ops.BlockedStatus(str(e))
-
     @property
     def exporters(self) -> List[BaseExporter]:
         """Return list of exporters based on detected hardware."""
@@ -94,7 +94,7 @@ class HardwareObserverCharm(ops.CharmBase):
             exporters.append(SmartCtlExporter(self.model.config))
 
         if stored_tools & DCGMExporter.hw_tools():
-            exporters.append(DCGMExporter(self.model.config))
+            exporters.append(DCGMExporter(self.typed_config))
 
         return exporters
 

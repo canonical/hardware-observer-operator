@@ -6,6 +6,7 @@ import pydantic
 from hardware import get_cuda_version_from_driver
 
 
+# TODO: Add more charm configuration options. See #468
 class HWObserverConfig(pydantic.BaseModel):
     class Config:
         """Pydantic config."""

@@ -300,8 +300,8 @@ class SnapStrategy(StrategyABC):
                 for service in snap.SnapCache()[self.snap_name].services.values()
             ):
                 return True
-            if attempt < retries:
-                time.sleep(delay * attempt)
+
+            time.sleep(delay * attempt)
 
         return False
 

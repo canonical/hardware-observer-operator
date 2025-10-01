@@ -827,7 +827,7 @@ class TestCharm(unittest.TestCase):
         config = self.harness.charm.model.config
         hw_exporter = HardwareExporter(Path(), config, set())
         smartctl_exporter = SmartCtlExporter(config)
-        dcgm_exporter = DCGMExporter(config)
+        dcgm_exporter = DCGMExporter(self.harness.charm.typed_config)
 
         mock_exporters.return_value = [hw_exporter, smartctl_exporter, dcgm_exporter]
 
@@ -876,7 +876,7 @@ class TestCharm(unittest.TestCase):
         config = self.harness.charm.model.config
         hw_exporter = HardwareExporter(Path(), config, set())
         smartctl_exporter = SmartCtlExporter(config)
-        dcgm_exporter = DCGMExporter(config)
+        dcgm_exporter = DCGMExporter(self.harness.charm.typed_config)
 
         mock_exporters.return_value = [hw_exporter, smartctl_exporter, dcgm_exporter]
 
