@@ -809,13 +809,15 @@ class TestDCGMSnapExporter(unittest.TestCase):
         self.nvidia_driver_to_cuda.return_value = 10
         self.assertEqual(self.exporter._automatic_channel_selection(), "v3/stable")
 
-    def test_channel_dcgm_exporter(self):
+    @mock.patch("hardware.get_nvidia_driver_version", return_value=580)
+    def test_channel_dcgm_exporter(self, _):
         self.nvidia_driver_to_cuda.return_value = 13
         typed_config = HWObserverConfig(dcgm_snap_channel="v4/edge")
         exporter = service.DCGMExporter(typed_config)
         self.assertEqual(exporter.channel, "v4-cuda13/edge")
 
-    def test_channel_dcgm_exporter_v3(self):
+    @mock.patch("hardware.get_nvidia_driver_version", return_value=570)
+    def test_channel_dcgm_exporter_v3(self, _):
         self.nvidia_driver_to_cuda.return_value = 11
         typed_config = HWObserverConfig(dcgm_snap_channel="v3/edge")
         exporter = service.DCGMExporter(typed_config)
