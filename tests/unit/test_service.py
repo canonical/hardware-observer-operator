@@ -735,6 +735,9 @@ class TestDCGMSnapExporter(unittest.TestCase):
         self.nvidia_driver_to_cuda.return_value = 12
         self.addCleanup(driver_patcher.stop)
 
+        driver_version_patcher = mock.patch("literals.get_nvidia_driver_version").start()
+        self.addCleanup(driver_version_patcher.stop)
+
         self.exporter = service.DCGMExporter(typed_config)
         self.snap_strategy = mock.MagicMock(spec=service.DCGMExporterStrategy)
         self.exporter.strategies = [self.snap_strategy]
@@ -801,13 +804,15 @@ class TestDCGMSnapExporter(unittest.TestCase):
         self.assertFalse(valid)
         self.assertEqual(msg, "Invalid config: exporter's port")
 
-    def test_automatic_channel_selection_v4(self):
-        self.nvidia_driver_to_cuda.return_value = 12
-        self.assertEqual(self.exporter._automatic_channel_selection(), "v4-cuda12/edge")
+    @mock.patch("service.get_cuda_version_from_driver", return_value=11)
+    def test_automatic_channel_selection_v4(self, _):
+        self.exporter.channel = "auto"  # forces setter again with patched value
+        self.assertEqual(self.exporter.channel, "v4-cuda11/edge")
 
-    def test_automatic_channel_selection_v3(self):
-        self.nvidia_driver_to_cuda.return_value = 10
-        self.assertEqual(self.exporter._automatic_channel_selection(), "v3/stable")
+    @mock.patch("service.get_cuda_version_from_driver", return_value=10)
+    def test_automatic_channel_selection_v3(self, _):
+        self.exporter.channel = "auto"  # forces setter again with patched value
+        self.assertEqual(self.exporter.channel, "v3/stable")
 
     @mock.patch("hardware.get_nvidia_driver_version", return_value=580)
     def test_channel_dcgm_exporter(self, _):

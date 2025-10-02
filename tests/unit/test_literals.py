@@ -15,6 +15,12 @@ def mock_driver_to_cuda():
         yield mock
 
 
+@pytest.fixture(autouse=True)
+def mock_driver_version():
+    with patch("literals.get_nvidia_driver_version") as mock:
+        yield mock
+
+
 @pytest.mark.parametrize("dcgm_config", ["auto"])
 def test_accepts_auto(dcgm_config):
     """Test that 'auto' passes validation without errors."""
@@ -72,4 +78,4 @@ def test_incompatible_v4_with_cuda10(mock_driver_to_cuda):
     mock_driver_to_cuda.return_value = 10
     with pytest.raises(ValidationError) as e:
         HWObserverConfig(dcgm_snap_channel="v4/stable")
-    assert "requires NVIDIA driver version 450 or higher" in str(e.value)
+    assert "not compatible" in str(e.value)

@@ -6,6 +6,7 @@ import re
 import subprocess
 import typing as t
 from pathlib import Path
+from typing import Optional
 
 from charms.operator_libs_linux.v0 import apt
 
@@ -149,3 +150,15 @@ def get_cuda_version_from_driver() -> int:
             driver_version,
         )
         return 10
+
+
+def dcgm_v3_compatible(cuda_version: int, track: str, channel: Optional[str] = None) -> bool:
+    """Check if the installed DCGM snap is v3 compatible."""
+    valid_channel = "v3" in channel if channel is not None else True
+    return valid_channel and cuda_version < 13 and track in {"v3", "auto"}
+
+
+def dcgm_v4_compatible(cuda_version: int, track: str, channel: Optional[str] = None) -> bool:
+    """Check if the installed DCGM snap is v4 compatible."""
+    valid_channel = f"v4-cuda{cuda_version}" in channel if channel is not None else True
+    return valid_channel and cuda_version > 10 and cuda_version <= 13 and track in {"v4", "auto"}
