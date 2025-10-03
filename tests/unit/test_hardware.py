@@ -4,7 +4,14 @@ from unittest import mock
 
 import pytest
 
-from hardware import get_bmc_address, hwinfo, is_nvidia_driver_loaded, lshw
+from hardware import (
+    get_bmc_address,
+    get_cuda_version_from_driver,
+    get_nvidia_driver_version,
+    hwinfo,
+    is_nvidia_driver_loaded,
+    lshw,
+)
 
 
 class TestHwinfo:
@@ -180,3 +187,39 @@ class TestGetBMCAddress(unittest.TestCase):
 def test_is_nvidia_driver_loaded(mock_path, path_exists, expected):
     mock_path.return_value = path_exists
     assert is_nvidia_driver_loaded() == expected
+
+
+@mock.patch("hardware.NVIDIA_DRIVER_PATH")
+def test_get_nvidia_driver_version(mock_driver_path):
+    mock_driver_path.read_text.return_value = (
+        "NVRM version: NVIDIA UNIX x86_64 Kernel Module  570.172.08"
+    )
+    result = get_nvidia_driver_version()
+    assert result == 570
+
+
+@mock.patch("hardware.NVIDIA_DRIVER_PATH")
+def test_get_nvidia_driver_version_file_not_found(mock_driver_path):
+    mock_driver_path.read_text.side_effect = FileNotFoundError
+
+    with pytest.raises(FileNotFoundError):
+        get_nvidia_driver_version()
+
+
+@pytest.mark.parametrize(
+    "driver_version, expected",
+    [
+        (590, 13),
+        (580, 13),
+        (570, 12),
+        (525, 12),
+        (500, 11),
+        (450, 11),
+        (400, 10),
+        (390, 10),
+    ],
+)
+@mock.patch("hardware.get_nvidia_driver_version")
+def test_get_cuda_version_from_driver(mock_nvidia_driver, driver_version, expected):
+    mock_nvidia_driver.return_value = driver_version
+    assert get_cuda_version_from_driver() == expected

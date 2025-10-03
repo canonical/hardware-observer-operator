@@ -15,6 +15,7 @@ from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
 from hw_tools import HWTool, HWToolHelper, detect_available_tools, remove_legacy_smartctl_exporter
+from literals import HWObserverConfig
 from service import BaseExporter, DCGMExporter, ExporterError, HardwareExporter, SmartCtlExporter
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,12 @@ class HardwareObserverCharm(ops.CharmBase):
         """Init."""
         super().__init__(*args)
         self.hw_tool_helper = HWToolHelper()
+
+        try:
+            self.typed_config = self.load_config(HWObserverConfig)
+        except ValueError as e:
+            logger.error("Invalid dcgm-snap-channel config: %s", e)
+            self.model.unit.status = ops.BlockedStatus(str(e))
 
         self._stored.set_default(
             # resource_installed is a flag that tracks the installation state for
@@ -87,7 +94,7 @@ class HardwareObserverCharm(ops.CharmBase):
             exporters.append(SmartCtlExporter(self.model.config))
 
         if stored_tools & DCGMExporter.hw_tools():
-            exporters.append(DCGMExporter(self.model.config))
+            exporters.append(DCGMExporter(self.typed_config))
 
         return exporters
 

@@ -39,6 +39,14 @@ class TestCharm(unittest.TestCase):
         requests_patcher.start()
         self.addCleanup(requests_patcher.stop)
 
+        driver_patcher = mock.patch("literals.get_cuda_version_from_driver").start()
+        driver_patcher.return_value = 12
+        self.addCleanup(driver_patcher.stop)
+
+        driver_patcher_service = mock.patch("service.get_cuda_version_from_driver").start()
+        driver_patcher_service.return_value = 12
+        self.addCleanup(driver_patcher_service.stop)
+
     def _get_notice_count(self, hook):
         """Return the notice count for a given charm hook."""
         notice_count = 0
@@ -817,7 +825,7 @@ class TestCharm(unittest.TestCase):
         config = self.harness.charm.model.config
         hw_exporter = HardwareExporter(Path(), config, set())
         smartctl_exporter = SmartCtlExporter(config)
-        dcgm_exporter = DCGMExporter(config)
+        dcgm_exporter = DCGMExporter(self.harness.charm.typed_config)
 
         mock_exporters.return_value = [hw_exporter, smartctl_exporter, dcgm_exporter]
 
@@ -866,7 +874,7 @@ class TestCharm(unittest.TestCase):
         config = self.harness.charm.model.config
         hw_exporter = HardwareExporter(Path(), config, set())
         smartctl_exporter = SmartCtlExporter(config)
-        dcgm_exporter = DCGMExporter(config)
+        dcgm_exporter = DCGMExporter(self.harness.charm.typed_config)
 
         mock_exporters.return_value = [hw_exporter, smartctl_exporter, dcgm_exporter]
 
@@ -916,3 +924,10 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._set_prometheus_alert_rules()
 
         mock_unlink.assert_called_with(missing_ok=True)
+
+    @mock.patch("service.get_bmc_address")
+    def test_block_wrong_dcgm_config(self, _):
+        self.harness.update_config({"dcgm-snap-channel": "wrong-format"})
+        self.harness.begin()
+        self.assertTrue(isinstance(self.harness.charm.model.unit.status, ops.BlockedStatus))
+        self.assertIn("Channel must be in the form", self.harness.charm.model.unit.status.message)

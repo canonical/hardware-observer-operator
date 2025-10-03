@@ -5,6 +5,7 @@ import pathlib
 import tempfile
 import unittest
 from unittest import mock
+from unittest.mock import PropertyMock
 
 import pytest
 import yaml
@@ -14,6 +15,7 @@ from redfish.rest.v1 import InvalidCredentialsError
 
 import service
 from config import HARDWARE_EXPORTER_SETTINGS, HWTool
+from literals import HWObserverConfig
 
 
 class TestRenderableExporter(unittest.TestCase):
@@ -720,16 +722,23 @@ class TestDCGMSnapExporter(unittest.TestCase):
 
     def setUp(self) -> None:
         """Set up harness for each test case."""
-        snap_lib_patcher = mock.patch.object(service, "snap")
+        typed_config = HWObserverConfig(dcgm_snap_channel="auto")
+        snap_cache_patcher = mock.patch("service.snap.SnapCache", autospec=True)
+        self.mock_snap_cache_cls = snap_cache_patcher.start()
+        self.addCleanup(snap_cache_patcher.stop)
 
-        self.mock_snap = snap_lib_patcher.start()
-        self.addCleanup(snap_lib_patcher.stop)
+        self.mock_snap = mock.MagicMock()
+        self.mock_snap_cache_cls.return_value.__getitem__.return_value = self.mock_snap
 
-        self.exporter = service.DCGMExporter(
-            {
-                "dcgm-snap-channel": "latest/stable",
-            }
-        )
+        driver_patcher = mock.patch("service.get_cuda_version_from_driver")
+        self.nvidia_driver_to_cuda = driver_patcher.start()
+        self.nvidia_driver_to_cuda.return_value = 12
+        self.addCleanup(driver_patcher.stop)
+
+        driver_version_patcher = mock.patch("literals.get_nvidia_driver_version").start()
+        self.addCleanup(driver_version_patcher.stop)
+
+        self.exporter = service.DCGMExporter(typed_config)
         self.snap_strategy = mock.MagicMock(spec=service.DCGMExporterStrategy)
         self.exporter.strategies = [self.snap_strategy]
 
@@ -739,19 +748,53 @@ class TestDCGMSnapExporter(unittest.TestCase):
     def test_hw_tools(self):
         self.assertEqual(self.exporter.hw_tools(), {HWTool.DCGM})
 
+    @mock.patch("service.get_nvidia_driver_version", return_value=570)
+    @mock.patch("service.get_cuda_version_from_driver", return_value=12)
     @mock.patch("service.is_nvidia_driver_loaded", return_value=True)
-    def test_validate_exporter_configs_success(self, _):
+    def test_validate_exporter_configs_success_v4(self, _, mock_driver_to_cuda, mock_driver):
+        type(self.mock_snap).channel = PropertyMock(return_value="v4-cuda12/edge")
         valid, msg = self.exporter.validate_exporter_configs()
         self.assertTrue(valid)
         self.assertEqual(msg, "Exporter config is valid.")
 
+    @mock.patch("service.get_nvidia_driver_version", return_value=500)
+    @mock.patch("service.get_cuda_version_from_driver", return_value=11)
+    @mock.patch("service.is_nvidia_driver_loaded", return_value=True)
+    def test_validate_exporter_configs_success_v3(self, _, mock_driver_to_cuda, mock_driver):
+        type(self.mock_snap).channel = PropertyMock(return_value="v3/stable")
+        valid, msg = self.exporter.validate_exporter_configs()
+        self.assertTrue(valid)
+        self.assertEqual(msg, "Exporter config is valid.")
+
+    @mock.patch("service.get_nvidia_driver_version", return_value=570)
+    @mock.patch("service.get_cuda_version_from_driver", return_value=12)
     @mock.patch("service.is_nvidia_driver_loaded", return_value=False)
-    def test_validate_exporter_configs_fails(self, _):
+    def test_validate_exporter_configs_fails_driver_not_loaded(
+        self, _, mock_driver_to_cuda, mock_driver
+    ):
+        type(self.mock_snap).channel = PropertyMock(return_value="v4-cuda12/edge")
         valid, msg = self.exporter.validate_exporter_configs()
         self.assertFalse(valid)
         self.assertEqual(
             msg,
             "The NVIDIA driver isn't installed or loaded. See more details in the logs",
+        )
+
+    @mock.patch("service.get_nvidia_driver_version", return_value=580)
+    @mock.patch("service.get_cuda_version_from_driver", return_value=13)
+    @mock.patch("service.is_nvidia_driver_loaded", return_value=True)
+    def test_validate_exporter_configs_fails_channel_mismatch(
+        self, _, mock_driver_to_cuda, mock_driver
+    ):
+        """Fails when the snap channel is not compatible with the driver.
+
+        This can happens if user manually upgrade the driver in the system.
+        """
+        type(self.mock_snap).channel = PropertyMock(return_value="v4-cuda12/stable")
+        valid, msg = self.exporter.validate_exporter_configs()
+        self.assertFalse(valid)
+        self.assertIn(
+            "Snap DCGM channel 'v4-cuda12/stable' doesn't match with driver version 580", msg
         )
 
     @mock.patch.object(service.BaseExporter, "validate_exporter_configs")
@@ -760,6 +803,30 @@ class TestDCGMSnapExporter(unittest.TestCase):
         valid, msg = self.exporter.validate_exporter_configs()
         self.assertFalse(valid)
         self.assertEqual(msg, "Invalid config: exporter's port")
+
+    @mock.patch("service.get_cuda_version_from_driver", return_value=11)
+    def test_automatic_channel_selection_v4(self, _):
+        self.exporter.channel = "auto"  # forces setter again with patched value
+        self.assertEqual(self.exporter.channel, "v4-cuda11/edge")
+
+    @mock.patch("service.get_cuda_version_from_driver", return_value=10)
+    def test_automatic_channel_selection_v3(self, _):
+        self.exporter.channel = "auto"  # forces setter again with patched value
+        self.assertEqual(self.exporter.channel, "v3/stable")
+
+    @mock.patch("hardware.get_nvidia_driver_version", return_value=580)
+    def test_channel_dcgm_exporter(self, _):
+        self.nvidia_driver_to_cuda.return_value = 13
+        typed_config = HWObserverConfig(dcgm_snap_channel="v4/edge")
+        exporter = service.DCGMExporter(typed_config)
+        self.assertEqual(exporter.channel, "v4-cuda13/edge")
+
+    @mock.patch("hardware.get_nvidia_driver_version", return_value=570)
+    def test_channel_dcgm_exporter_v3(self, _):
+        self.nvidia_driver_to_cuda.return_value = 11
+        typed_config = HWObserverConfig(dcgm_snap_channel="v3/edge")
+        exporter = service.DCGMExporter(typed_config)
+        self.assertEqual(exporter.channel, "v3/edge")
 
 
 class TestWriteToFile(unittest.TestCase):
