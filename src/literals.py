@@ -1,6 +1,8 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 """Literals for the charm."""
+import logging
+
 import pydantic
 
 from hardware import (
@@ -9,6 +11,8 @@ from hardware import (
     get_cuda_version_from_driver,
     get_nvidia_driver_version,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # TODO: Add more charm configuration options. See #468
@@ -20,6 +24,9 @@ class HWObserverConfig(pydantic.BaseModel):
 
     dcgm_snap_channel: str = pydantic.Field(
         default="", description="Snap channel for DCGM", alias="dcgm-snap-channel"
+    )
+    redfish_disable: bool = pydantic.Field(
+        default=True, description="Disable Redfish exporter", alias="redfish-disable"
     )
 
     @pydantic.validator("dcgm_snap_channel", pre=True)
@@ -50,4 +57,18 @@ class HWObserverConfig(pydantic.BaseModel):
         ):
             raise ValueError(f"DCGM {track} is not compatible with driver {driver_version}.")
 
+        return value
+
+    @pydantic.validator("redfish_disable", pre=True)
+    @classmethod
+    def validate_redfish_disable(cls, value):
+        """Validate the Redfish disable option.
+
+        Juju already checks for boolean values, but we want to log a warning.
+        """
+        if value is True:
+            logger.warning(
+                "Redfish alert rules are considered experimental and may be changed or removed "
+                "in future releases."
+            )
         return value
