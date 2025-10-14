@@ -31,6 +31,7 @@ from hardware import (
 )
 from hw_tools import APTStrategyABC, DCGMExporterStrategy, SmartCtlExporterStrategy, SnapStrategy
 from literals import HWObserverConfig
+from ssdlc import SSDLCSysEvent, log_ssdlc_system_event
 
 logger = getLogger(__name__)
 
@@ -155,11 +156,13 @@ class RenderableExporter(BaseExporter):
         """Enable and start the exporter service."""
         systemd.service_enable(self.exporter_name)
         systemd.service_start(self.exporter_name)
+        log_ssdlc_system_event(SSDLCSysEvent.STARTUP, self.exporter_name)
 
     def disable_and_stop(self) -> None:
         """Disable and stop the exporter service."""
         systemd.service_disable(self.exporter_name)
         systemd.service_stop(self.exporter_name)
+        log_ssdlc_system_event(SSDLCSysEvent.SHUTDOWN, self.exporter_name)
 
     def check_active(self) -> bool:
         """Check if the exporter is active or not."""
@@ -248,6 +251,7 @@ class RenderableExporter(BaseExporter):
     def restart(self) -> None:
         """Restart exporter service with retry."""
         logger.info("Restarting exporter - %s", self.exporter_name)
+        log_ssdlc_system_event(SSDLCSysEvent.RESTART, self.exporter_name)
         try:
             for i in range(1, self.settings.health_retry_count + 1):
                 logger.warning("Restarting exporter - %d retry", i)
@@ -258,9 +262,11 @@ class RenderableExporter(BaseExporter):
                     break
             if not self.check_active():
                 logger.error("Failed to restart exporter - %s.", self.exporter_name)
+                log_ssdlc_system_event(SSDLCSysEvent.CRASH, self.exporter_name)
                 raise ExporterError()
         except Exception as err:  # pylint: disable=W0718
             logger.error("Exporter %s crashed unexpectedly: %s", self.exporter_name, err)
+            log_ssdlc_system_event(SSDLCSysEvent.CRASH, self.exporter_name, str(err))
             raise ExporterError() from err
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
@@ -373,14 +379,21 @@ class SnapExporter(BaseExporter):
     def enable_and_start(self) -> None:
         """Enable and start the exporter services."""
         self.snap_client.start(list(self.snap_client.services.keys()), enable=True)
+        log_ssdlc_system_event(SSDLCSysEvent.STARTUP, self.exporter_name)
 
     def disable_and_stop(self) -> None:
         """Disable and stop the services."""
         self.snap_client.stop(list(self.snap_client.services.keys()), disable=True)
+        log_ssdlc_system_event(SSDLCSysEvent.SHUTDOWN, self.exporter_name)
 
     def restart(self) -> None:
         """Restart the exporter daemon."""
-        self.snap_client.restart(reload=True)
+        log_ssdlc_system_event(SSDLCSysEvent.RESTART, self.exporter_name)
+        try:
+            self.snap_client.restart(reload=True)
+        except Exception as err:
+            log_ssdlc_system_event(SSDLCSysEvent.CRASH, self.exporter_name, str(err))
+            raise
 
     def set(self, snap_config: dict) -> bool:
         """Set config options for the snap service.
