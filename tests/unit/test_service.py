@@ -192,17 +192,21 @@ class TestRenderableExporter(unittest.TestCase):
             mock_unlink.assert_called()
             self.mock_systemd.daemon_reload.assert_not_called()
 
-    def test_enable_and_start(self):
+    @mock.patch("service.log_ssdlc_system_event")
+    def test_enable_and_start(self, mock_ssdlc_log):
         """Test exporter enable and start behavior."""
         self.exporter.enable_and_start()
         self.mock_systemd.service_enable.assert_called_once()
         self.mock_systemd.service_start.assert_called_once()
+        mock_ssdlc_log.assert_called_once()
 
-    def test_disable_and_stop(self):
+    @mock.patch("service.log_ssdlc_system_event")
+    def test_disable_and_stop(self, mock_ssdlc_log):
         """Test exporter disable and stop behavior."""
         self.exporter.disable_and_stop()
         self.mock_systemd.service_disable.assert_called_once()
         self.mock_systemd.service_stop.assert_called_once()
+        mock_ssdlc_log.assert_called_once()
 
     def test_validate_exporter_config_okay(self):
         self.exporter.port = 10000
@@ -378,8 +382,9 @@ class TestRenderableExporter(unittest.TestCase):
             ("exception", [Exception("Some error"), Exception("Some error")]),
         ]
     )
+    @mock.patch("service.log_ssdlc_system_event")
     @mock.patch("service.sleep")
-    def test_restart(self, _, check_active_results, mock_sleep):
+    def test_restart(self, _, check_active_results, mock_sleep, mock_ssdlc_log):
         # Mocking necessary methods and attributes
         self.exporter.settings.health_retry_count = 3
         self.exporter.settings.health_retry_timeout = 1
@@ -391,8 +396,12 @@ class TestRenderableExporter(unittest.TestCase):
         if isinstance(check_active_results[-1], Exception) or check_active_results[-1] is False:
             with self.assertRaises(service.ExporterError):
                 self.exporter.restart()
+            # Verify SSDLC logging for crash
+            self.assertGreaterEqual(mock_ssdlc_log.call_count, 2)  # RESTART + CRASH
         else:
             self.exporter.restart()
+            # Verify SSDLC logging for restart
+            mock_ssdlc_log.assert_called_once()
 
         # Assert that the methods are called as expected
         if isinstance(check_active_results[-1], Exception):
@@ -996,19 +1005,37 @@ def test_snap_exporter_uninstall_present(snap_exporter):
         strategy.remove.assert_called_once()
 
 
-def test_snap_exporter_enable_and_start(snap_exporter):
+@mock.patch("service.log_ssdlc_system_event")
+def test_snap_exporter_enable_and_start(mock_ssdlc_log, snap_exporter):
     snap_exporter.enable_and_start()
     snap_exporter.snap_client.start.assert_called_once_with(["service1", "service2"], enable=True)
+    mock_ssdlc_log.assert_called_once()
 
 
-def test_snap_exporter_disable_and_stop(snap_exporter):
+@mock.patch("service.log_ssdlc_system_event")
+def test_snap_exporter_disable_and_stop(mock_ssdlc_log, snap_exporter):
     snap_exporter.disable_and_stop()
     snap_exporter.snap_client.stop.assert_called_once_with(["service1", "service2"], disable=True)
+    mock_ssdlc_log.assert_called_once()
 
 
-def test_snap_exporter_restart(snap_exporter):
+@mock.patch("service.log_ssdlc_system_event")
+def test_snap_exporter_restart(mock_ssdlc_log, snap_exporter):
     snap_exporter.restart()
     snap_exporter.snap_client.restart.assert_called_once_with(reload=True)
+    mock_ssdlc_log.assert_called_once()
+
+
+@mock.patch("service.log_ssdlc_system_event")
+def test_snap_exporter_restart_exception(mock_ssdlc_log, snap_exporter):
+    """Test that SSDLC logs crash event when restart raises exception."""
+    snap_exporter.snap_client.restart.side_effect = Exception("Restart failed")
+
+    with pytest.raises(Exception):
+        snap_exporter.restart()
+
+    # Verify crash event was logged
+    assert mock_ssdlc_log.call_count == 2  # RESTART + CRASH
 
 
 def test_snap_exporter_set(snap_exporter):
