@@ -13,6 +13,56 @@ hardware resources like RAID cards and BMC management tools.
 A juju controller. You can find what is juju and how to deploy it [here](https://juju.is/docs/juju)
 
 
+## DCGM prerequisites
+In order to test DCGM, it's necessary to have a machine with NVIDIA GPU. If using testflinger, there are the following machines that can be used:
+- nvidia-dgx-station-c25989 -> [NVIDIA Tesla V100](https://www.nvidia.com/en-gb/data-center/tesla-v100/)
+- swob -> [NVIDIA L40S](https://www.nvidia.com/en-us/data-center/l40s/)
+- plok -> [NVIDIA L40S](https://www.nvidia.com/en-us/data-center/l40s/)
+
+It's recommended to install the drivers before installing hardware observer and this can be achieved by running:
+
+```shell
+sudo apt install nvidia-driver-<VERSION>-server
+```
+
+It might be necessary to reboot the machine in order to have the NVIDIA drivers modules loaded.
+
+You can check if the installation was successful by running:
+
+```shell
+nvidia-smi
+```
+
+The output should look like this:
+```
+nvidia-smi
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 570.172.08             Driver Version: 570.172.08     CUDA Version: 12.8     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 3050 ...    Off |   00000000:01:00.0  On |                  N/A |
+| N/A   45C    P8              7W /   60W |      60MiB /   4096MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A           11418      G   /usr/bin/gnome-shell                     41MiB |
++-----------------------------------------------------------------------------------------+
+```
+
+If for some reason you forget to install the drivers before hardware-observer, you can run the following juju action:
+
+```
+juju run hardware-observer/0 redetect-hardware apply=true
+```
+
 ## Set up juju and lxd and deploy hardware-observer
 First, you need to bootstrap a Juju controller on a machine. For simplicity and convenience in this guide, we will use a default LXD controller. It's important to note that you can use any machine within the same network as the one you plan to deploy the hardware-observer on to serve as a controller. However, since we are utilizing only one physical machine in this setup, we will bootstrap an LXD controller on it.
 
