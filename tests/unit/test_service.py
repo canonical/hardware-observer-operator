@@ -816,7 +816,7 @@ class TestDCGMSnapExporter(unittest.TestCase):
     @mock.patch("service.get_cuda_version_from_driver", return_value=11)
     def test_automatic_channel_selection_v4(self, _):
         self.exporter.channel = "auto"  # forces setter again with patched value
-        self.assertEqual(self.exporter.channel, "v4-cuda11/edge")
+        self.assertEqual(self.exporter.channel, "v4-cuda11/stable")
 
     @mock.patch("service.get_cuda_version_from_driver", return_value=10)
     def test_automatic_channel_selection_v3(self, _):

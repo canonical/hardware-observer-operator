@@ -458,11 +458,10 @@ class DCGMExporter(SnapExporter):
         elif "v3" in value:
             self._channel = value
 
-    # TODO: change the default stable when v4 is released as stable
     def _automatic_channel_selection(self, cuda_version: str) -> str:
         """Automatically select the snap channel based on the NVIDIA driver version."""
         if cuda_version >= 11 and cuda_version <= 13:
-            return f"v4-cuda{cuda_version}/edge"
+            return f"v4-cuda{cuda_version}/stable"
         if cuda_version < 11:
             return "v3/stable"
 
