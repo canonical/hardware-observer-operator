@@ -55,12 +55,6 @@ class HardwareObserverCharm(ops.CharmBase):
         self.framework.observe(self.on.remove, self._on_remove)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
-        self.framework.observe(
-            self.on.cos_agent_relation_joined, self._on_cos_agent_relation_joined
-        )
-        self.framework.observe(
-            self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
-        )
         self.framework.observe(self.on.redetect_hardware_action, self._on_redetect_hardware)
 
         # Add refresh_events to COSAgentProvider to update relation data when
@@ -171,6 +165,7 @@ class HardwareObserverCharm(ops.CharmBase):
         # Install exporter services and resources
         for exporter in self.exporters:
             exporter_install_ok = exporter.install()
+
             if not exporter_install_ok:
                 resource_installed = False
                 self._stored.resource_installed = resource_installed
@@ -178,6 +173,9 @@ class HardwareObserverCharm(ops.CharmBase):
                 logger.warning(msg)
                 self.model.unit.status = BlockedStatus(msg)
                 return
+
+            exporter.enable_and_start()
+            logger.info("Enabled and started %s service", exporter.exporter_name)
 
         self._on_update_status(event)
 
@@ -251,44 +249,20 @@ class HardwareObserverCharm(ops.CharmBase):
             event.defer()
             return
 
-        if self.cos_agent_related:
-            success, message = self.validate_configs()
-            if not success:
-                self.model.unit.status = BlockedStatus(message)
-                return
-            for exporter in self.exporters:
-                success = exporter.configure()
-                if success:
-                    exporter.restart()
-                else:
-                    message = (
-                        f"Failed to configure {exporter.exporter_name}, "
-                        "please check if the server is healthy."
-                    )
-                    self.model.unit.status = BlockedStatus(message)
-
-        self._on_update_status(event)
-
-    def _on_cos_agent_relation_joined(self, event: EventBase) -> None:
-        """Enable and start the exporters when relation joined."""
-        if not self._stored.resource_installed:  # type: ignore[truthy-function]
-            logger.info(  # type: ignore[unreachable]
-                "Defer cos-agent relation join because resources are not ready yet."
-            )
-            event.defer()
+        success, message = self.validate_configs()
+        if not success:
+            self.model.unit.status = BlockedStatus(message)
             return
-
         for exporter in self.exporters:
-            exporter.enable_and_start()
-            logger.info("Enabled and started %s service", exporter.exporter_name)
-
-        self._on_update_status(event)
-
-    def _on_cos_agent_relation_departed(self, event: EventBase) -> None:
-        """Remove the exporters when relation departed."""
-        for exporter in self.exporters:
-            exporter.disable_and_stop()
-            logger.info("Disabled and stopped %s service", exporter.exporter_name)
+            success = exporter.configure()
+            if success:
+                exporter.restart()
+            else:
+                message = (
+                    f"Failed to configure {exporter.exporter_name}, "
+                    "please check if the server is healthy."
+                )
+                self.model.unit.status = BlockedStatus(message)
 
         self._on_update_status(event)
 
