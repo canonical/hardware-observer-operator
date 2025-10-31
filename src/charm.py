@@ -165,6 +165,9 @@ class HardwareObserverCharm(ops.CharmBase):
         self._stored.resource_installed = resource_installed
         if not resource_installed:
             logger.warning(msg)
+            # The charm should be in `BlockedStatus` when installation fails because it's still
+            # possible to recover by uploading a new and correct resource. However, in some cases,
+            # the error cannot be recovered.
             self.model.unit.status = BlockedStatus(msg)
             return
 
@@ -172,12 +175,10 @@ class HardwareObserverCharm(ops.CharmBase):
         for exporter in self.exporters:
             exporter_install_ok = exporter.install()
             if not exporter_install_ok:
-                resource_installed = False
-                self._stored.resource_installed = resource_installed
+                self._stored.resource_installed = False
                 msg = f"Exporter {exporter.exporter_name} install failed"
-                logger.warning(msg)
-                self.model.unit.status = BlockedStatus(msg)
-                return
+                logger.error(msg)
+                raise ExporterError(msg)
 
         self._on_update_status(event)
 

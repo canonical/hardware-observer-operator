@@ -10,6 +10,7 @@ from unittest import mock
 
 import ops
 import ops.testing
+import pytest
 from ops.model import ActiveStatus, BlockedStatus
 from parameterized import parameterized
 
@@ -209,10 +210,17 @@ class TestCharm(unittest.TestCase):
             ):
                 mock_exporter.install.return_value = return_val
 
-            if event == "install":
-                self.harness.charm.on.install.emit()
+            if not all(mock_exporter_install_returns):
+                with pytest.raises(ExporterError):
+                    if event == "install":
+                        self.harness.charm.on.install.emit()
+                    else:
+                        self.harness.charm.on.upgrade_charm.emit()
             else:
-                self.harness.charm.on.upgrade_charm.emit()
+                if event == "install":
+                    self.harness.charm.on.install.emit()
+                else:
+                    self.harness.charm.on.upgrade_charm.emit()
 
         self.harness.charm.hw_tool_helper.install.assert_called_with(
             self.harness.charm.model.resources,
