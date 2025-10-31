@@ -145,15 +145,7 @@ async def test_required_resources(ops_test: OpsTest, required_resources):
 @pytest.mark.abort_on_fail
 async def test_cos_agent_relation(ops_test: OpsTest, provided_collectors):
     """Test adding relation with grafana-agent."""
-    check_active_cmd = "systemctl is-active hardware-exporter"
     redfish_present = True if "redfish" in provided_collectors else False
-
-    # Test without cos-agent relation
-    logging.info("Check whether hardware-exporter is inactive before creating relation.")
-    for unit in ops_test.model.applications[APP_NAME].units:
-        results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
-        assert results.get("return-code") > 0
-        assert results.get("stdout").strip() == "inactive"
 
     # Add cos-agent relation
     logging.info("Adding cos-agent relation.")
@@ -170,12 +162,8 @@ async def test_cos_agent_relation(ops_test: OpsTest, provided_collectors):
     )
 
     # Test with cos-agent relation
-    logging.info("Check whether hardware-exporter is active after creating relation.")
+    logging.info("Check whether charm is active after creating relation.")
     for unit in ops_test.model.applications[APP_NAME].units:
-        if provided_collectors:
-            results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
-            assert results.get("return-code") == 0
-            assert results.get("stdout").strip() == "active"
         if redfish_present:
             assert unit.workload_status_message == AppStatus.INVALID_REDFISH_CREDS
         else:
@@ -208,6 +196,16 @@ async def test_redfish_credential_validation(ops_test: OpsTest, provided_collect
 @pytest.mark.realhw
 class TestCharmWithHW:
     """Run functional tests that require specific hardware."""
+
+    async def test_exporter_available(self, ops_test, unit, provided_collectors):
+        """Test if hardware-exporter is installed and ranning on the unit."""
+        if not provided_collectors:
+            pytest.skip("No collectors provided, skipping test")
+
+        check_active_cmd = "systemctl is-active hardware-exporter"
+        results = await run_command_on_unit(ops_test, unit.name, check_active_cmd)
+        assert results.get("return-code") == 0
+        assert results.get("stdout").strip() == "active"
 
     async def test_config_file_permissions(self, unit, ops_test, provided_collectors):
         """Check config file permissions are set correctly."""

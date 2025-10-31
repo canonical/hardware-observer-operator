@@ -353,7 +353,6 @@ class SnapExporter(BaseExporter):
         try:
             for strategy in self.strategies:
                 strategy.install()
-            self.enable_and_start()
             return self.snap_client.present is True
         except Exception as err:  # pylint: disable=broad-except
             logger.error("Failed to install %s: %s", strategy.name, err)
