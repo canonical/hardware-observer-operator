@@ -302,7 +302,6 @@ class TestHWToolHelper(unittest.TestCase):
         return_value=[
             mock.PropertyMock(spec=TPRStrategyABC),
             mock.PropertyMock(spec=APTStrategyABC),
-            mock.PropertyMock(spec=APTStrategyABC),
         ],
         new_callable=mock.PropertyMock,
     )
@@ -312,28 +311,17 @@ class TestHWToolHelper(unittest.TestCase):
         mock_resources = self.harness.charm.model.resources
         mock_strategies.return_value[0].name = HWTool.STORCLI
         mock_strategies.return_value[1].name = HWTool.IPMI_SENSOR
-        mock_strategies.return_value[2].name = HWTool.REDFISH
 
-        mock_strategies.return_value[0].install.side_effect = ResourceFileSizeZeroError(
-            HWTool.STORCLI, "fake-path"
-        )
-        mock_strategies.return_value[1].install.side_effect = OSError("Fake os error")
-        mock_strategies.return_value[2].install.side_effect = apt.PackageError(
+        mock_strategies.return_value[0].install.side_effect = OSError("Fake os error")
+        mock_strategies.return_value[1].install.side_effect = apt.PackageError(
             "Fake apt package error"
         )
-        mock_hw_available = [
-            HWTool.STORCLI,
-            HWTool.IPMI_SENSOR,
-            HWTool.REDFISH,
-        ]
 
-        ok, msg = self.hw_tool_helper.install(mock_resources, mock_hw_available)
+        with pytest.raises(OSError):
+            self.hw_tool_helper.install(mock_resources, [HWTool.STORCLI])
 
-        self.assertFalse(ok)
-        self.assertEqual(
-            f"Fail strategies: {[HWTool.STORCLI, HWTool.IPMI_SENSOR, HWTool.REDFISH]}",
-            msg,
-        )
+        with pytest.raises(apt.PackageError):
+            self.hw_tool_helper.install(mock_resources, [HWTool.IPMI_SENSOR])
 
     @mock.patch("hw_tools.file_is_empty", return_value=True)
     def test_11_check_missing_resources_zero_size_resources(self, file_is_empty):
@@ -388,6 +376,31 @@ class TestHWToolHelper(unittest.TestCase):
         ]
         success, msg = self.hw_tool_helper.check_installed(mock_hw_available)
         self.assertFalse(success)
+
+    @mock.patch(
+        "hw_tools.HWToolHelper.strategies",
+        return_value=[
+            mock.PropertyMock(spec=TPRStrategyABC),
+            mock.PropertyMock(spec=TPRStrategyABC),
+        ],
+        new_callable=mock.PropertyMock,
+    )
+    def test_15_install_strategy_fails(self, mock_strategies):
+        """Catch expected error when execute strategies' install method."""
+        self.harness.add_resource("storcli-deb", "storcli.deb")
+        self.harness.add_resource("perccli-deb", "perccli.deb")
+        mock_resources = self.harness.charm.model.resources
+        mock_strategies.return_value[0].name = HWTool.STORCLI
+        mock_strategies.return_value[1].name = HWTool.PERCCLI
+
+        mock_strategies.return_value[0].install.side_effect = ResourceFileSizeZeroError(
+            HWTool.STORCLI, "fake-path"
+        )
+        mock_strategies.return_value[1].install.side_effect = ResourceChecksumError
+
+        ok, msg = self.hw_tool_helper.install(mock_resources, [HWTool.STORCLI, HWTool.PERCCLI])
+        self.assertFalse(ok)
+        self.assertEqual(msg, f"Fail strategies: {[HWTool.STORCLI, HWTool.PERCCLI]}")
 
 
 class TestStorCLIStrategy(unittest.TestCase):
