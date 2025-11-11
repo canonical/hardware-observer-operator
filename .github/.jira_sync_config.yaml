@@ -16,6 +16,7 @@ settings:
   status_mapping:
     opened: Untriaged
     closed: done
+    not_planned: rejected
 
   # (Optional) Jira project components that should be attached to the created issue
   # Component names are case-sensitive
@@ -26,7 +27,7 @@ settings:
   add_gh_comment: true
 
   # (Optional) (Default: None) Parent Epic key to link the issue to
-  epic_key: SOLENG-190
+  epic_key: SOLENG-46
 
   # (Optional) Dictionary mapping GitHub issue labels to Jira issue types.
   # If label on the issue is not in specified list, this issue will be created as a Bug
