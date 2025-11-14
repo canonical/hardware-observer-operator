@@ -28,12 +28,12 @@ jobs:
         python-version: ['3.8', '3.10', '3.12']
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         submodules: true
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -55,12 +55,12 @@ jobs:
         python-version: ['3.8', '3.10', '3.12']
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         submodules: true
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -90,7 +90,7 @@ jobs:
         fi
 
     - name: Upload Unit Test Coverage File
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         include-hidden-files: true
         if-no-files-found: ignore
@@ -109,7 +109,7 @@ jobs:
       matrix:
         runs-on: [[ubuntu-24.04], [ubuntu-24.04-arm], [self-hosted, linux, s390x],[self-hosted, ppc64el]]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: true
 
@@ -130,7 +130,7 @@ jobs:
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
       - name: Upload the tested charms
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: built_charms_${{ env.SYSTEM_ARCH }}
           path: ./*.charm
@@ -148,7 +148,7 @@ jobs:
         test-command: ['tox -e func -- -v --base ubuntu@20.04 --keep-models', 'tox -e func -- -v --base ubuntu@22.04 --keep-models', 'tox -e func -- -v --base ubuntu@24.04 --keep-models' ]
         juju-channel: ["3.6/stable"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: true
 
@@ -159,7 +159,7 @@ jobs:
           sudo apt install -y gcc
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -223,7 +223,7 @@ jobs:
           fi
 
       - name: Upload Functional Test Coverage Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           include-hidden-files: true
           if-no-files-found: ignore
@@ -261,7 +261,7 @@ jobs:
           done
 
       - name: Upload juju crashdumps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: "juju-crashdumps-${{ env.CRASHDUMPS_ARTEFACT_SUFFIX }}"
@@ -274,7 +274,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     needs: func
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
