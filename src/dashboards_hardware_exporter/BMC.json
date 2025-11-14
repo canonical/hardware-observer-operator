@@ -325,7 +325,10 @@
   "refresh": "",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": [],
+  "tags": [
+    "bmc",
+    "ipmiseld"
+  ],
   "templating": {
     "list": [
       {
@@ -519,9 +522,9 @@
         },
         "definition": "",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "Instance",
-        "multi": false,
+        "multi": true,
         "name": "instance_var",
         "options": [],
         "query": {
@@ -530,7 +533,7 @@
           "stream": "",
           "type": 1
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
@@ -544,7 +547,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "BMC dashboard",
+  "description": "Dashboard for monitoring BMC System Event Logs (SEL) via IPMI.",
+  "title": "BMC Dashboard",
   "uid": "daee7467-cc8f-4484-b7a8-9414708a4df5",
   "version": 1,
   "weekStart": ""
