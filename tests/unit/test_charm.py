@@ -747,13 +747,15 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._stored.stored_tools = {"smartctl"}
         assert self.harness.charm.stored_tools == set()
 
+    @mock.patch("charm.socket.getfqdn", return_value="localhost")
     @mock.patch("service.get_bmc_address")
     @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
-    def test_scrape_config(self, mock_exporters, _):
+    def test_scrape_config(self, mock_exporters, _, __):
         self.harness.begin()
         config = self.harness.charm.model.config
         hw_exporter = HardwareExporter(Path(), config, set())
         smartctl_exporter = SmartCtlExporter(config)
+        labels = {"instance": "localhost"}
         dcgm_exporter = DCGMExporter(self.harness.charm.typed_config)
 
         mock_exporters.return_value = [hw_exporter, smartctl_exporter, dcgm_exporter]
@@ -761,26 +763,39 @@ class TestCharm(unittest.TestCase):
         assert self.harness.charm._scrape_config() == [
             {
                 "metrics_path": "/metrics",
-                "static_configs": [{"targets": ["localhost:10200"]}],
+                "static_configs": [
+                    {
+                        "targets": ["localhost:10200"],
+                        "labels": labels,
+                    }
+                ],
                 "scrape_timeout": "10s",
             },
             {
                 "metrics_path": "/metrics",
-                "static_configs": [{"targets": ["localhost:10201"]}],
+                "static_configs": [
+                    {
+                        "targets": ["localhost:10201"],
+                        "labels": labels,
+                    }
+                ],
                 "scrape_timeout": "10s",
             },
             {
                 "metrics_path": "/metrics",
-                "static_configs": [{"targets": ["localhost:9400"]}],
+                "static_configs": [
+                    {
+                        "targets": ["localhost:9400"],
+                        "labels": labels,
+                    }
+                ],
                 "scrape_timeout": "10s",
             },
         ]
 
+    @mock.patch("charm.socket.getfqdn", return_value="localhost")
     @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
-    def test_scrape_config_no_specific_hardware(
-        self,
-        mock_exporters,
-    ):
+    def test_scrape_config_no_specific_hardware(self, mock_exporters, _):
         # simulate a hardware that does not have NVIDIA or tools to install hw exporter
         self.harness.begin()
         config = self.harness.charm.model.config
@@ -791,7 +806,12 @@ class TestCharm(unittest.TestCase):
         assert self.harness.charm._scrape_config() == [
             {
                 "metrics_path": "/metrics",
-                "static_configs": [{"targets": ["localhost:10201"]}],
+                "static_configs": [
+                    {
+                        "targets": ["localhost:10201"],
+                        "labels": {"instance": "localhost"},
+                    }
+                ],
                 "scrape_timeout": "10s",
             },
         ]
