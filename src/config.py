@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic import BaseModel  # pylint: disable = no-name-in-module
 
 DEFAULT_BIND_ADDRESS = "127.0.0.1"
+DCGM_EXPORTER_PORT = 9400
 
 
 class ExporterSettings(BaseModel):  # pylint: disable = too-few-public-methods
