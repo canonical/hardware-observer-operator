@@ -15,6 +15,7 @@ from redfish import redfish_client
 from redfish.rest.v1 import InvalidCredentialsError
 
 from config import (
+    DCGM_EXPORTER_PORT,
     DEFAULT_BIND_ADDRESS,
     HARDWARE_EXPORTER_COLLECTOR_MAPPING,
     HARDWARE_EXPORTER_SETTINGS,
@@ -353,7 +354,6 @@ class SnapExporter(BaseExporter):
         try:
             for strategy in self.strategies:
                 strategy.install()
-            self.enable_and_start()
             return self.snap_client.present is True
         except Exception as err:  # pylint: disable=broad-except
             logger.error("Failed to install %s: %s", strategy.name, err)
@@ -434,7 +434,7 @@ class DCGMExporter(SnapExporter):
     """A class representing the DCGM exporter and the metric endpoints."""
 
     exporter_name: str = "dcgm"
-    port: int = 9400
+    port: int = DCGM_EXPORTER_PORT
 
     def __init__(self, config: HWObserverConfig) -> None:
         """Init."""

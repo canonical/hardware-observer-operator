@@ -521,22 +521,12 @@ class TestCharm(unittest.TestCase):
             (
                 "happy case",
                 True,
-                True,
                 (True, ""),
                 [mock.MagicMock(), mock.MagicMock()],
                 [(True, ""), (True, "")],
             ),
             (
                 "No resource_installed",
-                False,
-                True,
-                (True, ""),
-                [mock.MagicMock(), mock.MagicMock()],
-                [(True, ""), (True, "")],
-            ),
-            (
-                "No cos_agent_related",
-                True,
                 False,
                 (True, ""),
                 [mock.MagicMock(), mock.MagicMock()],
@@ -545,14 +535,12 @@ class TestCharm(unittest.TestCase):
             (
                 "invalid config",
                 True,
-                True,
                 (False, "invalid msg"),
                 [mock.MagicMock(), mock.MagicMock()],
                 [(True, ""), (True, "")],
             ),
             (
                 "Exporter configure failed",
-                True,
                 True,
                 (True, ""),
                 [mock.MagicMock(), mock.MagicMock()],
@@ -565,7 +553,6 @@ class TestCharm(unittest.TestCase):
         self,
         _,
         resource_installed,
-        cos_agent_related,
         validate_configs_return,
         mock_exporters,
         mock_exporters_configure_returns,
@@ -583,8 +570,6 @@ class TestCharm(unittest.TestCase):
                 return_value=mock_exporters,
             ),
         ):
-            if cos_agent_related:
-                self.harness.add_relation("cos-agent", "grafana-agent")
             self.harness.begin()
             self.harness.charm._stored.resource_installed = resource_installed
             self.harness.charm.validate_configs = mock.MagicMock()
@@ -598,10 +583,6 @@ class TestCharm(unittest.TestCase):
                 self.harness.charm.validate_configs.assert_not_called()
                 self.harness.charm._on_update_status.assert_not_called()
             else:
-                if not cos_agent_related:
-                    self.harness.charm.validate_configs.assert_not_called()
-                    self.harness.charm._on_update_status.assert_called()
-                    return
                 if not validate_configs_return[0]:
                     self.assertEqual(self.harness.charm.unit.status, BlockedStatus("invalid msg"))
                     self.harness.charm.exporters[0].configure.assert_not_called()
@@ -729,58 +710,6 @@ class TestCharm(unittest.TestCase):
 
     @parameterized.expand(
         [
-            ("happy case", True),
-            ("No resource_installed", False),
-        ]
-    )
-    def test_on_relation_joined(self, _, resource_installed):
-        mock_exporters = [mock.MagicMock()]
-        with mock.patch(
-            "charm.HardwareObserverCharm.exporters",
-            new_callable=mock.PropertyMock(
-                return_value=mock_exporters,
-            ),
-        ):
-            self.harness.begin()
-            self.harness.charm._on_update_status = mock.MagicMock()
-            self.harness.charm._stored.resource_installed = resource_installed
-
-            rid = self.harness.add_relation("cos-agent", "grafana-agent")
-            self.harness.add_relation_unit(rid, "grafana-agent/0")
-
-        if not resource_installed:
-            self.harness.charm._on_update_status.assert_not_called()
-            return
-        for mock_exporter in mock_exporters:
-            mock_exporter.enable_and_start.assert_called()
-        self.harness.charm._on_update_status.assert_called()
-
-    @parameterized.expand(
-        [
-            ("happy case", True),
-        ]
-    )
-    def test_relation_departed(self, _, resource_installed):
-        mock_exporters = [mock.MagicMock()]
-        with mock.patch(
-            "charm.HardwareObserverCharm.exporters",
-            new_callable=mock.PropertyMock(
-                return_value=mock_exporters,
-            ),
-        ):
-            self.harness.begin()
-            self.harness.charm._on_update_status = mock.MagicMock()
-
-            rid = self.harness.add_relation("cos-agent", "grafana-agent")
-            self.harness.add_relation_unit(rid, "grafana-agent/0")
-            rid = self.harness.remove_relation(rid)
-
-        for mock_exporter in mock_exporters:
-            mock_exporter.disable_and_stop.assert_called()
-        self.harness.charm._on_update_status.assert_called()
-
-    @parameterized.expand(
-        [
             (
                 "happy case",
                 [10000, 10001],
@@ -826,13 +755,15 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._stored.stored_tools = {"smartctl"}
         assert self.harness.charm.stored_tools == set()
 
+    @mock.patch("charm.socket.getfqdn", return_value="localhost")
     @mock.patch("service.get_bmc_address")
     @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
-    def test_scrape_config(self, mock_exporters, _):
+    def test_scrape_config(self, mock_exporters, _, __):
         self.harness.begin()
         config = self.harness.charm.model.config
         hw_exporter = HardwareExporter(Path(), config, set())
         smartctl_exporter = SmartCtlExporter(config)
+        labels = {"instance": "localhost"}
         dcgm_exporter = DCGMExporter(self.harness.charm.typed_config)
 
         mock_exporters.return_value = [hw_exporter, smartctl_exporter, dcgm_exporter]
@@ -840,26 +771,39 @@ class TestCharm(unittest.TestCase):
         assert self.harness.charm._scrape_config() == [
             {
                 "metrics_path": "/metrics",
-                "static_configs": [{"targets": ["localhost:10200"]}],
+                "static_configs": [
+                    {
+                        "targets": ["localhost:10200"],
+                        "labels": labels,
+                    }
+                ],
                 "scrape_timeout": "10s",
             },
             {
                 "metrics_path": "/metrics",
-                "static_configs": [{"targets": ["localhost:10201"]}],
+                "static_configs": [
+                    {
+                        "targets": ["localhost:10201"],
+                        "labels": labels,
+                    }
+                ],
                 "scrape_timeout": "10s",
             },
             {
                 "metrics_path": "/metrics",
-                "static_configs": [{"targets": ["localhost:9400"]}],
+                "static_configs": [
+                    {
+                        "targets": ["localhost:9400"],
+                        "labels": labels,
+                    }
+                ],
                 "scrape_timeout": "10s",
             },
         ]
 
+    @mock.patch("charm.socket.getfqdn", return_value="localhost")
     @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
-    def test_scrape_config_no_specific_hardware(
-        self,
-        mock_exporters,
-    ):
+    def test_scrape_config_no_specific_hardware(self, mock_exporters, _):
         # simulate a hardware that does not have NVIDIA or tools to install hw exporter
         self.harness.begin()
         config = self.harness.charm.model.config
@@ -870,7 +814,12 @@ class TestCharm(unittest.TestCase):
         assert self.harness.charm._scrape_config() == [
             {
                 "metrics_path": "/metrics",
-                "static_configs": [{"targets": ["localhost:10201"]}],
+                "static_configs": [
+                    {
+                        "targets": ["localhost:10201"],
+                        "labels": {"instance": "localhost"},
+                    }
+                ],
                 "scrape_timeout": "10s",
             },
         ]

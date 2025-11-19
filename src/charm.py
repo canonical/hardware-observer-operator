@@ -6,6 +6,7 @@
 
 import logging
 import shutil
+import socket
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
 
@@ -14,6 +15,7 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops.framework import EventBase, StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
+from config import DCGM_EXPORTER_PORT
 from hw_tools import HWTool, HWToolHelper, detect_available_tools, remove_legacy_smartctl_exporter
 from literals import HWObserverConfig
 from service import BaseExporter, DCGMExporter, ExporterError, HardwareExporter, SmartCtlExporter
@@ -55,12 +57,6 @@ class HardwareObserverCharm(ops.CharmBase):
         self.framework.observe(self.on.remove, self._on_remove)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
-        self.framework.observe(
-            self.on.cos_agent_relation_joined, self._on_cos_agent_relation_joined
-        )
-        self.framework.observe(
-            self.on.cos_agent_relation_departed, self._on_cos_agent_relation_departed
-        )
         self.framework.observe(self.on.redetect_hardware_action, self._on_redetect_hardware)
 
         # Add refresh_events to COSAgentProvider to update relation data when
@@ -174,11 +170,15 @@ class HardwareObserverCharm(ops.CharmBase):
         # Install exporter services and resources
         for exporter in self.exporters:
             exporter_install_ok = exporter.install()
+
             if not exporter_install_ok:
                 self._stored.resource_installed = False
                 msg = f"Exporter {exporter.exporter_name} install failed"
                 logger.error(msg)
                 raise ExporterError(msg)
+
+            exporter.enable_and_start()
+            logger.info("Enabled and started %s service", exporter.exporter_name)
 
         self._on_update_status(event)
 
@@ -252,44 +252,20 @@ class HardwareObserverCharm(ops.CharmBase):
             event.defer()
             return
 
-        if self.cos_agent_related:
-            success, message = self.validate_configs()
-            if not success:
-                self.model.unit.status = BlockedStatus(message)
-                return
-            for exporter in self.exporters:
-                success = exporter.configure()
-                if success:
-                    exporter.restart()
-                else:
-                    message = (
-                        f"Failed to configure {exporter.exporter_name}, "
-                        "please check if the server is healthy."
-                    )
-                    self.model.unit.status = BlockedStatus(message)
-
-        self._on_update_status(event)
-
-    def _on_cos_agent_relation_joined(self, event: EventBase) -> None:
-        """Enable and start the exporters when relation joined."""
-        if not self._stored.resource_installed:  # type: ignore[truthy-function]
-            logger.info(  # type: ignore[unreachable]
-                "Defer cos-agent relation join because resources are not ready yet."
-            )
-            event.defer()
+        success, message = self.validate_configs()
+        if not success:
+            self.model.unit.status = BlockedStatus(message)
             return
-
         for exporter in self.exporters:
-            exporter.enable_and_start()
-            logger.info("Enabled and started %s service", exporter.exporter_name)
-
-        self._on_update_status(event)
-
-    def _on_cos_agent_relation_departed(self, event: EventBase) -> None:
-        """Remove the exporters when relation departed."""
-        for exporter in self.exporters:
-            exporter.disable_and_stop()
-            logger.info("Disabled and stopped %s service", exporter.exporter_name)
+            success = exporter.configure()
+            if success:
+                exporter.restart()
+            else:
+                message = (
+                    f"Failed to configure {exporter.exporter_name}, "
+                    "please check if the server is healthy."
+                )
+                self.model.unit.status = BlockedStatus(message)
 
         self._on_update_status(event)
 
@@ -318,6 +294,7 @@ class HardwareObserverCharm(ops.CharmBase):
         # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration
         scrape_config: List[Dict[str, Any]] = []
         timeout = f"{self.model.config['collect-timeout']}s"
+        labels = {"instance": socket.getfqdn()}
 
         for exporter in self.exporters:
             if isinstance(exporter, HardwareExporter):
@@ -325,7 +302,12 @@ class HardwareObserverCharm(ops.CharmBase):
                 scrape_config.append(
                     {
                         "metrics_path": "/metrics",
-                        "static_configs": [{"targets": [f"localhost:{port}"]}],
+                        "static_configs": [
+                            {
+                                "targets": [f"localhost:{port}"],
+                                "labels": labels,
+                            }
+                        ],
                         "scrape_timeout": timeout,
                     }
                 )
@@ -334,16 +316,26 @@ class HardwareObserverCharm(ops.CharmBase):
                 scrape_config.append(
                     {
                         "metrics_path": "/metrics",
-                        "static_configs": [{"targets": [f"localhost:{port}"]}],
+                        "static_configs": [
+                            {
+                                "targets": [f"localhost:{port}"],
+                                "labels": labels,
+                            }
+                        ],
                         "scrape_timeout": timeout,
                     }
                 )
             if isinstance(exporter, DCGMExporter):
-                port = 9400
+                port = DCGM_EXPORTER_PORT
                 scrape_config.append(
                     {
                         "metrics_path": "/metrics",
-                        "static_configs": [{"targets": [f"localhost:{port}"]}],
+                        "static_configs": [
+                            {
+                                "targets": [f"localhost:{port}"],
+                                "labels": labels,
+                            }
+                        ],
                         "scrape_timeout": timeout,
                     }
                 )
