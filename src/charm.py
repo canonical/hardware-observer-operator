@@ -219,28 +219,17 @@ class HardwareObserverCharm(ops.CharmBase):
             return
 
         # Check health of all exporters
-        exporters_health = [self._check_exporter_health(exporter) for exporter in self.exporters]
+        for exporter in self.exporters:
+            healthy = exporter.check_health()
+            if not healthy:
+                logger.error("Exporter health check failed: %s", exporter.exporter_name)
+                raise RuntimeError(f"Exporter unhealthy: {exporter.exporter_name}")
 
         # If this correction failed, the charm will be set in error status
         self.hw_tool_helper.correct_storelib_log_permissions()
 
-        if all(exporters_health):
-            self.model.unit.status = ActiveStatus("Unit is ready")
-
-    def _check_exporter_health(self, exporter: BaseExporter) -> bool:
-        """Check exporter health."""
-        if not exporter.check_health():
-            logger.warning("%s - Exporter health check failed.", exporter.exporter_name)
-            try:
-                exporter.restart()
-            except ExporterError as e:
-                msg = f"Exporter {exporter.exporter_name} crashed unexpectedly: {e}"
-                logger.error(msg)
-                # Setting the status as blocked instead of error
-                # since other exporters may still be healthy.
-                self.model.unit.status = BlockedStatus(msg)
-                return False
-        return True
+        # If all checks passed, set unit to active
+        self.model.unit.status = ActiveStatus("Unit is ready")
 
     def _on_config_changed(self, event: EventBase) -> None:
         """Reconfigure charm."""

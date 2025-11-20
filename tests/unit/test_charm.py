@@ -15,9 +15,15 @@ from ops.model import ActiveStatus, BlockedStatus
 from parameterized import parameterized
 
 import charm
-from charm import ExporterError, HardwareObserverCharm
+from charm import HardwareObserverCharm
 from config import HWTool
-from service import HARDWARE_EXPORTER_SETTINGS, DCGMExporter, HardwareExporter, SmartCtlExporter
+from service import (
+    HARDWARE_EXPORTER_SETTINGS,
+    DCGMExporter,
+    ExporterError,
+    HardwareExporter,
+    SmartCtlExporter,
+)
 
 
 class TestCharm(unittest.TestCase):
@@ -339,7 +345,6 @@ class TestCharm(unittest.TestCase):
         ):
             mock_exporter.validate_exporter_configs.return_value = config_valid
             mock_exporter.check_health.return_value = health
-            mock_exporter.restart.side_effect = ExporterError
 
         with mock.patch(
             "charm.HardwareObserverCharm.exporters",
@@ -358,7 +363,12 @@ class TestCharm(unittest.TestCase):
                 hw_tool_check_installed
             )
 
-            self.harness.charm.on.update_status.emit()
+            if not all(mock_exporter_healths):
+                with pytest.raises(RuntimeError, match=r"^Exporter unhealthy: .*"):
+                    self.harness.charm.on.update_status.emit()
+                return
+            else:
+                self.harness.charm.on.update_status.emit()
 
         if not resource_installed:
             self.assertEqual(
@@ -401,21 +411,7 @@ class TestCharm(unittest.TestCase):
             )
             return
 
-        if all(mock_exporter_healths):
-            self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
-        else:
-            for mock_exporter, health in zip(
-                mock_exporters,
-                mock_exporter_healths,
-            ):
-                if health:
-                    mock_exporter.restart.assert_not_called()
-                else:
-                    msg = (
-                        f"Exporter {mock_exporter.exporter_name} "
-                        f"crashed unexpectedly: {ExporterError()}"
-                    )
-                    self.assertEqual(self.harness.charm.unit.status, BlockedStatus(msg))
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
 
     @parameterized.expand(
         [
