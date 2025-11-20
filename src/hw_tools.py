@@ -817,14 +817,12 @@ class HWToolHelper:
                     strategy.install()  # pylint: disable=E1120
 
                 logger.info("Strategy %s install success", strategy)
-            except (
-                ResourceFileSizeZeroError,
-                OSError,
-                apt.PackageError,
-                ResourceChecksumError,
-            ) as e:
+            except (ResourceFileSizeZeroError, ResourceChecksumError) as e:
                 logger.warning("Strategy %s install fail: %s", strategy, e)
                 fail_strategies.append(strategy.name)
+            except (OSError, apt.PackageError) as e:
+                logger.error("Strategy %s install fail: %s", strategy, e)
+                raise e
 
         if fail_strategies:
             return False, f"Fail strategies: {fail_strategies}"
