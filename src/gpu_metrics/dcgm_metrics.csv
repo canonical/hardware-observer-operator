@@ -121,6 +121,26 @@ DCGM_FI_PROF_PIPE_FP16_ACTIVE,   gauge, Ratio of cycles the fp16 pipes are activ
 DCGM_FI_PROF_PCIE_TX_BYTES,      gauge, The rate of data transmitted over the PCIe bus - including both protocol headers and data payloads - in bytes per second.
 DCGM_FI_PROF_PCIE_RX_BYTES,      gauge, The rate of data received over the PCIe bus - including both protocol headers and data payloads - in bytes per second.
 
+# Features and modes
+DCGM_FI_DEV_COMPUTE_MODE,            gauge, Compute mode
+DCGM_FI_DEV_PERSISTENCE_MODE,        gauge, Persistance mode (1 or 0)
+DCGM_FI_DEV_CC_MODE,                 gauge, ConfidentialCompute/AmpereProtectedMemory status (1 or 0)
+DCGM_FI_DEV_ECC_CURRENT,             gauge, Current ECC mode
+DCGM_FI_DEV_VIRTUAL_MODE,            gauge, Virtualization mode
+DCGM_FI_DEV_AUTOBOOST,               gauge, Auto-boost enabled
+DCGM_FI_DEV_BAR1_TOTAL,              gauge, Total BAR1 (in MB)
+DCGM_FI_DEV_MAX_SM_CLOCK,            gauge, Maximum supported SM clock
+DCGM_FI_DEV_MAX_MEM_CLOCK,           gauge, Maximum supported Memory clock
+DCGM_FI_DEV_GPU_MAX_OP_TEMP,         gauge, Maximum operating temperature
+DCGM_FI_DEV_SLOWDOWN_TEMP,           gauge, Slowdown temperature
+DCGM_FI_DEV_SHUTDOWN_TEMP,           gauge, Shutdown temperature
+DCGM_FI_DEV_POWER_MGMT_LIMIT,        gauge, Current Power limit
+DCGM_FI_DEV_POWER_MGMT_LIMIT_MIN,    gauge, Minimum Power limit
+DCGM_FI_DEV_POWER_MGMT_LIMIT_MAX,    gauge, Maximum Power limit
+DCGM_FI_DEV_ENFORCED_POWER_LIMIT,    gauge, Effective Power limit that the driver enforces after taking into account all limiters
+DCGM_FI_DEV_FB_TOTAL,                gauge, Total Frame buffer (in MB)
+DCGM_FI_DEV_COUNT,                   gauge, Number of devices on the node
+
 # Static configuration information and features
 DCGM_FI_NVML_VERSION,                label, NVML Version
 DCGM_FI_DEV_BRAND,                   label, Device Brand
@@ -133,28 +153,3 @@ DCGM_FI_DEV_ECC_INFOROM_VER,         label, ECC inforom version
 DCGM_FI_DEV_POWER_INFOROM_VER,       label, Power management object inforom version
 DCGM_FI_DEV_INFOROM_IMAGE_VER,       label, Inforom image version
 DCGM_FI_DEV_VBIOS_VERSION,           label, VBIOS version of the device
-
-DCGM_FI_DEV_COMPUTE_MODE,            label, Compute mode
-DCGM_FI_DEV_PERSISTENCE_MODE,        label, Persistance mode (1 or 0)
-DCGM_FI_DEV_CC_MODE,                 label, ConfidentialCompute/AmpereProtectedMemory status (1 or 0)
-DCGM_FI_DEV_ECC_CURRENT,             label, Current ECC mode
-DCGM_FI_DEV_VIRTUAL_MODE,            label, Virtualization mode
-DCGM_FI_DEV_AUTOBOOST,               label, Auto-boost enabled
-
-DCGM_FI_DEV_BAR1_TOTAL,              label, Total BAR1 (in MB)
-
-DCGM_FI_DEV_MAX_SM_CLOCK,            label, Maximum supported SM clock
-DCGM_FI_DEV_MAX_MEM_CLOCK,           label, Maximum supported Memory clock
-
-DCGM_FI_DEV_GPU_MAX_OP_TEMP,         label, Maximum operating temperature
-DCGM_FI_DEV_SLOWDOWN_TEMP,           label, Slowdown temperature
-DCGM_FI_DEV_SHUTDOWN_TEMP,           label, Shutdown temperature
-
-DCGM_FI_DEV_POWER_MGMT_LIMIT,        label, Current Power limit
-DCGM_FI_DEV_POWER_MGMT_LIMIT_MIN,    label, Minimum Power limit
-DCGM_FI_DEV_POWER_MGMT_LIMIT_MAX,    label, Maximum Power limit
-DCGM_FI_DEV_ENFORCED_POWER_LIMIT,    label, Effective Power limit that the driver enforces after taking into account all limiters
-
-DCGM_FI_DEV_FB_TOTAL,                label, Total Frame buffer (in MB)
-
-DCGM_FI_DEV_COUNT,                   label, Number of devices on the node
