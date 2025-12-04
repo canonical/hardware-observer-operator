@@ -555,7 +555,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device{instance=~\"$instance\"}) by (instance, device, model_name)",
+          "expr": "avg(smartctl_device{instance=~\"$instance\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -563,7 +563,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_temperature{instance=~\"$instance\", temperature_type=\"current\"}) by (instance, device)",
+          "expr": "sum(smartctl_device_temperature{instance=~\"$instance\", temperature_type=\"current\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -571,7 +571,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_smartctl_exit_status{instance=~\"$instance\"}) by (instance, device)",
+          "expr": "avg(smartctl_device_smartctl_exit_status{instance=~\"$instance\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -579,7 +579,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_smart_status{instance=~\"$instance\"}) by (instance, device)",
+          "expr": "sum(smartctl_device_smart_status{instance=~\"$instance\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -587,7 +587,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_power_on_seconds{instance=~\"$instance\"}) by (instance, device)",
+          "expr": "avg(smartctl_device_power_on_seconds{instance=~\"$instance\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -595,7 +595,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_power_cycle_count{instance=~\"$instance\"}) by (instance, device)",
+          "expr": "avg(smartctl_device_power_cycle_count{instance=~\"$instance\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -603,7 +603,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_interface_speed{instance=~\"$instance\", speed_type=\"current\"}) by (instance, device)",
+          "expr": "avg(smartctl_device_interface_speed{instance=~\"$instance\", speed_type=\"current\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -611,7 +611,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_capacity_bytes{instance=~\"$instance\"}) by (instance, device)",
+          "expr": "avg(smartctl_device_capacity_bytes{instance=~\"$instance\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -619,7 +619,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_capacity_blocks{instance=~\"$instance\"}) by (instance, device)",
+          "expr": "avg(smartctl_device_capacity_blocks{instance=~\"$instance\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -627,7 +627,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_block_size{blocks_type=\"logical\", instance=~\"$instance\"}) by (instance, device)",
+          "expr": "avg(smartctl_device_block_size{blocks_type=\"logical\", instance=~\"$instance\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -635,7 +635,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_block_size{blocks_type=\"physical\", instance=~\"$instance\"}) by (instance, device)",
+          "expr": "avg(smartctl_device_block_size{blocks_type=\"physical\", instance=~\"$instance\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -643,7 +643,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_error_log_count{instance=~\"$instance\"}) by (instance, device)",
+          "expr": "avg(smartctl_device_error_log_count{instance=~\"$instance\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
