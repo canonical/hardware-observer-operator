@@ -144,7 +144,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [[ubuntu-24.04], [ubuntu-24.04-arm]]
+        runs-on: [[ubuntu-24.04], [ubuntu-22.04-arm]]
         test-command: ['tox -e func -- -v --base ubuntu@20.04 --keep-models', 'tox -e func -- -v --base ubuntu@22.04 --keep-models', 'tox -e func -- -v --base ubuntu@24.04 --keep-models' ]
         juju-channel: ["3.6/stable"]
     steps:
