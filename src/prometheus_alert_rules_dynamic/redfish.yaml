@@ -71,7 +71,7 @@ groups:
               LABELS = {{ $labels }}
 
       - alert: RedfishStorageDriveHealthNotOk
-        expr: redfish_storage_drive_info{health!~"OK|NA"}
+        expr: redfish_storage_drive_info{health!~"OK|NA", state="Enabled"}
         for: 5m
         labels:
           severity: critical
