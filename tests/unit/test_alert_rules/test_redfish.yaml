@@ -130,7 +130,7 @@ tests:
 
   - interval: 1m
     input_series:
-      - series: redfish_storage_drive_info{instance="ubuntu-1", health="Unhealthy", system_id="s1", storage_id="stor1", drive_id="dr1"}
+      - series: redfish_storage_drive_info{instance="ubuntu-1", health="Unhealthy", system_id="s1", state="Enabled", storage_id="stor1", drive_id="dr1"}
         values: "1x15"
 
     alert_rule_test:
@@ -144,11 +144,13 @@ tests:
               system_id: s1
               storage_id: stor1
               drive_id: dr1
+              state: Enabled
             exp_annotations:
               summary: Redfish storage drive health not OK. (instance ubuntu-1)
               description: |
                 Redfish storage drive health not OK.
-                  LABELS = map[__name__:redfish_storage_drive_info drive_id:dr1 health:Unhealthy instance:ubuntu-1 storage_id:stor1 system_id:s1]
+                  LABELS = map[__name__:redfish_storage_drive_info drive_id:dr1 health:Unhealthy instance:ubuntu-1 state:Enabled storage_id:stor1 system_id:s1]
+
 
   - interval: 1m
     input_series:
