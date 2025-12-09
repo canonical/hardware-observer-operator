@@ -563,7 +563,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_temperature{instance=~\"$instance\", temperature_type=\"current\"}) by (instance, device, serial_number, model_name)",
+          "expr": "avg(smartctl_device_temperature{instance=~\"$instance\", temperature_type=\"current\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -579,7 +579,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(smartctl_device_smart_status{instance=~\"$instance\"}) by (instance, device, serial_number, model_name)",
+          "expr": "avg(smartctl_device_smart_status{instance=~\"$instance\"}) by (instance, device, serial_number, model_name)",
           "range": false,
           "instant": true,
           "format": "table",
@@ -659,7 +659,7 @@
           "id": "filterFieldsByName",
           "options": {
             "include": {
-              "pattern": "(device|model_name|instance|Value\\s.*)"
+              "pattern": "(device|model_name|instance|serial_number|Value\\s.*)"
             }
           }
         },
@@ -675,6 +675,7 @@
               "instance": "Instance",
               "device": "Device",
               "model_name": "Model name",
+              "serial_number": "Serial number",
               "Value #TEMP": "Temperature",
               "Value #EXIT": "Exit status",
               "Value #PASSED": "Passed",
@@ -705,42 +706,6 @@
       "fieldConfig": {
         "defaults": {},
         "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Device"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 70
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Instance"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 320
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Model name"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 220
-              }
-            ]
-          },
           {
             "matcher": {
               "id": "byName",
@@ -840,7 +805,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "smartctl_device_attribute{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"}",
+          "expr": "smartctl_device_attribute{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"}",
           "range": false,
           "instant": true,
           "format": "table",
@@ -858,16 +823,20 @@
             },
             "indexByName": {
               "device": 0,
-              "model_name": 1,
-              "attribute_id": 2,
-              "attribute_name": 3,
-              "attribute_value_type": 4,
-              "attribute_flags_long": 5,
-              "attribute_flags_short": 6,
-              "Value": 7
+              "instance": 1,
+              "model_name": 2,
+              "serial_number": 3,
+              "attribute_id": 4,
+              "attribute_name": 5,
+              "attribute_value_type": 6,
+              "attribute_flags_long": 7,
+              "attribute_flags_short": 8,
+              "Value": 9
             },
             "renameByName": {
               "device": "Device",
+              "instance": "Instance",
+              "serial_number": "Serial number",
               "attribute_flags_long": "Attribute flags (long)",
               "attribute_flags_short": "Attribute flags (short)",
               "attribute_id": "Attribute ID",
@@ -886,6 +855,10 @@
                 "operation": "groupby"
               },
               "Device": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "Serial number": {
                 "aggregations": [],
                 "operation": "groupby"
               },
@@ -966,8 +939,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_temperature{instance=~\"$instance\",temperature_type=\"current\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_temperature{instance=~\"$instance\",temperature_type=\"current\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -1051,8 +1024,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_smartctl_exit_status{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_smartctl_exit_status{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -1136,8 +1109,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_smart_status{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_smart_status{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -1221,8 +1194,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (increase(smartctl_device_power_on_seconds{instance=~\"$instance\"}[1h]) * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (increase(smartctl_device_power_on_seconds{instance=~\"$instance\"}[1h]) * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -1306,8 +1279,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_power_cycle_count{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_power_cycle_count{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -1391,8 +1364,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_percentage_used{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_percentage_used{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -1476,8 +1449,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_nvme_capacity_bytes{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_nvme_capacity_bytes{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -1561,8 +1534,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_num_err_log_entries{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_num_err_log_entries{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -1647,8 +1620,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_media_errors{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_media_errors{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -1733,8 +1706,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_error_log_count{instance=~\"$instance\",error_log_type=\"summary\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_error_log_count{instance=~\"$instance\",error_log_type=\"summary\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -1818,8 +1791,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_critical_warning{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_critical_warning{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -1903,8 +1876,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_interface_speed{instance=~\"$instance\",speed_type=\"current\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_interface_speed{instance=~\"$instance\",speed_type=\"current\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -1988,8 +1961,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_interface_speed{instance=~\"$instance\",speed_type=\"max\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_interface_speed{instance=~\"$instance\",speed_type=\"max\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -2073,8 +2046,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_capacity_bytes{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_capacity_bytes{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -2158,8 +2131,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_capacity_blocks{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_capacity_blocks{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -2243,8 +2216,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_bytes_written{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_bytes_written{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -2328,8 +2301,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_bytes_read{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_bytes_read{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -2413,8 +2386,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_block_size{instance=~\"$instance\",blocks_type=\"logical\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_block_size{instance=~\"$instance\",blocks_type=\"logical\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -2498,8 +2471,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_block_size{instance=~\"$instance\",blocks_type=\"physical\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_block_size{instance=~\"$instance\",blocks_type=\"physical\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -2583,8 +2556,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_available_spare_threshold{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_available_spare_threshold{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
@@ -2669,8 +2642,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (model_name) (smartctl_device_available_spare{instance=~\"$instance\"} * on(device, juju_unit) group_left(model_name) smartctl_device{instance=~\"$instance\"})",
-          "legendFormat": "{{ model_name }}",
+          "expr": "avg by (model_name, serial_number, device, instance) (smartctl_device_available_spare{instance=~\"$instance\"} * on(device) group_left(model_name, serial_number) smartctl_device{instance=~\"$instance\"})",
+          "legendFormat": "{{ device }} ({{ instance }})",
           "range": true,
           "instant": false,
           "format": "time_series",
