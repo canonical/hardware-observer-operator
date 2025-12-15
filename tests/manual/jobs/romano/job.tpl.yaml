@@ -1,0 +1,8 @@
+# job.yaml
+job_queue: romano
+provision_data:
+  distro: <SERIES>
+reserve_data:
+  ssh_keys:
+    - <SSH_IMPORT_ID>
+  timeout: 21600
