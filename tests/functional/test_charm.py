@@ -27,7 +27,7 @@ from utils import (
     run_command_on_unit,
 )
 
-from config import TOOLS_DIR
+from config import DEFAULT_BIND_ADDRESS, TOOLS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +254,7 @@ class TestCharmWithHW:
             config = await get_snap_config(ops_test, unit.name, "smartctl-exporter")
         except SnapConfigError:
             pytest.fail("Not able to obtain smartctl-exporter config!")
-        assert config["web"]["listen-address"] == f":{new_port}"
+        assert config["web"]["listen-address"] == f"{DEFAULT_BIND_ADDRESS}:{new_port}"
 
         await app.reset_config(["smartctl-exporter-port"])
 

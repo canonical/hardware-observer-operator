@@ -27,6 +27,6 @@ juju remove-relation -m hw-obs hardware-observer grafana-agent
 juju config -m hw-obs hardware-observer redfish-disable=true
 
 # Running the tests
-tox -e func -- -v --realhw --model hw-obs --no-deploy  --collectors ipmi_dcmi ipmi_sel ipmi_sensor keep-models
+tox -e func -- -v --realhw --model hw-obs --no-deploy  --collectors ipmi_dcmi ipmi_sel ipmi_sensor --keep-models
 ```
 
