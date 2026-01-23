@@ -1,7 +1,7 @@
 # Test basic deployment:
-# ubuntu:juju-info <-> grafana-agent:juju-info
+# ubuntu:juju-info <-> opentelemetry-collector:juju-info
 # ubuntu:juju-info <-> hardware-observer:general-info
-# grafana-agent:cos-agent <-> hardware-observer:cos-agent
+#opentelemetry-collector:cos-agent <-> hardware-observer:cos-agent
 
 default-base: {{ base }}
 
@@ -14,16 +14,16 @@ applications:
     num_units: 1
     to:
       - "0"
-  grafana-agent:
-    charm: grafana-agent
-    channel: 1/stable
+  opentelemetry-collector:
+    charm: opentelemetry-collector
+    channel: 2/stable
   hardware-observer:
     charm: {{ charm }}
     options:
         redfish-disable: {{ redfish_disable }}
 
 relations:
-- - grafana-agent:juju-info
+- - opentelemetry-collector:juju-info
   - ubuntu:juju-info
 - - hardware-observer:general-info
   - ubuntu:juju-info

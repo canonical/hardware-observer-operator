@@ -10,6 +10,7 @@ Logging these events allows for the identification of unauthorized changes to sy
 such as unapproved restarts or unexpected shutdowns, which may indicate security incidents
 or availability attacks, or changes to security settings.
 """
+
 from datetime import datetime, timezone
 from enum import Enum
 from logging import getLogger

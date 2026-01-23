@@ -2,8 +2,8 @@ variable "machine_model" {
   description = "The machine model name"
 }
 
-variable "grafana_agent_base" {
-  description = "The base for grafana agent"
+variable "opentelemetry_collector_base" {
+  description = "The base for opentelemetry-collector"
 }
 
 variable "ubuntu_name" {

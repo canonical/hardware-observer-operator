@@ -51,7 +51,7 @@ options:
     description: |
       Timeout for collectors' shell commands in seconds. Changing this will also change
       the scrape_timeout config option for prometheus for the cos-agent relation with
-      grafana-agent.
+      opentelemtry-collecter.
       This value is also used for the redfish client's timeout parameter.
       The value of this timeout should not be greater than prometheus scrape_interval (which
       is 60 seconds by default), as it greater would cause the scrape_timeout to be

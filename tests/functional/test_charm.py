@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 PRINCIPAL_APP_NAME = "ubuntu"
-GRAFANA_AGENT_APP_NAME = "grafana-agent"
+OTCOL_APP_NAME = "opentelemetry-collector"
 
 TIMEOUT = 600
 
@@ -85,7 +85,7 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
         timeout=TIMEOUT,
     )
     await ops_test.model.wait_for_idle(
-        apps=[GRAFANA_AGENT_APP_NAME],
+        apps=[OTCOL_APP_NAME],
         status="blocked",
         timeout=TIMEOUT,
     )
@@ -101,8 +101,8 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
         else:
             assert unit.workload_status_message == AppStatus.MISSING_RELATION
 
-    for unit in ops_test.model.applications[GRAFANA_AGENT_APP_NAME].units:
-        messages = ["Missing", "grafana-cloud-config", "logging-consumer", "send-remote-write"]
+    for unit in ops_test.model.applications[OTCOL_APP_NAME].units:
+        messages = ["cloud-config", "send-loki-logs", "send-remote-write"]
         for msg in messages:
             assert msg in unit.workload_status_message
 
@@ -144,16 +144,14 @@ async def test_required_resources(ops_test: OpsTest, required_resources):
 
 @pytest.mark.abort_on_fail
 async def test_cos_agent_relation(ops_test: OpsTest, provided_collectors):
-    """Test adding relation with grafana-agent."""
+    """Test adding relation with Opentelemetry Collector."""
     redfish_present = True if "redfish" in provided_collectors else False
 
     # Add cos-agent relation
     logging.info("Adding cos-agent relation.")
     status = "blocked" if redfish_present else "active"
     await asyncio.gather(
-        ops_test.model.add_relation(
-            f"{APP_NAME}:cos-agent", f"{GRAFANA_AGENT_APP_NAME}:cos-agent"
-        ),
+        ops_test.model.add_relation(f"{APP_NAME}:cos-agent", f"{OTCOL_APP_NAME}:cos-agent"),
         ops_test.model.wait_for_idle(
             apps=[APP_NAME],
             status=status,

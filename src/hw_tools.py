@@ -505,7 +505,7 @@ class IPMISELStrategy(IPMIStrategy):
     The ipmiseld daemon polls the system event log (SEL)
     of specified hosts and stores the logs into the local syslog.
 
-    Grafana agent will then forward the logs to Loki.
+    Opentelemetry Collector will then forward the logs to Loki.
     """
 
     _name = HWTool.IPMI_SEL

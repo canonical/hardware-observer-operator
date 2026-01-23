@@ -18,16 +18,16 @@ dependency "deploy_cos" {
 }
 
 terraform {
-  after_hook "wait-for-grafana-agent" {
+  after_hook "wait-for-opentelemetry-collector" {
     commands     = ["apply"]
-    execute      = [find_in_parent_folders("./scripts/wait-for-application.sh"), "hw-obs", "grafana-agent"]
+    execute      = [find_in_parent_folders("./scripts/wait-for-application.sh"), "hw-obs", "opentelemetry-collector"]
     run_on_error = true
   }
 }
 
 inputs = {
   machine_model                  = "${dependency.add_machine.outputs.machine_model}"
-  grafana_agent_base             = "${dependency.add_machine.outputs.machine_base}"
+  opentelemetry_collector_base   = "${dependency.add_machine.outputs.machine_base}"
   ubuntu_name                    = "${dependency.add_machine.outputs.ubuntu_name}"
   hardware_observer_name         = "${dependency.add_machine.outputs.hardware_observer_name}"
   receive-remote-write-offer-url = "${dependency.deploy_cos.outputs.receive-remote-write-offer-url}"

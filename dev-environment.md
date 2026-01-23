@@ -99,14 +99,14 @@ juju add-machine ssh:ubuntu@$BR0_ADDR
 juju switch hw-obs
 juju deploy ubuntu --to 0
 juju deploy hardware-observer
-juju deploy grafana-agent
+juju deploy opentelemetry-collector --channel 2/stable
 ```
 
 Add necessary relations:
 ```
 juju relate hardware-observer ubuntu
-juju relate grafana-agent ubuntu
-juju relate grafana-agent hardware-observer
+juju relate opentelemetry-collector ubuntu
+juju relate opentelemetry-collector hardware-observer
 ```
 
 
@@ -181,9 +181,9 @@ juju deploy cos-lite --trust --overlay ./offers-overlay.yaml
 Switch back to your physical model and add the relations to COS:
 ```
 juju switch hw-obs
-juju relate grafana-agent k8s-controller:cos.prometheus-receive-remote-write
-juju relate grafana-agent k8s-controller:cos.grafana-dashboards
-juju relate grafana-agent k8s-controller:cos.loki-logging
+juju relate opentelemetry-collector k8s-controller:cos.prometheus-receive-remote-write
+juju relate opentelemetry-collector k8s-controller:cos.grafana-dashboards
+juju relate opentelemetry-collector k8s-controller:cos.loki-logging
 ```
 
 

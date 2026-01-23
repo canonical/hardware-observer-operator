@@ -28,7 +28,7 @@ async def test_setup_and_deploy(base, channel, lxd_ctl, k8s_ctl, lxd_model, k8s_
     await _add_cross_controller_relations(k8s_ctl, lxd_ctl, k8s_model, lxd_model)
 
     # This verifies that the cross-controller relation with COS is successful
-    assert lxd_model.applications["grafana-agent"].status == "active"
+    assert lxd_model.applications["opentelemetry-collector"].status == "active"
 
 
 async def test_alerts(ops_test: OpsTest, lxd_model, k8s_model):
@@ -149,25 +149,25 @@ async def _deploy_cos(channel, ctl, model):
 
 
 async def _deploy_hardware_observer(base, channel, model):
-    """Deploy Hardware Observer and Grafana Agent on the existing lxd cloud."""
+    """Deploy Hardware Observer and Opentelemetry Collector on the existing lxd cloud."""
     await asyncio.gather(
         # Principal Ubuntu
         model.deploy("ubuntu", num_units=1, base=base, channel=channel),
         # Hardware Observer
         model.deploy("hardware-observer", base=base, num_units=0, channel=channel),
-        # Grafana Agent
-        model.deploy("grafana-agent", num_units=0, base=base, channel=channel),
+        # Opentelemetry Collector
+        model.deploy("opentelemetry-collector", num_units=0, base=base, channel=channel),
     )
 
     await model.add_relation("ubuntu:juju-info", "hardware-observer:general-info")
-    await model.add_relation("hardware-observer:cos-agent", "grafana-agent:cos-agent")
-    await model.add_relation("ubuntu:juju-info", "grafana-agent:juju-info")
+    await model.add_relation("hardware-observer:cos-agent", "opentelemetry-collector:cos-agent")
+    await model.add_relation("ubuntu:juju-info", "opentelemetry-collector:juju-info")
 
     await model.block_until(lambda: model.applications["hardware-observer"].status == "active")
 
 
 async def _add_cross_controller_relations(k8s_ctl, lxd_ctl, k8s_model, lxd_model):
-    """Add relations between Grafana Agent and COS."""
+    """Add relations between Opentelemetry Collector and COS."""
     cos_saas_names = ["prometheus-receive-remote-write", "loki-logging", "grafana-dashboards"]
     for saas in cos_saas_names:
         # Using juju cli since Model.consume() from libjuju causes error.
@@ -180,7 +180,7 @@ async def _add_cross_controller_relations(k8s_ctl, lxd_ctl, k8s_model, lxd_model
             f"{k8s_ctl.controller_name}:admin/{k8s_model.name}.{saas}",
         ]
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        await lxd_model.add_relation("grafana-agent", saas),
+        await lxd_model.add_relation("opentelemetry-collector", saas),
 
     # `idle_period` needs to be greater than the scrape interval to make sure metrics ingested.
     await asyncio.gather(

@@ -6,8 +6,8 @@ output "receive-remote-write-offer-url" {
   value = module.cos-lite-terraform.prometheus-receive-remote-write-offer-url
 }
 
-output "grafana-dashboard-offer-url" {
-  value = module.cos-lite-terraform.grafana-dashboard-offer-url
+output "opentelemetry-collector-offer-url" {
+  value = module.cos-lite-terraform.opentelemetry-collector-offer-url
 }
 
 output "loki-logging-offer-url" {

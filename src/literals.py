@@ -1,6 +1,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 """Literals for the charm."""
+
 import logging
 
 import pydantic
