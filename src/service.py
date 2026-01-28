@@ -559,7 +559,7 @@ class HardwareExporter(RenderableExporter):
             LEVEL=self.log_level,
             COLLECT_TIMEOUT=self.collect_timeout,
             COLLECTORS=collectors,
-            REDFISH_ENABLE=HWTool.REDFISH in self.enabled_tools,
+            IPMI_DRIVER_TYPE=self.config["ipmi-driver-type"],
             REDFISH_HOST=self.redfish_conn_params.get("host", ""),
             REDFISH_USERNAME=self.redfish_conn_params.get("username", ""),
             REDFISH_PASSWORD=self.redfish_conn_params.get("password", ""),
@@ -644,7 +644,7 @@ class HardwareExporter(RenderableExporter):
     def redfish_conn_params(self) -> Dict[str, Any]:
         """Get redfish connection parameters."""
         return {
-            "host": f"https://{self.bmc_address}",
+            "host": self.bmc_address,
             "username": self.config["redfish-username"],
             "password": self.config["redfish-password"],
             "timeout": self.config["collect-timeout"],

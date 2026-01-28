@@ -8,9 +8,8 @@ enable_collectors:
   {% endfor %}
 {% endif %}
 
-{% if REDFISH_ENABLE  %}
-redfish_host: "{{ REDFISH_HOST }}"
-redfish_username: "{{ REDFISH_USERNAME }}"
-redfish_password: "{{ REDFISH_PASSWORD }}"
+driver_type: "{{ IPMI_DRIVER_TYPE }}"
+hostname: "{{ REDFISH_HOST }}"
+username: "{{ REDFISH_USERNAME }}"
+password: "{{ REDFISH_PASSWORD }}"
 redfish_client_timeout: "{{ REDFISH_CLIENT_TIMEOUT }}"
-{% endif %}

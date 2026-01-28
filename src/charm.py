@@ -102,7 +102,7 @@ class HardwareObserverCharm(ops.CharmBase):
         """
         if not self._stored.stored_tools:  # type: ignore[truthy-function]
             self._stored.stored_tools = {  # type: ignore[unreachable]
-                tool.value for tool in detect_available_tools()
+                tool.value for tool in detect_available_tools(self.config)
             }
         # remove legacy smartctl tool if present
         # See https://github.com/canonical/hardware-observer-operator/pull/327
@@ -120,7 +120,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_redetect_hardware(self, event: ops.ActionEvent) -> None:
         """Redetect available hardware tools and option to rerun the install hook."""
-        available_tools = detect_available_tools()
+        available_tools = detect_available_tools(self.config)
 
         hw_change_detected = self.stored_tools != available_tools
 
@@ -353,7 +353,7 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.info("Enabling Redfish alert rules.")
             shutil.copy(PROM_RULES_REDFISH, PROM_RULES)
         else:
-            logger.info("Disabling Redfish alert rules.")
+            logger.debug("Disabling Redfish alert rules.")
             PROM_RULES_REDFISH.unlink(missing_ok=True)
 
 
