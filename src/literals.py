@@ -87,3 +87,20 @@ class HWObserverConfig(pydantic.BaseModel):
                 f"Invalid IPMI driver type '{value}'. Must be one of: {sorted(choices)}"
             )
         return driver
+
+    @pydantic.root_validator
+    @classmethod
+    def check_ipmi_redfish_compatibility(cls, values):
+        """Ensure IPMI LAN mode is not used together with Redfish enabled.
+
+        Using IPMI over LAN and Redfish simultaneously may conflict; require
+        that if `ipmi-driver-type` contains 'LAN', then `redfish-disable`
+        must be True.
+        """
+        ipmi = (values.get("ipmi_driver_type") or "").upper()
+        redfish_disabled = values.get("redfish_disable", True)
+
+        if "LAN" in ipmi and redfish_disabled is False:
+            raise ValueError("Cannot use use IPMI over LAN and redfish exporter simultaneously.")
+
+        return values

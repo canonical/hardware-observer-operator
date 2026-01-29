@@ -573,9 +573,9 @@ class TestHardwareExporter(unittest.TestCase):
         self.assertEqual(self.exporter.enabled_tools, expected_result)
         self.assertEqual(self.exporter.available_tools, available_tools)
 
-    def test_get_redfish_conn_params(self):
-        """Test get_redfish_conn_params."""
-        result = self.exporter.redfish_conn_params
+    def test_get_bmc_conn_params(self):
+        """Test get_bmc_conn_params."""
+        result = self.exporter.bmc_conn_params
         expected_result = {
             "host": "https://127.0.0.1",
             "username": "",
@@ -585,7 +585,7 @@ class TestHardwareExporter(unittest.TestCase):
         self.assertEqual(result, expected_result)
 
     @mock.patch(
-        "service.HardwareExporter.redfish_conn_params",
+        "service.HardwareExporter.bmc_conn_params",
         new_callable=mock.PropertyMock,
         return_value={
             "host": "hosta",
@@ -610,7 +610,7 @@ class TestHardwareExporter(unittest.TestCase):
         mock_redfish_client.return_value.logout.assert_called()
 
     @mock.patch(
-        "service.HardwareExporter.redfish_conn_params",
+        "service.HardwareExporter.bmc_conn_params",
         new_callable=mock.PropertyMock,
         return_value={
             "host": "hosta",
@@ -637,7 +637,7 @@ class TestHardwareExporter(unittest.TestCase):
         mock_redfish_client.return_value.login.assert_not_called()
 
     @mock.patch(
-        "service.HardwareExporter.redfish_conn_params",
+        "service.HardwareExporter.bmc_conn_params",
         new_callable=mock.PropertyMock,
         return_value={
             "host": "hosta",
@@ -693,18 +693,18 @@ class TestHardwareExporter(unittest.TestCase):
         ]
     )
     @mock.patch(
-        "service.HardwareExporter.redfish_conn_params",
+        "service.HardwareExporter.bmc_conn_params",
         new_callable=mock.PropertyMock,
     )
     @mock.patch("service.redfish_client")
     def test_redfish_conn_params_valid_failed_missing_credentials(
         self,
         _,
-        redfish_conn_params,
+        bmc_conn_params,
         mock_redfish_client,
-        mock_redfish_conn_params,
+        mock_bmc_conn_params,
     ):
-        mock_redfish_conn_params.return_value = redfish_conn_params
+        mock_bmc_conn_params.return_value = bmc_conn_params
         result = self.exporter.redfish_conn_params_valid()
         self.assertEqual(result, False)
         mock_redfish_client.assert_not_called()

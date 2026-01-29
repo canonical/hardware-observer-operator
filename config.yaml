@@ -60,12 +60,12 @@ options:
     type: string
     default: ""
     description: |
-      BMC username to be used by the redfish or IPMIs collectors.
+      This username is used to log in to the Redfish server and the BMC when IPMI over LAN is enabled.
   redfish-password:
     type: string
     default: ""
     description: |
-      BMC password to be used by the redfish or IPMIs collectors.
+      This password is used to log in to the Redfish server and the BMC when IPMI over LAN is enabled.
   redfish-disable:
     type: boolean
     default: true

@@ -12,7 +12,7 @@ import time
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from string import Template
-from typing import Any, Dict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 import requests
 import urllib3
@@ -48,6 +48,7 @@ from hardware import (
     lshw,
 )
 from keys import HP_KEYS
+from literals import HWObserverConfig
 
 logger = logging.getLogger(__name__)
 
@@ -647,7 +648,7 @@ def redfish_available() -> bool:
     return result
 
 
-def bmc_hw_verifier(config: dict[str, Any]) -> Set[HWTool]:
+def bmc_hw_verifier(config: HWObserverConfig) -> Set[HWTool]:
     """Verify if the ipmi is available on the machine.
 
     Using freeipmi-tools to verify, the package will be removed in removing stage.
@@ -689,7 +690,7 @@ def bmc_hw_verifier(config: dict[str, Any]) -> Set[HWTool]:
     return tools
 
 
-def ipmi_over_lan_args(config: dict[str, any]) -> List[str]:
+def ipmi_over_lan_args(config: HWObserverConfig) -> List[str]:
     """Get IPMI over LAN arguments for ipmitool commands."""
     driver = config.get("ipmi-driver-type", "").upper()
 
@@ -736,7 +737,7 @@ def nvidia_gpu_verifier() -> Set[HWTool]:
     return set()
 
 
-def detect_available_tools(config: dict[str, Any]) -> Set[HWTool]:
+def detect_available_tools(config: HWObserverConfig) -> Set[HWTool]:
     """Return HWTool detected after checking the hardware."""
     return (
         raid_hw_verifier() | bmc_hw_verifier(config) | disk_hw_verifier() | nvidia_gpu_verifier()

@@ -560,10 +560,10 @@ class HardwareExporter(RenderableExporter):
             COLLECT_TIMEOUT=self.collect_timeout,
             COLLECTORS=collectors,
             IPMI_DRIVER_TYPE=self.config["ipmi-driver-type"],
-            REDFISH_HOST=self.redfish_conn_params.get("host", ""),
-            REDFISH_USERNAME=self.redfish_conn_params.get("username", ""),
-            REDFISH_PASSWORD=self.redfish_conn_params.get("password", ""),
-            REDFISH_CLIENT_TIMEOUT=self.redfish_conn_params.get("timeout", ""),
+            HOSTNAME=self.bmc_conn_params.get("hostname", ""),
+            USERNAME=self.bmc_conn_params.get("username", ""),
+            PASSWORD=self.bmc_conn_params.get("password", ""),
+            REDFISH_CLIENT_TIMEOUT=self.bmc_conn_params.get("timeout", ""),
         )
         return content
 
@@ -607,8 +607,7 @@ class HardwareExporter(RenderableExporter):
         parameters are valid, it returns True; if not valid, it returns False.
         """
         if not (
-            self.redfish_conn_params.get("username", "")
-            and self.redfish_conn_params.get("password", "")
+            self.bmc_conn_params.get("username", "") and self.bmc_conn_params.get("password", "")
         ):
             logger.warning("Empty redfish username/password, skip validation.")
             return False
@@ -616,10 +615,10 @@ class HardwareExporter(RenderableExporter):
         redfish_obj = None
         try:
             redfish_obj = redfish_client(
-                base_url=self.redfish_conn_params.get("host", ""),
-                username=self.redfish_conn_params.get("username", ""),
-                password=self.redfish_conn_params.get("password", ""),
-                timeout=self.redfish_conn_params.get(
+                base_url=self.bmc_conn_params.get("hostname", ""),
+                username=self.bmc_conn_params.get("username", ""),
+                password=self.bmc_conn_params.get("password", ""),
+                timeout=self.bmc_conn_params.get(
                     "timeout", self.settings.redfish_timeout  # type: ignore
                 ),
                 max_retry=self.settings.redfish_max_retry,  # type: ignore
@@ -641,10 +640,10 @@ class HardwareExporter(RenderableExporter):
         return result
 
     @property
-    def redfish_conn_params(self) -> Dict[str, Any]:
-        """Get redfish connection parameters."""
+    def bmc_conn_params(self) -> Dict[str, Any]:
+        """Get bmc connection parameters."""
         return {
-            "host": self.bmc_address,
+            "hostname": self.bmc_address,
             "username": self.config["redfish-username"],
             "password": self.config["redfish-password"],
             "timeout": self.config["collect-timeout"],
