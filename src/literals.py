@@ -31,6 +31,12 @@ class HWObserverConfig(pydantic.BaseModel):
     ipmi_driver_type: str = pydantic.Field(
         default="", description="Driver type for IPMI", alias="ipmi-driver-type"
     )
+    redfish_username: str = pydantic.Field(
+        default="", description="Username for Redfish", alias="redfish-username"
+    )
+    redfish_password: str = pydantic.Field(
+        default="", description="Password for Redfish", alias="redfish-password"
+    )
 
     @pydantic.validator("dcgm_snap_channel", pre=True)
     @classmethod

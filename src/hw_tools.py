@@ -682,17 +682,16 @@ def bmc_hw_verifier(config: HWObserverConfig) -> Set[HWTool]:
         logger.info("IPMI DCMI monitoring is not available")
 
     # Check if RedFish is available
-    if config.get("redfish-disable") is False:
-        if redfish_available():
-            tools.add(HWTool.REDFISH)
-        else:
-            logger.info("Redfish is not available")
+    if redfish_available():
+        tools.add(HWTool.REDFISH)
+    else:
+        logger.info("Redfish is not available")
     return tools
 
 
 def ipmi_over_lan_args(config: HWObserverConfig) -> List[str]:
     """Get IPMI over LAN arguments for ipmitool commands."""
-    driver = config.get("ipmi-driver-type", "").upper()
+    driver = config.ipmi_driver_type.upper()
 
     if "LAN" not in driver:
         return []
@@ -701,8 +700,8 @@ def ipmi_over_lan_args(config: HWObserverConfig) -> List[str]:
 
     optional_args = {
         "-h": get_bmc_address(),
-        "-u": config.get("redfish-username", ""),
-        "-p": config.get("redfish-password", ""),
+        "-u": config.redfish_username,
+        "-p": config.redfish_password,
     }
 
     for flag, value in optional_args.items():

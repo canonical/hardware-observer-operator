@@ -354,7 +354,7 @@ class HardwareObserverCharm(ops.CharmBase):
             logger.info("Enabling Redfish alert rules.")
             shutil.copy(PROM_RULES_REDFISH, PROM_RULES)
         else:
-            logger.debug("Disabling Redfish alert rules.")
+            logger.info("Disabling Redfish alert rules.")
             PROM_RULES_REDFISH.unlink(missing_ok=True)
 
 
