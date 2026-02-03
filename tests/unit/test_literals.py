@@ -79,3 +79,17 @@ def test_incompatible_v4_with_cuda10(mock_driver_to_cuda):
     with pytest.raises(ValidationError) as e:
         HWObserverConfig(dcgm_snap_channel="v4/stable")
     assert "not compatible" in str(e.value)
+
+
+def test_invalid_ipmi_driver_type():
+    """Test that invalid ipmi_driver_type raises a ValidationError."""
+    with pytest.raises(ValidationError) as e:
+        HWObserverConfig(ipmi_driver_type="LAN_")
+        assert "Invalid ipmi_driver_type" in str(e.value)
+
+
+def test_mutually_exclusive_ipmi_over_lan_and_redfish_disabled():
+    """Test that ipmi_driver_type can be empty when redfish is disabled."""
+    with pytest.raises(ValidationError) as e:
+        HWObserverConfig(redfish_disable=False, ipmi_driver_type="LAN_2_0")
+        assert "simultaneously" in str(e.value)

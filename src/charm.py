@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent
 PROM_RULES = BASE_DIR / "prometheus_alert_rules"
 PROM_RULES_DYNAMIC = BASE_DIR / "prometheus_alert_rules_dynamic"
-PROM_RULES_REDFISH = PROM_RULES / "redfish.yaml"
+PROM_RULES_REDFISH = PROM_RULES_DYNAMIC / "redfish.yaml"
 
 
 class HardwareObserverCharm(ops.CharmBase):
@@ -44,6 +44,7 @@ class HardwareObserverCharm(ops.CharmBase):
         except ValueError as e:
             logger.error("Invalid dcgm-snap-channel config: %s", e)
             self.model.unit.status = ops.BlockedStatus(str(e))
+            return
 
         self._stored.set_default(
             # resource_installed is a flag that tracks the installation state for
@@ -102,7 +103,7 @@ class HardwareObserverCharm(ops.CharmBase):
         """
         if not self._stored.stored_tools:  # type: ignore[truthy-function]
             self._stored.stored_tools = {  # type: ignore[unreachable]
-                tool.value for tool in detect_available_tools()
+                tool.value for tool in detect_available_tools(self.typed_config)
             }
         # remove legacy smartctl tool if present
         # See https://github.com/canonical/hardware-observer-operator/pull/327
@@ -120,7 +121,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _on_redetect_hardware(self, event: ops.ActionEvent) -> None:
         """Redetect available hardware tools and option to rerun the install hook."""
-        available_tools = detect_available_tools()
+        available_tools = detect_available_tools(self.typed_config)
 
         hw_change_detected = self.stored_tools != available_tools
 

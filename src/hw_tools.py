@@ -48,6 +48,7 @@ from hardware import (
     lshw,
 )
 from keys import HP_KEYS
+from literals import HWObserverConfig
 
 logger = logging.getLogger(__name__)
 
@@ -647,7 +648,7 @@ def redfish_available() -> bool:
     return result
 
 
-def bmc_hw_verifier() -> Set[HWTool]:
+def bmc_hw_verifier(config: HWObserverConfig) -> Set[HWTool]:
     """Verify if the ipmi is available on the machine.
 
     Using freeipmi-tools to verify, the package will be removed in removing stage.
@@ -657,20 +658,25 @@ def bmc_hw_verifier() -> Set[HWTool]:
     # Check if ipmi services are available
     apt_helpers.add_pkg_with_candidate_version("freeipmi-tools")
 
+    ipmi_over_lan = ipmi_over_lan_args(config)
+
     try:
-        subprocess.check_output("ipmimonitoring --sdr-cache-recreate".split())
+        monitoring_cmd = ["ipmimonitoring", "--sdr-cache-recreate", *ipmi_over_lan]
+        subprocess.check_output(monitoring_cmd)
         tools.add(HWTool.IPMI_SENSOR)
     except subprocess.CalledProcessError:
         logger.info("IPMI sensors monitoring is not available")
 
     try:
-        subprocess.check_output("ipmi-sel --sdr-cache-recreate".split())
+        sel_cmd = ["ipmi-sel", "--sdr-cache-recreate", *ipmi_over_lan]
+        subprocess.check_output(sel_cmd)
         tools.add(HWTool.IPMI_SEL)
     except subprocess.CalledProcessError:
         logger.info("IPMI SEL monitoring is not available")
 
     try:
-        subprocess.check_output("ipmi-dcmi --get-system-power-statistics".split())
+        dcmi_cmd = ["ipmi-dcmi", "--get-system-power-statistics", *ipmi_over_lan]
+        subprocess.check_output(dcmi_cmd)
         tools.add(HWTool.IPMI_DCMI)
     except subprocess.CalledProcessError:
         logger.info("IPMI DCMI monitoring is not available")
@@ -681,6 +687,28 @@ def bmc_hw_verifier() -> Set[HWTool]:
     else:
         logger.info("Redfish is not available")
     return tools
+
+
+def ipmi_over_lan_args(config: HWObserverConfig) -> List[str]:
+    """Get IPMI over LAN arguments for ipmitool commands."""
+    driver = config.ipmi_driver_type.upper()
+
+    if "LAN" not in driver:
+        return []
+
+    args = ["-D", driver]
+
+    optional_args = {
+        "-h": get_bmc_address(),
+        "-u": config.redfish_username,
+        "-p": config.redfish_password,
+    }
+
+    for flag, value in optional_args.items():
+        if value:
+            args.extend([flag, value])
+
+    return args
 
 
 def disk_hw_verifier() -> Set[HWTool]:
@@ -708,9 +736,11 @@ def nvidia_gpu_verifier() -> Set[HWTool]:
     return set()
 
 
-def detect_available_tools() -> Set[HWTool]:
+def detect_available_tools(config: HWObserverConfig) -> Set[HWTool]:
     """Return HWTool detected after checking the hardware."""
-    return raid_hw_verifier() | bmc_hw_verifier() | disk_hw_verifier() | nvidia_gpu_verifier()
+    return (
+        raid_hw_verifier() | bmc_hw_verifier(config) | disk_hw_verifier() | nvidia_gpu_verifier()
+    )
 
 
 def remove_legacy_smartctl_exporter() -> None:

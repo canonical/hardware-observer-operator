@@ -46,6 +46,7 @@ from hw_tools import (
     disk_hw_verifier,
     file_is_empty,
     install_deb,
+    ipmi_over_lan_args,
     make_executable,
     nvidia_gpu_verifier,
     raid_hw_verifier,
@@ -55,6 +56,7 @@ from hw_tools import (
     symlink,
 )
 from keys import HP_KEYS
+from literals import HWObserverConfig
 
 
 def get_mock_path(size: int):
@@ -776,7 +778,8 @@ class TestIPMIDCMIStrategy(unittest.TestCase):
 def test_detect_available_tools(
     mock_raid_verifier, mock_bmc_hw_verifier, mock_disk_hw_verifier, mock_nvidia_gpu_verifier
 ):
-    output = detect_available_tools()
+    mock_config = mock.Mock()
+    output = detect_available_tools(mock_config)
     mock_raid_verifier.assert_called()
     mock_bmc_hw_verifier.assert_called()
     mock_disk_hw_verifier.assert_called()
@@ -1041,7 +1044,8 @@ class TestIPMIHWVerifier(unittest.TestCase):
     @mock.patch("hw_tools.subprocess")
     @mock.patch("hw_tools.apt_helpers")
     def test_bmc_hw_verifier(self, mock_apt_helpers, mock_subprocess, mock_redfish_available):
-        output = bmc_hw_verifier()
+        cfg = HWObserverConfig()
+        output = bmc_hw_verifier(cfg)
         mock_apt_helpers.add_pkg_with_candidate_version.assert_called_with("freeipmi-tools")
         self.assertCountEqual(
             output, [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL, HWTool.IPMI_DCMI, HWTool.REDFISH]
@@ -1056,7 +1060,8 @@ class TestIPMIHWVerifier(unittest.TestCase):
     def test_bmc_hw_verifier_error_handling(
         self, mock_apt_helpers, mock_check_output, mock_redfish_available
     ):
-        output = bmc_hw_verifier()
+        cfg = HWObserverConfig()
+        output = bmc_hw_verifier(cfg)
         mock_apt_helpers.add_pkg_with_candidate_version.assert_called_with("freeipmi-tools")
         self.assertEqual(output, set())
 
@@ -1074,7 +1079,8 @@ class TestIPMIHWVerifier(unittest.TestCase):
                 raise subprocess.CalledProcessError(-1, "cmd")
 
         with mock.patch("hw_tools.subprocess.check_output", side_effect=mock_get_response_ipmi):
-            output = bmc_hw_verifier()
+            cfg = HWObserverConfig()
+            output = bmc_hw_verifier(cfg)
             mock_apt_helpers.add_pkg_with_candidate_version.assert_called_with("freeipmi-tools")
             self.assertCountEqual(output, [HWTool.IPMI_SENSOR, HWTool.IPMI_SEL])
 
@@ -1438,3 +1444,34 @@ class TestTPRStrategyStorelib(unittest.TestCase):
         mock_logger.error.assert_called_with(
             "Failed to remove storelib config file: %s", mock_unlink.side_effect
         )
+
+
+def test_ipmi_over_lan_args_no_lan():
+    """Returns empty list when driver type does not include LAN."""
+    cfg = HWObserverConfig(ipmi_driver_type="kcs")
+    assert ipmi_over_lan_args(cfg) == []
+
+
+@mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
+def test_ipmi_over_lan_args_lan_no_creds(mock_get_bmc):
+    """When using LAN driver and no credentials, only -h is added."""
+    cfg = HWObserverConfig(ipmi_driver_type="lan")
+    assert ipmi_over_lan_args(cfg) == ["-D", "LAN", "-h", "1.2.3.4"]
+
+
+@mock.patch("hw_tools.get_bmc_address", return_value="1.2.3.4")
+def test_ipmi_over_lan_args_with_creds(mock_get_bmc):
+    """When using LAN driver and credentials provided, -h -u -p flags are present."""
+    cfg = HWObserverConfig(
+        ipmi_driver_type="lan", redfish_username="user", redfish_password="pass"
+    )
+    assert ipmi_over_lan_args(cfg) == [
+        "-D",
+        "LAN",
+        "-h",
+        "1.2.3.4",
+        "-u",
+        "user",
+        "-p",
+        "pass",
+    ]

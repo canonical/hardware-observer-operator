@@ -60,14 +60,19 @@ options:
     type: string
     default: ""
     description: |
-      BMC username to be used by the redfish collector.
+      This username is used to log in to the Redfish server and the BMC when IPMI over LAN is enabled.
   redfish-password:
     type: string
     default: ""
     description: |
-      BMC password to be used by the redfish collector.
+      This password is used to log in to the Redfish server and the BMC when IPMI over LAN is enabled.
   redfish-disable:
     type: boolean
     default: true
     description: |
       By default the Redfish collector is disabled. Set this option to false to enable it.
+  ipmi-driver-type:
+    type: string
+    default: ""
+    description: |
+      Specify the driver type to be used for IPMI. Use LAN_2_0 for IPMI over LAN.
