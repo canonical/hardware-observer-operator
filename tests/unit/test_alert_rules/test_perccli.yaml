@@ -6,7 +6,7 @@ evaluation_interval: 1m
 tests:
 
   - interval: 1m
-    input_series: 
+    input_series:
       - series: 'perccli_command_success{instance="ubuntu-0"}'
         values: '0x15'  # error: PerccliCommandFailed
     alert_rule_test:
@@ -29,7 +29,7 @@ tests:
       - series: 'perccli_command_success{instance="ubuntu-1"}'
         values: '1x15'
       - series: 'poweredgeraid_controllers{instance="ubuntu-1"}'
-        values: '0x15' # error: PowerEdgeRAIDControllerNotFound 
+        values: '0x15' # error: PowerEdgeRAIDControllerNotFound
 
     alert_rule_test:
       - eval_time: 0m
@@ -89,3 +89,86 @@ tests:
                 PowerEdge RAID virtual drives are not in optimal state. Please check the if the virtual drives are working as expected.
                   STATE = Dgrd
                   LABELS = map[__name__:poweredgeraid_virtual_info cache_policy:NRWTD controller_id:0 device_group:1 instance:ubuntu-1 state:Dgrd virtual_drive_id:2]
+
+  - interval: 1m
+    input_series:
+      - series: 'perccli_command_success{instance="ubuntu-3"}'
+        values: '1x15'
+      - series: 'poweredgeraid_controllers{instance="ubuntu-3", hostname="ubuntu-3"}'
+        values: '1x15'
+      # Physical drive in failed state
+      - series: 'poweredgeraid_physical_device{instance="ubuntu-3", controller_id="0", enclosure_device_id="252", slot="0", state="failed"}'
+        values: '1x10'
+      # Physical drive in offline state (lowercase)
+      - series: 'poweredgeraid_physical_device{instance="ubuntu-3", controller_id="0", enclosure_device_id="252", slot="1", state="offln"}'
+        values: '1x10'
+      # Physical drive in offline state (mixed case)
+      - series: 'poweredgeraid_physical_device{instance="ubuntu-3", controller_id="0", enclosure_device_id="252", slot="2", state="Offln"}'
+        values: '1x10'
+      # Physical drive in ubad state
+      - series: 'poweredgeraid_physical_device{instance="ubuntu-3", controller_id="0", enclosure_device_id="252", slot="3", state="ubad"}'
+        values: '1x10'
+      # Physical drive in FAILED state (uppercase)
+      - series: 'poweredgeraid_physical_device{instance="ubuntu-3", controller_id="1", enclosure_device_id="253", slot="5", state="FAILED"}'
+        values: '1x10'
+      # Physical drive in good state (should not alert)
+      - series: 'poweredgeraid_physical_device{instance="ubuntu-3", controller_id="0", enclosure_device_id="252", slot="10", state="online"}'
+        values: '1x10'
+      # Physical drive in good state (should not alert)
+      - series: 'poweredgeraid_physical_device{instance="ubuntu-3", controller_id="0", enclosure_device_id="252", slot="11", state="Onln"}'
+        values: '1x10'
+
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: PowerEdgeRAIDPhysicalDriveCritical
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: "0"
+              enclosure_device_id: "252"
+              slot: "0"
+              state: "failed"
+            exp_annotations:
+              summary: "PowerEdge RAID drive critical state"
+              description: "Controller 0, Enclosure 252, Slot 0 is in state failed.\n"
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: "0"
+              enclosure_device_id: "252"
+              slot: "1"
+              state: "offln"
+            exp_annotations:
+              summary: "PowerEdge RAID drive critical state"
+              description: "Controller 0, Enclosure 252, Slot 1 is in state offln.\n"
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: "0"
+              enclosure_device_id: "252"
+              slot: "2"
+              state: "Offln"
+            exp_annotations:
+              summary: "PowerEdge RAID drive critical state"
+              description: "Controller 0, Enclosure 252, Slot 2 is in state Offln.\n"
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: "0"
+              enclosure_device_id: "252"
+              slot: "3"
+              state: "ubad"
+            exp_annotations:
+              summary: "PowerEdge RAID drive critical state"
+              description: "Controller 0, Enclosure 252, Slot 3 is in state ubad.\n"
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: "1"
+              enclosure_device_id: "253"
+              slot: "5"
+              state: "FAILED"
+            exp_annotations:
+              summary: "PowerEdge RAID drive critical state"
+              description: "Controller 1, Enclosure 253, Slot 5 is in state FAILED.\n"
