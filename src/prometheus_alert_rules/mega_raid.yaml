@@ -37,3 +37,17 @@ groups:
         MegaRAID virtual drives are not in optimal state. Please check the if the virtual drives are working as expected.
           STATE = {{ $labels.state }}
           LABELS = {{ $labels }}
+
+  - alert: MegaRaidPhysicalDriveCritical
+    expr: |
+      megaraid_physical_drive_info{state=~"(?i)offln|failed|ubad"} == 1
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "MegaRAID drive critical state"
+      description: >
+        Controller {{ $labels.controller_id }},
+        Enclosure {{ $labels.enclosure_id }},
+        Slot {{ $labels.slot_id }}
+        is in state {{ $labels.state }}.

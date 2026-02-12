@@ -76,3 +76,103 @@ tests:
                 MegaRAID virtual drives are not in optimal state. Please check the if the virtual drives are working as expected.
                   STATE = Dgrd
                   LABELS = map[__name__:megaraid_virtual_drive_info controller_id:0 drive_group:0 instance:ubuntu-2 name:NVMe-RAID-1 state:Dgrd virtual_drive_group:239]
+
+
+  - interval: 1m
+    input_series:
+      - series: 'storcli_command_success{instance="ubuntu-3"}'
+        values: '1x15'
+      - series: 'megaraid_controllers{instance="ubuntu-3", hostname="ubuntu-3"}'
+        values: '1x15'
+      # Physical drive in failed state
+      - series: 'megaraid_physical_drive_info{instance="ubuntu-3", controller_id="0", enclosure_id="252", slot_id="0", state="failed"}'
+        values: '1x10'
+      # Physical drive in offline state (lowercase)
+      - series: 'megaraid_physical_drive_info{instance="ubuntu-3", controller_id="0", enclosure_id="252", slot_id="1", state="offln"}'
+        values: '1x10'
+      # Physical drive in offline state (mixed case)
+      - series: 'megaraid_physical_drive_info{instance="ubuntu-3", controller_id="0", enclosure_id="252", slot_id="2", state="Offln"}'
+        values: '1x10'
+      # Physical drive in ubad state
+      - series: 'megaraid_physical_drive_info{instance="ubuntu-3", controller_id="0", enclosure_id="252", slot_id="3", state="ubad"}'
+        values: '1x10'
+      # Physical drive in UBAD state (uppercase)
+      - series: 'megaraid_physical_drive_info{instance="ubuntu-3", controller_id="1", enclosure_id="253", slot_id="4", state="UBAD"}'
+        values: '1x10'
+      # Physical drive in FAILED state (uppercase)
+      - series: 'megaraid_physical_drive_info{instance="ubuntu-3", controller_id="1", enclosure_id="253", slot_id="5", state="FAILED"}'
+        values: '1x10'
+      # Physical drive in good state (should not alert)
+      - series: 'megaraid_physical_drive_info{instance="ubuntu-3", controller_id="0", enclosure_id="252", slot_id="10", state="online"}'
+        values: '1x10'
+      # Physical drive in good state (should not alert)
+      - series: 'megaraid_physical_drive_info{instance="ubuntu-3", controller_id="0", enclosure_id="252", slot_id="11", state="Onln"}'
+        values: '1x10'
+
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: MegaRaidPhysicalDriveCritical
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: "0"
+              enclosure_id: "252"
+              slot_id: "0"
+              state: "failed"
+            exp_annotations:
+              summary: "MegaRAID drive critical state"
+              description: "Controller 0, Enclosure 252, Slot 0 is in state failed.\n"
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: "0"
+              enclosure_id: "252"
+              slot_id: "1"
+              state: "offln"
+            exp_annotations:
+              summary: "MegaRAID drive critical state"
+              description: "Controller 0, Enclosure 252, Slot 1 is in state offln.\n"
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: "0"
+              enclosure_id: "252"
+              slot_id: "2"
+              state: "Offln"
+            exp_annotations:
+              summary: "MegaRAID drive critical state"
+              description: "Controller 0, Enclosure 252, Slot 2 is in state Offln.\n"
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: "0"
+              enclosure_id: "252"
+              slot_id: "3"
+              state: "ubad"
+            exp_annotations:
+              summary: "MegaRAID drive critical state"
+              description: "Controller 0, Enclosure 252, Slot 3 is in state ubad.\n"
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: "1"
+              enclosure_id: "253"
+              slot_id: "4"
+              state: "UBAD"
+            exp_annotations:
+              summary: "MegaRAID drive critical state"
+              description: "Controller 1, Enclosure 253, Slot 4 is in state UBAD.\n"
+          - exp_labels:
+              severity: critical
+              instance: ubuntu-3
+              controller_id: "1"
+              enclosure_id: "253"
+              slot_id: "5"
+              state: "FAILED"
+            exp_annotations:
+              summary: "MegaRAID drive critical state"
+              description: "Controller 1, Enclosure 253, Slot 5 is in state FAILED.\n"
+      - eval_time: 4m
+        alertname: MegaRaidPhysicalDriveCritical
+        exp_alerts: []
