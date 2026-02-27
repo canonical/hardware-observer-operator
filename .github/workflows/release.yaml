@@ -26,7 +26,7 @@ jobs:
           submodules: true
 
       - name: Download the tested charms
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: built_charms_*
           merge-multiple: true
