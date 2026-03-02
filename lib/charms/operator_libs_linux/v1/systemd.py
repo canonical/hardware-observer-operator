@@ -13,7 +13,20 @@
 # limitations under the License.
 
 
-"""Abstractions for stopping, starting and managing system services via systemd.
+"""Legacy Charmhub-hosted systemd library, deprecated in favour of ``charmlibs.systemd``.
+
+WARNING: This library is deprecated and will no longer receive feature updates or bugfixes.
+``charmlibs.systemd`` version 1.0 is a bug-for-bug compatible migration of this library.
+Add 'charmlibs-systemd~=1.0' to your charm's dependencies, and remove this Charmhub-hosted library.
+Then replace `from charms.operator_libs_linux.v0 import systemd` with
+`from charmlibs import systemd`.
+Read more:
+- https://documentation.ubuntu.com/charmlibs
+- https://pypi.org/project/charmlibs-systemd
+
+---
+
+Abstractions for stopping, starting and managing system services via systemd.
 
 This library assumes that your charm is running on a platform that uses systemd. E.g.,
 Centos 7 or later, Ubuntu Xenial (16.04) or later.
@@ -64,7 +77,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 5
 
 
 class SystemdError(Exception):

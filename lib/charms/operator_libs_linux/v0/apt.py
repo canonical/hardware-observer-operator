@@ -12,7 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Abstractions for the system's Debian/Ubuntu package information and repositories.
+"""Legacy Charmhub-hosted snap library, deprecated in favour of ``charmlibs.apt``.
+
+WARNING: This library is deprecated and will no longer receive feature updates or bugfixes.
+``charmlibs.apt`` version 1.0 is a bug-for-bug compatible migration of this library.
+Add 'charmlibs-apt~=1.0' to your charm's dependencies, and remove this Charmhub-hosted library.
+Then replace `from charms.operator_libs_linux.v0 import apt` with `from charmlibs import apt`.
+Read more:
+- https://documentation.ubuntu.com/charmlibs
+- https://pypi.org/project/charmlibs-apt
+
+---
+
+Abstractions for the system's Debian/Ubuntu package information and repositories.
 
 This module contains abstractions and wrappers around Debian/Ubuntu-style repositories and
 packages, in order to easily provide an idiomatic and Pythonic mechanism for adding packages and/or
@@ -35,11 +47,13 @@ try:
     apt.update()
     apt.add_package("zsh")
     apt.add_package(["vim", "htop", "wget"])
-except PackageNotFoundError:
-    logger.error("a specified package not found in package cache or on system")
 except PackageError as e:
     logger.error("could not install package. Reason: %s", e.message)
 ````
+
+The convenience methods don't raise `PackageNotFoundError`. If any packages aren't found in
+the cache, `apt.add_package` raises `PackageError` with a message 'Failed to install
+packages: foo, bar'.
 
 To find details of a specific package:
 
@@ -66,8 +80,8 @@ except PackageError as e:
 and their properties (available groups, baseuri. gpg key). This class can add, disable, or
 manipulate repositories. Items can be retrieved as `DebianRepository` objects.
 
-In order add a new repository with explicit details for fields, a new `DebianRepository` can
-be added to `RepositoryMapping`
+In order to add a new repository with explicit details for fields, a new `DebianRepository`
+can be added to `RepositoryMapping`
 
 `RepositoryMapping` provides an abstraction around the existing repositories on the system,
 and can be accessed and iterated over like any `Mapping` object, to retrieve values by key,
@@ -98,6 +112,10 @@ if "deb-us.archive.ubuntu.com-xenial" not in repositories:
     repo = DebianRepository.from_repo_line(line)
     repositories.add(repo)
 ```
+
+Dependencies:
+Note that this module requires `opentelemetry-api`, which is already included into
+your charm's virtual environment via `ops >= 2.21`.
 """
 
 from __future__ import annotations
@@ -114,7 +132,10 @@ from subprocess import PIPE, CalledProcessError, check_output
 from typing import Any, Iterable, Iterator, Literal, Mapping
 from urllib.parse import urlparse
 
+import opentelemetry.trace
+
 logger = logging.getLogger(__name__)
+tracer = opentelemetry.trace.get_tracer(__name__)
 
 # The unique Charmhub library identifier, never change it
 LIBID = "7c3dbc9c2ad44a47bd6fcb25caa270e5"
@@ -124,7 +145,9 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 17
+LIBPATCH = 20
+
+PYDEPS = ["opentelemetry-api"]
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -151,11 +174,15 @@ class Error(Exception):
 
 
 class PackageError(Error):
-    """Raised when there's an error installing or removing a package."""
+    """Raised when there's an error installing or removing a package.
+
+    Additionally, `apt.add_package` raises `PackageError` if any packages aren't found in
+    the cache.
+    """
 
 
 class PackageNotFoundError(Error):
-    """Raised when a requested package is not known to the system."""
+    """Raised by `DebianPackage` methods if a requested package is not found."""
 
 
 class PackageState(Enum):
@@ -249,7 +276,9 @@ class DebianPackage:
         try:
             env = os.environ.copy()
             env["DEBIAN_FRONTEND"] = "noninteractive"
-            subprocess.run(_cmd, capture_output=True, check=True, text=True, env=env)
+            with tracer.start_as_current_span(_cmd[0]) as span:
+                span.set_attribute("argv", _cmd)
+                subprocess.run(_cmd, capture_output=True, check=True, text=True, env=env)
         except CalledProcessError as e:
             raise PackageError(
                 f"Could not {command} package(s) {package_names}: {e.stderr}"
@@ -464,18 +493,20 @@ class DebianPackage:
             arch: an optional architecture, defaulting to `dpkg --print-architecture`.
                 If an architecture is not specified, this will be used for selection.
         """
-        system_arch = check_output(
-            ["dpkg", "--print-architecture"], universal_newlines=True
-        ).strip()
+        cmd = ["dpkg", "--print-architecture"]
+        with tracer.start_as_current_span(cmd[0]) as span:
+            span.set_attribute("argv", cmd)
+            system_arch = check_output(cmd, universal_newlines=True).strip()
         arch = arch if arch else system_arch
 
         # Regexps are a really terrible way to do this. Thanks dpkg
         keys = ("Package", "Architecture", "Version")
 
+        cmd = ["apt-cache", "show", package]
         try:
-            output = check_output(
-                ["apt-cache", "show", package], stderr=PIPE, universal_newlines=True
-            )
+            with tracer.start_as_current_span(cmd[0]) as span:
+                span.set_attribute("argv", cmd)
+                output = check_output(cmd, stderr=PIPE, universal_newlines=True)
         except CalledProcessError as e:
             raise PackageError(f"Could not list packages in apt-cache: {e.stderr}") from None
 
@@ -766,8 +797,8 @@ def add_package(
 
     Raises:
         TypeError if no package name is given, or explicit version is set for multiple packages
-        PackageNotFoundError if the package is not in the cache.
-        PackageError if packages fail to install
+        PackageError: if packages fail to install, including if any packages aren't found in the
+            cache
     """
     cache_refreshed = False
     if update_cache:
@@ -880,7 +911,9 @@ def update() -> None:
     """Update the apt cache via `apt-get update`."""
     cmd = ["apt-get", "update", "--error-on=any"]
     try:
-        subprocess.run(cmd, capture_output=True, check=True)
+        with tracer.start_as_current_span(cmd[0]) as span:
+            span.set_attribute("argv", cmd)
+            subprocess.run(cmd, capture_output=True, check=True)
     except CalledProcessError as e:
         logger.error(
             "%s:\nstdout:\n%s\nstderr:\n%s",
@@ -1107,12 +1140,14 @@ class DebianRepository:
                 " Please raise an issue if you require this feature."
             )
         searcher = f"{self.repotype} {self.make_options_string()}{self.uri} {self.release}"
-        with fileinput.input(self._filename, inplace=True) as lines:
-            for line in lines:
-                if re.match(rf"^{re.escape(searcher)}\s", line):
-                    print(f"# {line}", end="")
-                else:
-                    print(line, end="")
+        with tracer.start_as_current_span("disable source") as span:
+            span.set_attribute("filename", self._filename)
+            with fileinput.input(self._filename, inplace=True) as lines:
+                for line in lines:
+                    if re.match(rf"^{re.escape(searcher)}\s", line):
+                        print(f"# {line}", end="")
+                    else:
+                        print(line, end="")
 
     def import_key(self, key: str) -> None:
         """Import an ASCII Armor key.
@@ -1145,8 +1180,10 @@ class DebianRepository:
         """
         # Use the same gpg command for both Xenial and Bionic
         cmd = ["gpg", "--with-colons", "--with-fingerprint"]
-        ps = subprocess.run(cmd, capture_output=True, input=key_material)
-        out, err = ps.stdout.decode(), ps.stderr.decode()
+        with tracer.start_as_current_span(cmd[0]) as span:
+            span.set_attribute("argv", cmd)
+            ps = subprocess.run(cmd, capture_output=True, input=key_material)
+            out, err = ps.stdout.decode(), ps.stderr.decode()
         if "gpg: no valid OpenPGP data found." in err:
             raise GPGKeyError("Invalid GPG key material provided")
         # from gnupg2 docs: fpr :: Fingerprint (fingerprint is in field 10)
@@ -1191,8 +1228,10 @@ class DebianRepository:
             "https://keyserver.ubuntu.com" "/pks/lookup?op=get&options=mr&exact=on&search=0x{}"
         )
         curl_cmd = ["curl", keyserver_url.format(keyid)]
-        # use proxy server settings in order to retrieve the key
-        return check_output(curl_cmd).decode()
+        with tracer.start_as_current_span(curl_cmd[0]) as span:
+            span.set_attribute("argv", curl_cmd)
+            # use proxy server settings in order to retrieve the key
+            return check_output(curl_cmd).decode()
 
     @staticmethod
     def _dearmor_gpg_key(key_asc: bytes) -> bytes:
@@ -1207,8 +1246,11 @@ class DebianRepository:
         Raises:
           GPGKeyError
         """
-        ps = subprocess.run(["gpg", "--dearmor"], capture_output=True, input=key_asc)
-        out, err = ps.stdout, ps.stderr.decode()
+        cmd = ["gpg", "--dearmor"]
+        with tracer.start_as_current_span(cmd[0]) as span:
+            span.set_attribute("argv", cmd)
+            ps = subprocess.run(cmd, capture_output=True, input=key_asc)
+            out, err = ps.stdout, ps.stderr.decode()
         if "gpg: no valid OpenPGP data found." in err:
             raise GPGKeyError(
                 "Invalid GPG key material. Check your network setup"
@@ -1289,11 +1331,12 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
                 if not os.path.isfile(default_sources):
                     raise
 
-        # read sources.list.d
-        for file in glob.iglob(os.path.join(sources_dir, "*.list")):
-            self.load(file)
-        for file in glob.iglob(os.path.join(sources_dir, "*.sources")):
-            self.load_deb822(file)
+        with tracer.start_as_current_span("load sources"):
+            # read sources.list.d
+            for file in glob.iglob(os.path.join(sources_dir, "*.list")):
+                self.load(file)
+            for file in glob.iglob(os.path.join(sources_dir, "*.sources")):
+                self.load_deb822(file)
 
     def __contains__(self, key: Any) -> bool:
         """Magic method for checking presence of repo in mapping.
@@ -1533,7 +1576,9 @@ def _add_repository(
         cmd.append("--no-update")
     logger.info("%s", cmd)
     try:
-        subprocess.run(cmd, check=True, capture_output=True)
+        with tracer.start_as_current_span(cmd[0]) as span:
+            span.set_attribute("argv", cmd)
+            subprocess.run(cmd, check=True, capture_output=True)
     except CalledProcessError as e:
         logger.error(
             "subprocess.run(%s):\nstdout:\n%s\nstderr:\n%s",
