@@ -9,11 +9,11 @@ terraform {
 
 provider "juju" {}
 
-module "grafana-agent" {
+module "opentelemetry-collector" {
   source = "git::https://github.com/canonical/snap-openstack.git//sunbeam-python/sunbeam/features/observability/etc/deploy-grafana-agent"
 
-  grafana-agent-base             = var.grafana_agent_base
-  grafana-agent-channel          = "1/stable" # Can move back to latest/stable when the charm is updated
+  opentelemetry-collector-base             = var.otel_base
+  opentelemetry-collector-channel          = "2/stable"
   principal-application-model    = var.machine_model
   receive-remote-write-offer-url = var.receive-remote-write-offer-url
   grafana-dashboard-offer-url    = var.grafana-dashboard-offer-url
@@ -21,7 +21,7 @@ module "grafana-agent" {
 
 }
 
-resource "juju_integration" "ubuntu-to-grafana-agent" {
+resource "juju_integration" "ubuntu-to-opentelemetry-collector" {
   model = var.machine_model
 
   application {
@@ -30,12 +30,12 @@ resource "juju_integration" "ubuntu-to-grafana-agent" {
   }
 
   application {
-    name     = "grafana-agent"
+    name     = "opentelemetry-collector"
     endpoint = "juju-info"
   }
 }
 
-resource "juju_integration" "hardware-observer-to-grafana-agent" {
+resource "juju_integration" "hardware-observer-to-opentelemetry-collector" {
   model = var.machine_model
 
   application {
@@ -44,7 +44,7 @@ resource "juju_integration" "hardware-observer-to-grafana-agent" {
   }
 
   application {
-    name     = "grafana-agent"
+    name     = "opentelemetry-collector"
     endpoint = "cos-agent"
   }
 }
