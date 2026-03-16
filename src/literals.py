@@ -15,7 +15,6 @@ from hardware import (
 logger = logging.getLogger(__name__)
 
 
-# TODO: Add more charm configuration options. See #468
 class HWObserverConfig(pydantic.BaseModel):
     class Config:
         """Pydantic config."""
@@ -37,6 +36,49 @@ class HWObserverConfig(pydantic.BaseModel):
     redfish_password: str = pydantic.Field(
         default="", description="Password for Redfish", alias="redfish-password"
     )
+    hardware_exporter_port: int = pydantic.Field(
+        default=10200, description="Port for hardware exporter", alias="hardware-exporter-port"
+    )
+    smartctl_exporter_port: int = pydantic.Field(
+        default=10201, description="Port for smartctl exporter", alias="smartctl-exporter-port"
+    )
+    exporter_log_level: str = pydantic.Field(
+        default="INFO", description="Log level for exporters", alias="exporter-log-level"
+    )
+    collect_timeout: int = pydantic.Field(
+        default=10, description="Timeout for collectors in seconds", alias="collect-timeout"
+    )
+    smartctl_exporter_snap_channel: str = pydantic.Field(
+        default="latest/stable",
+        description="Snap channel for smartctl exporter",
+        alias="smartctl-exporter-snap-channel",
+    )
+
+    @pydantic.validator("hardware_exporter_port", "smartctl_exporter_port")
+    @classmethod
+    def validate_port(cls, value):
+        """Validate that port is within valid range."""
+        if not 1 <= value <= 65535:
+            raise ValueError(f"Port must be in range [1, 65535], got {value}")
+        return value
+
+    @pydantic.validator("exporter_log_level", pre=True)
+    @classmethod
+    def validate_log_level(cls, value):
+        """Validate and normalise log level to uppercase."""
+        upper = str(value).upper()
+        allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        if upper not in allowed:
+            raise ValueError(f"Invalid log level '{value}'. Must be one of: {sorted(allowed)}")
+        return upper
+
+    @pydantic.validator("collect_timeout")
+    @classmethod
+    def validate_collect_timeout(cls, value):
+        """Validate that collect timeout is positive."""
+        if value <= 0:
+            raise ValueError(f"collect-timeout must be > 0, got {value}")
+        return value
 
     @pydantic.validator("dcgm_snap_channel", pre=True)
     @classmethod
