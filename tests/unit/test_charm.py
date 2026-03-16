@@ -11,6 +11,7 @@ from unittest import mock
 import ops
 import ops.testing
 import pytest
+from ops._main import _Abort
 from ops.model import ActiveStatus, BlockedStatus
 from parameterized import parameterized
 
@@ -881,6 +882,9 @@ class TestCharm(unittest.TestCase):
     @mock.patch("service.get_bmc_address")
     def test_block_wrong_dcgm_config(self, _):
         self.harness.update_config({"dcgm-snap-channel": "wrong-format"})
-        self.harness.begin()
-        self.assertTrue(isinstance(self.harness.charm.model.unit.status, ops.BlockedStatus))
-        self.assertIn("Channel must be in the form", self.harness.charm.model.unit.status.message)
+        with self.assertRaises(_Abort):
+            self.harness.begin()
+        # Harness doesn't expose charm after _Abort, check status via backend
+        status = self.harness._backend.status_get()
+        self.assertEqual(status["status"], "blocked")
+        self.assertIn("Channel must be in the form", status["message"])

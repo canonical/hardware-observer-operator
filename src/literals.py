@@ -62,11 +62,11 @@ class HWObserverConfig(pydantic.BaseModel):
             raise ValueError(f"Port must be in range [1, 65535], got {value}")
         return value
 
-    @pydantic.validator("exporter_log_level", pre=True)
+    @pydantic.validator("exporter_log_level")
     @classmethod
     def validate_log_level(cls, value):
         """Validate and normalise log level to uppercase."""
-        upper = str(value).upper()
+        upper = value.upper()
         allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if upper not in allowed:
             raise ValueError(f"Invalid log level '{value}'. Must be one of: {sorted(allowed)}")

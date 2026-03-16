@@ -39,12 +39,7 @@ class HardwareObserverCharm(ops.CharmBase):
         super().__init__(*args)
         self.hw_tool_helper = HWToolHelper()
 
-        try:
-            self.typed_config = self.load_config(HWObserverConfig)
-        except ValueError as e:
-            logger.error("Invalid dcgm-snap-channel config: %s", e)
-            self.model.unit.status = ops.BlockedStatus(str(e))
-            return
+        self.typed_config = self.load_config(HWObserverConfig, errors="blocked")
 
         self._stored.set_default(
             # resource_installed is a flag that tracks the installation state for
