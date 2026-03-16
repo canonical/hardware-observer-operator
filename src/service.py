@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from charms.operator_libs_linux.v1 import systemd
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Environment, FileSystemLoader
-from ops.model import ConfigData
 from redfish import redfish_client
 from redfish.rest.v1 import InvalidCredentialsError
 
@@ -47,7 +46,7 @@ class ExporterError(Exception):
 class BaseExporter(ABC):
     """A class representing the exporter and the metric endpoints."""
 
-    config: ConfigData
+    config: HWObserverConfig
     exporter_name: str
     port: int
     log_level: str
@@ -86,11 +85,10 @@ class BaseExporter(ABC):
         """Set exporter config."""
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
-        """Validate the static and runtime config options for the exporter."""
-        if not 1 <= self.port <= 65535:
-            logger.error("Invalid exporter port: port must be in [1, 65535].")
-            return False, "Invalid config: exporter's port"
+        """Validate the runtime config options for the exporter.
 
+        Static config validation (port range, log level) is handled by HWObserverConfig.
+        """
         return True, "Exporter config is valid."
 
 
@@ -101,7 +99,9 @@ class RenderableExporter(BaseExporter):
 
     exporter_config_path: Optional[Path] = None
 
-    def __init__(self, charm_dir: Path, config: ConfigData, settings: ExporterSettings) -> None:
+    def __init__(
+        self, charm_dir: Path, config: HWObserverConfig, settings: ExporterSettings
+    ) -> None:
         """Initialize the Exporter class."""
         self.charm_dir = charm_dir
 
@@ -113,7 +113,7 @@ class RenderableExporter(BaseExporter):
         self.exporter_service_path = self.settings.service_path
         self.exporter_name = self.settings.name
 
-        self.log_level = str(config["exporter-log-level"])
+        self.log_level = config.exporter_log_level
 
     def resources_exist(self) -> bool:
         """Return true if required resources exist.
@@ -270,21 +270,6 @@ class RenderableExporter(BaseExporter):
             log_ssdlc_system_event(SSDLCSysEvent.CRASH, self.exporter_name, str(err))
             raise ExporterError() from err
 
-    def validate_exporter_configs(self) -> Tuple[bool, str]:
-        """Validate the static and runtime config options for the exporter."""
-        valid, msg = super().validate_exporter_configs()
-        if not valid:
-            return valid, msg
-
-        allowed_log_level_choices = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-        if self.log_level.upper() not in allowed_log_level_choices:
-            logger.error(
-                "Invalid exporter-log-level: log-level must be in %s (case-insensitive).",
-                allowed_log_level_choices,
-            )
-            return False, "Invalid config: 'exporter-log-level'"
-        return True, "Exporter config is valid."
-
 
 def write_to_file(path: Path, content: str, mode: Optional[int] = None) -> bool:
     """Write to file with provided content.
@@ -332,7 +317,7 @@ class SnapExporter(BaseExporter):
     port: int
     strategies: List[Union[SnapStrategy, APTStrategyABC]]
 
-    def __init__(self, config: ConfigData):
+    def __init__(self, config: HWObserverConfig):
         """Init."""
         self.config = config
 
@@ -471,11 +456,11 @@ class DCGMExporter(SnapExporter):
         return {HWTool.DCGM}
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
-        """Validate if the DCGM exporter is able to run."""
-        valid, msg = super().validate_exporter_configs()
-        if not valid:
-            return False, msg
+        """Validate runtime config for the DCGM exporter.
 
+        Checks NVIDIA driver state and snap channel compatibility.
+        Static config validation is handled by HWObserverConfig.
+        """
         if not is_nvidia_driver_loaded():
             return (
                 False,
@@ -488,10 +473,10 @@ class DCGMExporter(SnapExporter):
         dcgm_channel = self.snap_client.channel
 
         if dcgm_v3_compatible(cuda_version, track, dcgm_channel):
-            return valid, msg
+            return True, "Exporter config is valid."
 
         if dcgm_v4_compatible(cuda_version, track, dcgm_channel):
-            return valid, msg
+            return True, "Exporter config is valid."
 
         recommended_channel = self._automatic_channel_selection(cuda_version)
         dcgm_channel_config = self.config.dcgm_snap_channel
@@ -508,11 +493,11 @@ class SmartCtlExporter(SnapExporter):
 
     exporter_name: str = "smartctl-exporter"
 
-    def __init__(self, config: ConfigData) -> None:
+    def __init__(self, config: HWObserverConfig) -> None:
         """Initialize the SmartctlExporter class."""
-        self.port = int(config["smartctl-exporter-port"])
-        self.log_level = str(config["exporter-log-level"])
-        self.strategies = [SmartCtlExporterStrategy(str(config["smartctl-exporter-snap-channel"]))]
+        self.port = config.smartctl_exporter_port
+        self.log_level = config.exporter_log_level
+        self.strategies = [SmartCtlExporterStrategy(config.smartctl_exporter_snap_channel)]
         super().__init__(config)
 
     @staticmethod
@@ -535,16 +520,18 @@ class HardwareExporter(RenderableExporter):
 
     required_config: bool = True
 
-    def __init__(self, charm_dir: Path, config: ConfigData, available_tools: Set[HWTool]) -> None:
+    def __init__(
+        self, charm_dir: Path, config: HWObserverConfig, available_tools: Set[HWTool]
+    ) -> None:
         """Initialize the Hardware Exporter class."""
         super().__init__(charm_dir, config, HARDWARE_EXPORTER_SETTINGS)
 
         self.config_template = self.environment.get_template(self.settings.config_template)
         self.exporter_config_path = self.settings.config_path
-        self.port = int(config["hardware-exporter-port"])
+        self.port = config.hardware_exporter_port
         self.config = config
         self.available_tools = available_tools
-        self.collect_timeout = int(config["collect-timeout"])
+        self.collect_timeout = config.collect_timeout
         self.bmc_address = get_bmc_address()
 
     def _render_config_content(self) -> str:
@@ -559,7 +546,7 @@ class HardwareExporter(RenderableExporter):
             LEVEL=self.log_level,
             COLLECT_TIMEOUT=self.collect_timeout,
             COLLECTORS=collectors,
-            IPMI_DRIVER_TYPE=self.config["ipmi-driver-type"],
+            IPMI_DRIVER_TYPE=self.config.ipmi_driver_type,
             HOSTNAME=self.bmc_conn_params.get("hostname", ""),
             USERNAME=self.bmc_conn_params.get("username", ""),
             PASSWORD=self.bmc_conn_params.get("password", ""),
@@ -574,7 +561,7 @@ class HardwareExporter(RenderableExporter):
         Tools that are available, but disabled should not be used on prometheus hardware exporter.
         """
         enabled_tools = self.available_tools.copy()
-        if self.config["redfish-disable"]:
+        if self.config.redfish_disable:
             enabled_tools.discard(HWTool.REDFISH)
         return enabled_tools
 
@@ -589,11 +576,11 @@ class HardwareExporter(RenderableExporter):
         return service_rendered
 
     def validate_exporter_configs(self) -> Tuple[bool, str]:
-        """Validate the static and runtime config options for the exporter."""
-        valid, msg = super().validate_exporter_configs()
-        if not valid:
-            return valid, msg
+        """Validate runtime config for the hardware exporter.
 
+        Checks redfish credentials when redfish is enabled.
+        Static config validation is handled by HWObserverConfig.
+        """
         if HWTool.REDFISH in self.enabled_tools and self.redfish_conn_params_valid() is False:
             logger.error("Invalid redfish credentials.")
             return False, "Invalid config: 'redfish-username' or 'redfish-password'"
@@ -644,9 +631,9 @@ class HardwareExporter(RenderableExporter):
         """Get bmc connection parameters."""
         return {
             "hostname": self.bmc_address,
-            "username": self.config["redfish-username"],
-            "password": self.config["redfish-password"],
-            "timeout": self.config["collect-timeout"],
+            "username": self.config.redfish_username,
+            "password": self.config.redfish_password,
+            "timeout": self.config.collect_timeout,
         }
 
     @staticmethod
