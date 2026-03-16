@@ -17,6 +17,7 @@ from parameterized import parameterized
 import charm
 from charm import HardwareObserverCharm
 from config import HWTool
+from literals import HWObserverConfig
 from service import (
     HARDWARE_EXPORTER_SETTINGS,
     DCGMExporter,
@@ -756,11 +757,11 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
     def test_scrape_config(self, mock_exporters, _, __):
         self.harness.begin()
-        config = self.harness.charm.model.config
-        hw_exporter = HardwareExporter(Path(), config, set())
-        smartctl_exporter = SmartCtlExporter(config)
+        typed_config = self.harness.charm.typed_config
+        hw_exporter = HardwareExporter(Path(), typed_config, set())
+        smartctl_exporter = SmartCtlExporter(typed_config)
         labels = {"instance": "localhost"}
-        dcgm_exporter = DCGMExporter(self.harness.charm.typed_config)
+        dcgm_exporter = DCGMExporter(typed_config)
 
         mock_exporters.return_value = [hw_exporter, smartctl_exporter, dcgm_exporter]
 
@@ -802,8 +803,7 @@ class TestCharm(unittest.TestCase):
     def test_scrape_config_no_specific_hardware(self, mock_exporters, _):
         # simulate a hardware that does not have NVIDIA or tools to install hw exporter
         self.harness.begin()
-        config = self.harness.charm.model.config
-        smartctl_exporter = SmartCtlExporter(config)
+        smartctl_exporter = SmartCtlExporter(self.harness.charm.typed_config)
 
         mock_exporters.return_value = [smartctl_exporter]
 
@@ -824,10 +824,10 @@ class TestCharm(unittest.TestCase):
     @mock.patch("charm.HardwareObserverCharm.exporters", new_callable=mock.PropertyMock)
     def test_dashboards(self, mock_exporters, _):
         self.harness.begin()
-        config = self.harness.charm.model.config
-        hw_exporter = HardwareExporter(Path(), config, set())
-        smartctl_exporter = SmartCtlExporter(config)
-        dcgm_exporter = DCGMExporter(self.harness.charm.typed_config)
+        typed_config = self.harness.charm.typed_config
+        hw_exporter = HardwareExporter(Path(), typed_config, set())
+        smartctl_exporter = SmartCtlExporter(typed_config)
+        dcgm_exporter = DCGMExporter(typed_config)
 
         mock_exporters.return_value = [hw_exporter, smartctl_exporter, dcgm_exporter]
 
@@ -844,8 +844,7 @@ class TestCharm(unittest.TestCase):
     ):
         # simulate a hardware that does not have NVIDIA or tools to install hw exporter
         self.harness.begin()
-        config = self.harness.charm.model.config
-        smartctl_exporter = SmartCtlExporter(config)
+        smartctl_exporter = SmartCtlExporter(self.harness.charm.typed_config)
 
         mock_exporters.return_value = [smartctl_exporter]
 
@@ -858,7 +857,8 @@ class TestCharm(unittest.TestCase):
         mock_stored_tools.return_value = {HWTool.REDFISH}
 
         self.harness.begin()
-        self.harness.update_config({"redfish-disable": False})
+        # Harness doesn't re-instantiate charm on update_config, so update typed_config directly
+        self.harness.charm.typed_config = HWObserverConfig(redfish_disable=False)
 
         self.harness.charm._set_prometheus_alert_rules()
 
