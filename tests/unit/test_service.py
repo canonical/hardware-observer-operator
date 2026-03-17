@@ -139,8 +139,12 @@ class TestRenderableExporter(unittest.TestCase):
             m.return_value = return_value
             setattr(self.exporter, method, m)
 
-        result = self.exporter.install()
-        self.assertEqual(result, expected_result)
+        if expected_result:
+            result = self.exporter.install()
+            self.assertEqual(result, expected_result)
+        else:
+            with self.assertRaises(service.ExporterError):
+                self.exporter.install()
 
         for method, accept_called in method_calls.items():
             m = getattr(self.exporter, method)
@@ -165,8 +169,8 @@ class TestRenderableExporter(unittest.TestCase):
         self.exporter.render_service = mock.MagicMock()
         self.exporter.render_service.return_value = True
 
-        result = self.exporter.install()
-        self.assertFalse(result)
+        with self.assertRaises(service.ExporterError):
+            self.exporter.install()
 
         self.exporter.install_resources.assert_called()
         self.exporter.resources_exist.assert_called()
@@ -985,7 +989,15 @@ def test_snap_exporter_install_success(snap_exporter):
 def test_snap_exporter_install_fail(snap_exporter):
     snap_exporter.strategies[0].install.side_effect = ValueError
 
-    assert snap_exporter.install() is False
+    with pytest.raises(service.ExporterError):
+        snap_exporter.install()
+
+
+def test_snap_exporter_install_snap_not_present(snap_exporter):
+    snap_exporter.snap_client.present = False
+
+    with pytest.raises(service.ExporterError, match="snap not present after install"):
+        snap_exporter.install()
 
 
 def test_snap_exporter_uninstall(snap_exporter):

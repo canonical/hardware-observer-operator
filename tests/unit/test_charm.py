@@ -214,7 +214,10 @@ class TestCharm(unittest.TestCase):
             for mock_exporter, return_val in zip(
                 self.harness.charm.exporters, mock_exporter_install_returns
             ):
-                mock_exporter.install.return_value = return_val
+                if return_val:
+                    mock_exporter.install.return_value = True
+                else:
+                    mock_exporter.install.side_effect = ExporterError("install failed")
 
             if not all(mock_exporter_install_returns):
                 with pytest.raises(ExporterError):
