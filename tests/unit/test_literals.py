@@ -93,3 +93,70 @@ def test_mutually_exclusive_ipmi_over_lan_and_redfish_disabled():
     with pytest.raises(ValidationError) as e:
         HWObserverConfig(redfish_disable=False, ipmi_driver_type="LAN_2_0")
         assert "simultaneously" in str(e.value)
+
+
+@pytest.mark.parametrize("port", [1, 10200, 65535])
+def test_valid_hardware_exporter_port(port):
+    """Valid ports within [1, 65535] should pass."""
+    cfg = HWObserverConfig(hardware_exporter_port=port)
+    assert cfg.hardware_exporter_port == port
+
+
+@pytest.mark.parametrize("port", [0, 65536, -1])
+def test_invalid_hardware_exporter_port(port):
+    """Ports outside [1, 65535] should raise ValidationError."""
+    with pytest.raises(ValidationError) as e:
+        HWObserverConfig(hardware_exporter_port=port)
+    assert "Port must be in range" in str(e.value)
+
+
+@pytest.mark.parametrize("port", [1, 10201, 65535])
+def test_valid_smartctl_exporter_port(port):
+    """Valid ports within [1, 65535] should pass."""
+    cfg = HWObserverConfig(smartctl_exporter_port=port)
+    assert cfg.smartctl_exporter_port == port
+
+
+@pytest.mark.parametrize("port", [0, 65536, -1])
+def test_invalid_smartctl_exporter_port(port):
+    """Ports outside [1, 65535] should raise ValidationError."""
+    with pytest.raises(ValidationError) as e:
+        HWObserverConfig(smartctl_exporter_port=port)
+    assert "Port must be in range" in str(e.value)
+
+
+@pytest.mark.parametrize("level", ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+def test_valid_log_levels(level):
+    """All standard log levels should pass."""
+    cfg = HWObserverConfig(exporter_log_level=level)
+    assert cfg.exporter_log_level == level
+
+
+@pytest.mark.parametrize("level", ["debug", "info", "Warning"])
+def test_log_level_normalised_to_upper(level):
+    """Log level should be normalised to uppercase."""
+    cfg = HWObserverConfig(exporter_log_level=level)
+    assert cfg.exporter_log_level == level.upper()
+
+
+@pytest.mark.parametrize("level", ["TRACE", "VERBOSE", "not-valid"])
+def test_invalid_log_level(level):
+    """Invalid log levels should raise ValidationError."""
+    with pytest.raises(ValidationError) as e:
+        HWObserverConfig(exporter_log_level=level)
+    assert "Invalid log level" in str(e.value)
+
+
+@pytest.mark.parametrize("timeout", [1, 10, 300])
+def test_valid_collect_timeout(timeout):
+    """Positive timeout values should pass."""
+    cfg = HWObserverConfig(collect_timeout=timeout)
+    assert cfg.collect_timeout == timeout
+
+
+@pytest.mark.parametrize("timeout", [0, -1])
+def test_invalid_collect_timeout(timeout):
+    """Zero or negative timeout should raise ValidationError."""
+    with pytest.raises(ValidationError) as e:
+        HWObserverConfig(collect_timeout=timeout)
+    assert "collect-timeout must be > 0" in str(e.value)

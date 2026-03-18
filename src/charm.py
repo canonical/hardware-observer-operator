@@ -39,12 +39,7 @@ class HardwareObserverCharm(ops.CharmBase):
         super().__init__(*args)
         self.hw_tool_helper = HWToolHelper()
 
-        try:
-            self.typed_config = self.load_config(HWObserverConfig)
-        except ValueError as e:
-            logger.error("Invalid dcgm-snap-channel config: %s", e)
-            self.model.unit.status = ops.BlockedStatus(str(e))
-            return
+        self.typed_config = self.load_config(HWObserverConfig, errors="blocked")
 
         self._stored.set_default(
             # resource_installed is a flag that tracks the installation state for
@@ -82,13 +77,13 @@ class HardwareObserverCharm(ops.CharmBase):
             exporters.append(
                 HardwareExporter(
                     self.charm_dir,
-                    self.model.config,
+                    self.typed_config,
                     stored_tools,
                 )
             )
 
         if stored_tools & SmartCtlExporter.hw_tools():
-            exporters.append(SmartCtlExporter(self.model.config))
+            exporters.append(SmartCtlExporter(self.typed_config))
 
         if stored_tools & DCGMExporter.hw_tools():
             exporters.append(DCGMExporter(self.typed_config))
@@ -280,12 +275,12 @@ class HardwareObserverCharm(ops.CharmBase):
         # Setting scrape_timeout as collect_timeout in the `duration` format specified in
         # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#duration
         scrape_config: List[Dict[str, Any]] = []
-        timeout = f"{self.model.config['collect-timeout']}s"
+        timeout = f"{self.typed_config.collect_timeout}s"
         labels = {"instance": socket.getfqdn()}
 
         for exporter in self.exporters:
             if isinstance(exporter, HardwareExporter):
-                port = self.model.config["hardware-exporter-port"]
+                port = self.typed_config.hardware_exporter_port
                 scrape_config.append(
                     {
                         "metrics_path": "/metrics",
@@ -299,7 +294,7 @@ class HardwareObserverCharm(ops.CharmBase):
                     }
                 )
             if isinstance(exporter, SmartCtlExporter):
-                port = self.model.config["smartctl-exporter-port"]
+                port = self.typed_config.smartctl_exporter_port
                 scrape_config.append(
                     {
                         "metrics_path": "/metrics",
@@ -347,7 +342,7 @@ class HardwareObserverCharm(ops.CharmBase):
 
     def _set_prometheus_alert_rules(self) -> None:
         """Set Prometheus alert rules based on enabled exporters."""
-        if HWTool.REDFISH in self.stored_tools and self.config["redfish-disable"] is False:
+        if HWTool.REDFISH in self.stored_tools and self.typed_config.redfish_disable is False:
             logger.info("Enabling Redfish alert rules.")
             shutil.copy(PROM_RULES_REDFISH, PROM_RULES)
         else:

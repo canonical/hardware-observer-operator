@@ -32,13 +32,15 @@ class TestRenderableExporter(unittest.TestCase):
         self.addCleanup(get_bmc_address_patcher.stop)
 
         search_path = pathlib.Path(f"{__file__}/../../..").resolve()
-        self.mock_config = {
-            "hardware-exporter-port": 10200,
-            "collect-timeout": 10,
-            "exporter-log-level": "INFO",
-            "redfish-username": "",
-            "redfish-password": "",
-        }
+        self.mock_config = HWObserverConfig(
+            **{
+                "hardware-exporter-port": 10200,
+                "collect-timeout": 10,
+                "exporter-log-level": "INFO",
+                "redfish-username": "",
+                "redfish-password": "",
+            }
+        )
         self.mock_stored_hw_available = {"storcli", "ssacli"}
         service.RenderableExporter.__abstractmethods__ = set()
 
@@ -211,28 +213,6 @@ class TestRenderableExporter(unittest.TestCase):
         self.mock_systemd.service_disable.assert_called_once()
         self.mock_systemd.service_stop.assert_called_once()
         mock_ssdlc_log.assert_called_once()
-
-    def test_validate_exporter_config_okay(self):
-        self.exporter.port = 10000
-        self.exporter.log_level = "debug"
-        self.assertEqual(
-            (True, "Exporter config is valid."), self.exporter.validate_exporter_configs()
-        )
-
-    def test_validate_exporter_config_failed_port(self):
-        self.exporter.port = 70000
-        self.assertEqual(
-            (False, "Invalid config: exporter's port"),
-            self.exporter.validate_exporter_configs(),
-        )
-
-    def test_validate_exporter_config_failed_log_level(self):
-        self.exporter.port = 10000
-        self.exporter.log_level = "not-allowed_level_choices"
-        self.assertEqual(
-            (False, "Invalid config: 'exporter-log-level'"),
-            self.exporter.validate_exporter_configs(),
-        )
 
     @mock.patch("service.remove_file")
     def test_remove_service_okay(self, mock_remove_file):
@@ -424,15 +404,17 @@ class TestHardwareExporter(unittest.TestCase):
         self.addCleanup(get_bmc_address_patcher.stop)
 
         search_path = pathlib.Path(f"{__file__}/../../..").resolve()
-        self.mock_config = {
-            "hardware-exporter-port": 10200,
-            "collect-timeout": 10,
-            "exporter-log-level": "INFO",
-            "redfish-username": "",
-            "redfish-password": "",
-            "redfish-disable": False,
-            "ipmi-driver-type": "",
-        }
+        self.mock_config = HWObserverConfig(
+            **{
+                "hardware-exporter-port": 10200,
+                "collect-timeout": 10,
+                "exporter-log-level": "INFO",
+                "redfish-username": "",
+                "redfish-password": "",
+                "redfish-disable": False,
+                "ipmi-driver-type": "",
+            }
+        )
         self.mock_tools_available = {"storcli", "ssacli"}
         self.exporter = service.HardwareExporter(
             search_path, self.mock_config, self.mock_tools_available
@@ -460,17 +442,6 @@ class TestHardwareExporter(unittest.TestCase):
         self.assertEqual(
             (True, "Exporter config is valid."), self.exporter.validate_exporter_configs()
         )
-
-    @mock.patch("builtins.super", return_value=mock.MagicMock())
-    def test_validate_exporter_config_super_failed(self, mock_super):
-        self.exporter.redfish_conn_params_valid = mock.MagicMock()
-        self.exporter.redfish_conn_params_valid.return_value = True
-
-        mock_super.return_value.validate_exporter_configs.return_value = (False, "something wrong")
-        self.assertEqual((False, "something wrong"), self.exporter.validate_exporter_configs())
-
-        mock_super.return_value.validate_exporter_configs.assert_called()
-        self.exporter.redfish_conn_params_valid.assert_not_called()
 
     @mock.patch("service.HardwareExporter.enabled_tools", new_callable=mock.PropertyMock)
     def test_validate_exporter_config_redfish_conn_params_failed(self, mock_enable_tools):
@@ -502,15 +473,17 @@ class TestHardwareExporter(unittest.TestCase):
     def test_render_config_content_redfish_available_and_disabled(self):
         """Test render config content redfish is available but disabled."""
         self.exporter.available_tools = {HWTool.REDFISH, HWTool.IPMI_DCMI}
-        self.exporter.config = {
-            "hardware-exporter-port": 10200,
-            "collect-timeout": 10,
-            "exporter-log-level": "INFO",
-            "redfish-username": "my-user",
-            "redfish-password": "my-pwd",
-            "redfish-disable": True,
-            "ipmi-driver-type": "",
-        }
+        self.exporter.config = HWObserverConfig(
+            **{
+                "hardware-exporter-port": 10200,
+                "collect-timeout": 10,
+                "exporter-log-level": "INFO",
+                "redfish-username": "my-user",
+                "redfish-password": "my-pwd",
+                "redfish-disable": True,
+                "ipmi-driver-type": "",
+            }
+        )
         content = self.exporter._render_config_content()
         content_config = yaml.safe_load(content)
         self.assertEqual(content_config["port"], 10200)
@@ -525,15 +498,17 @@ class TestHardwareExporter(unittest.TestCase):
     def test_render_config_content_redfish_available_and_enabled(self):
         """Test render config content when redfish is available and enabled."""
         self.exporter.available_tools = {HWTool.REDFISH}
-        self.exporter.config = {
-            "hardware-exporter-port": 10200,
-            "collect-timeout": 10,
-            "exporter-log-level": "INFO",
-            "redfish-username": "my-user",
-            "redfish-password": "my-pwd",
-            "redfish-disable": False,
-            "ipmi-driver-type": "LAN_2_0",
-        }
+        self.exporter.config = HWObserverConfig(
+            **{
+                "hardware-exporter-port": 10200,
+                "collect-timeout": 10,
+                "exporter-log-level": "INFO",
+                "redfish-username": "my-user",
+                "redfish-password": "my-pwd",
+                "redfish-disable": False,
+                "ipmi-driver-type": "",
+            }
+        )
         content = self.exporter._render_config_content()
         content_config = yaml.safe_load(content)
         self.assertEqual(content_config["port"], 10200)
@@ -577,7 +552,7 @@ class TestHardwareExporter(unittest.TestCase):
         expected_result,
     ):
         """Test that Redfish is removed from available_tools if necessary."""
-        self.exporter.config = {"redfish-disable": redfish_disable}
+        self.exporter.config = HWObserverConfig(redfish_disable=redfish_disable)
         self.exporter.available_tools = available_tools
         self.assertEqual(self.exporter.enabled_tools, expected_result)
         self.assertEqual(self.exporter.available_tools, available_tools)
@@ -815,13 +790,6 @@ class TestDCGMSnapExporter(unittest.TestCase):
             "Snap DCGM channel 'v4-cuda12/stable' doesn't match with driver version 580", msg
         )
 
-    @mock.patch.object(service.BaseExporter, "validate_exporter_configs")
-    def test_validate_exporter_configs_fails_parent(self, mock_parent_validate):
-        mock_parent_validate.return_value = False, "Invalid config: exporter's port"
-        valid, msg = self.exporter.validate_exporter_configs()
-        self.assertFalse(valid)
-        self.assertEqual(msg, "Invalid config: exporter's port")
-
     @mock.patch("service.get_cuda_version_from_driver", return_value=11)
     def test_automatic_channel_selection_v4(self, _):
         self.exporter.channel = "auto"  # forces setter again with patched value
@@ -959,11 +927,7 @@ def snap_exporter():
         strategies = [my_snap_strategy, my_apt_strategy]
 
     with mock.patch("service.snap.SnapCache"):
-        exporter = MySnapExporter(
-            {
-                "dcgm-snap-channel": "latest/stable",
-            }
-        )
+        exporter = MySnapExporter(HWObserverConfig())
 
         exporter.snap_client.services = {"service1": {}, "service2": {}}
 
@@ -1091,17 +1055,34 @@ def test_snap_exporter_configure_exception(_, snap_exporter):
 @mock.patch("service.SmartCtlExporterStrategy.install")
 @mock.patch("service.SnapExporter.set")
 def test_smartctl_exporter_configure(mock_set, mock_install, result, expected_result):
-    mock_config = {
-        "smartctl-exporter-port": "10000",
-        "exporter-log-level": "info",
-        "smartctl-exporter-snap-channel": "latest/stable",
-    }
+    mock_config = HWObserverConfig(
+        **{
+            "smartctl-exporter-port": 10000,
+            "exporter-log-level": "info",
+            "smartctl-exporter-snap-channel": "latest/stable",
+        }
+    )
     mock_set.return_value = result
     mock_install.return_value = result
     exporter = service.SmartCtlExporter(mock_config)
     assert exporter.exporter_name == "smartctl-exporter"
     assert exporter.hw_tools() == {HWTool.SMARTCTL_EXPORTER}
     assert exporter.configure() is expected_result
+
+
+def test_smartctl_exporter_validate_exporter_configs():
+    """Test SmartCtlExporter inherits BaseExporter validation which always passes."""
+    mock_config = HWObserverConfig(
+        **{
+            "smartctl-exporter-port": 10201,
+            "exporter-log-level": "info",
+            "smartctl-exporter-snap-channel": "latest/stable",
+        }
+    )
+    exporter = service.SmartCtlExporter(mock_config)
+    valid, msg = exporter.validate_exporter_configs()
+    assert valid is True
+    assert msg == "Exporter config is valid."
 
 
 if __name__ == "__main__":
