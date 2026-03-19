@@ -128,7 +128,7 @@ STORCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
 PERCCLI_VERSION_INFOS: t.List[ToolVersionInfo] = [
     ToolVersionInfo(
         version="007.2313.0000.0000",
-        supported_series=[UbuntuSeries.JAMMY, UbuntuSeries.FOCAL],
+        supported_series=[UbuntuSeries.NOBLE, UbuntuSeries.JAMMY, UbuntuSeries.FOCAL],
         supported_architectures=[Architecture.X86_64],
         link="https://www.dell.com/support/home/zh-tw/drivers/driversdetails?driverid=tdghn",
         desc="A14",
