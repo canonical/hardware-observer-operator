@@ -58,7 +58,11 @@ class BaseExporter(ABC):
 
     @abstractmethod
     def install(self) -> bool:
-        """Install the exporter."""
+        """Install the exporter.
+
+        Returns True on success.
+        Raises ExporterError on failure.
+        """
 
     @abstractmethod
     def uninstall(self) -> bool:
@@ -202,34 +206,42 @@ class RenderableExporter(BaseExporter):
         return service_file_exists and config_file_exists
 
     def install(self) -> bool:
-        """Install the exporter."""
+        """Install the exporter.
+
+        Returns True on success.
+        Raises ExporterError on failure.
+        """
         logger.info("Installing %s.", self.exporter_name)
 
         # Install resources
         install_resource_success = self.install_resources()
         if not install_resource_success:
-            logger.error("Failed to install %s resources.", self.exporter_name)
-            return False
+            msg = f"Failed to install {self.exporter_name} resources."
+            logger.error(msg)
+            raise ExporterError(msg)
         if not self.resources_exist():
-            logger.error("%s resources are not installed properly.", self.exporter_name)
-            # pylint: disable=too-many-instance-attributes
-            return False
+            msg = f"{self.exporter_name} resources are not installed properly."
+            logger.error(msg)
+            raise ExporterError(msg)
 
         # Render config
         configure_success = self.configure()
         if not configure_success:
-            logger.error("Failed to render config files for %s.", self.exporter_name)
-            return False
+            msg = f"Failed to render config files for {self.exporter_name}."
+            logger.error(msg)
+            raise ExporterError(msg)
 
         # Install service
         render_service_success = self.render_service()
         if not render_service_success:
-            logger.error("Failed to install %s.", self.exporter_name)
-            return False
+            msg = f"Failed to install {self.exporter_name}."
+            logger.error(msg)
+            raise ExporterError(msg)
 
         if not self.verify_render_files_exist():
-            logger.error("%s is not installed properly.", self.exporter_name)
-            return False
+            msg = f"{self.exporter_name} is not installed properly."
+            logger.error(msg)
+            raise ExporterError(msg)
 
         systemd.daemon_reload()
 
@@ -334,15 +346,19 @@ class SnapExporter(BaseExporter):
     def install(self) -> bool:
         """Install the snap from a channel.
 
-        Returns true if the install is successful, false otherwise.
+        Returns True on success.
+        Raises ExporterError on failure.
         """
         try:
             for strategy in self.strategies:
                 strategy.install()
-            return self.snap_client.present is True
         except Exception as err:  # pylint: disable=broad-except
             logger.error("Failed to install %s: %s", strategy.name, err)
-            return False
+            raise ExporterError(f"Failed to install {strategy.name}: {err}") from err
+
+        if not self.snap_client.present:
+            raise ExporterError(f"{self.exporter_name} snap not present after install")
+        return True
 
     def uninstall(self) -> bool:
         """Uninstall the snap.

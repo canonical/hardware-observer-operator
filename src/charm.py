@@ -164,17 +164,14 @@ class HardwareObserverCharm(ops.CharmBase):
             return
 
         # Install exporter services and resources
-        for exporter in self.exporters:
-            exporter_install_ok = exporter.install()
-
-            if not exporter_install_ok:
-                self._stored.resource_installed = False
-                msg = f"Exporter {exporter.exporter_name} install failed"
-                logger.error(msg)
-                raise ExporterError(msg)
-
-            exporter.enable_and_start()
-            logger.info("Enabled and started %s service", exporter.exporter_name)
+        try:
+            for exporter in self.exporters:
+                exporter.install()
+                exporter.enable_and_start()
+                logger.info("Enabled and started %s service", exporter.exporter_name)
+        except ExporterError:
+            self._stored.resource_installed = False
+            raise
 
         self._on_update_status(event)
 
