@@ -358,7 +358,7 @@ class TestCharm(unittest.TestCase):
             ),
         ):
             if cos_agent_related:
-                self.harness.add_relation("cos-agent", "grafana-agent")
+                self.harness.add_relation("cos-agent", "opentelemetry-collector")
             self.harness.begin()
 
             self.harness.charm.model.unit.status = BlockedStatus("Random status")
@@ -626,7 +626,7 @@ class TestCharm(unittest.TestCase):
                 return_value=mock_stored_tools,
             ),
         ):
-            rid = self.harness.add_relation("cos-agent", "grafana-agent")
+            rid = self.harness.add_relation("cos-agent", "opentelemetry-collector")
 
             self.harness.begin()
 
@@ -635,7 +635,7 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.hw_tool_helper.check_installed.return_value = (True, "")
 
             self.harness.charm.on.install.emit()
-            self.harness.add_relation_unit(rid, "grafana-agent/0")
+            self.harness.add_relation_unit(rid, "opentelemetry-collector/0")
             self.harness.charm.on.update_status.emit()
             self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
 
@@ -670,7 +670,7 @@ class TestCharm(unittest.TestCase):
                 return_value=mock_exporters,
             ),
         ):
-            rid = self.harness.add_relation("cos-agent", "grafana-agent")
+            rid = self.harness.add_relation("cos-agent", "opentelemetry-collector")
 
             self.harness.begin()
 
@@ -688,7 +688,7 @@ class TestCharm(unittest.TestCase):
             )
 
             self.harness.charm.on.install.emit()
-            self.harness.add_relation_unit(rid, "grafana-agent/0")
+            self.harness.add_relation_unit(rid, "opentelemetry-collector/0")
             self.harness.charm.on.update_status.emit()
             self.assertEqual(self.harness.charm.unit.status, ActiveStatus("Unit is ready"))
 
