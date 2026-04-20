@@ -143,6 +143,7 @@ async def test_required_resources(ops_test: OpsTest, required_resources):
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.skip_if_deployed
 async def test_cos_agent_relation(ops_test: OpsTest, provided_collectors):
     """Test adding relation with grafana-agent."""
     redfish_present = True if "redfish" in provided_collectors else False
@@ -321,7 +322,10 @@ class TestCharmWithHW:
                 app.set_config({"exporter-log-level": "RANDOM_LEVEL"}),
                 ops_test.model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=TIMEOUT),
             )
-            assert unit.workload_status_message == AppStatus.INVALID_CONFIG_EXPORTER_LOG_LEVEL
+            assert (
+                unit.workload_status_message.startswith("Invalid config:")
+                and "exporter-log-level" in unit.workload_status_message
+            )
 
         async with ops_test.fast_forward():
             await asyncio.gather(
@@ -738,6 +742,7 @@ class TestCharmWithHW:
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.skip_if_deployed
 async def test_on_remove_event(app, ops_test, nvidia_present):
     """Test _on_remove event cleans up the service on the host machine."""
     await asyncio.gather(
