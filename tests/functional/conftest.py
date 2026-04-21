@@ -3,7 +3,7 @@ import logging
 import os
 import platform
 from pathlib import Path
-from typing import List, Set
+from typing import List
 
 import pytest
 from pytest_operator.plugin import OpsTest
