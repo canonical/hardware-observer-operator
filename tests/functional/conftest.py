@@ -3,6 +3,7 @@ import logging
 import os
 import platform
 from pathlib import Path
+from typing import List, Set
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -135,7 +136,7 @@ def unit(app):
 
 
 @pytest.fixture()
-def resources() -> list[Resource]:
+def resources() -> List[Resource]:
     """Return list of Resource objects."""
     return [
         Resource(
@@ -174,7 +175,7 @@ def resources() -> list[Resource]:
 
 
 @pytest.fixture()
-def required_resources(resources: list[Resource], provided_collectors: set) -> list[Resource]:
+def required_resources(resources: List[Resource], provided_collectors: set) -> List[Resource]:
     """Return list of required resources to be attached as per hardware availability.
 
     Required resources will be empty if no collectors are provided.
