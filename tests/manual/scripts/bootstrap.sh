@@ -61,7 +61,7 @@ EOF
     fi
 else
     BRIDGE="lxdbr0"
-    if [ -z "$(sudo --user $USER lxc storage list --format csv)" ]; then
+    if ! ip link show "$BRIDGE" > /dev/null 2>&1; then
         echo 'Bootstrapping LXD'
         sudo --user $USER lxd init --auto
     fi
