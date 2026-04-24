@@ -268,11 +268,11 @@ jobs:
           path: "${{ env.CRASHDUMPS_DIR }}/juju-crashdump-*.tar.xz"
 
   tics-analysis:
-    runs-on: [self-hosted, linux, amd64, tiobe, noble]
+    runs-on: [self-hosted, linux, amd64, tiobe, jammy]
     # if: >
     #   (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
     #   (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-    # needs: func
+    needs: func
     steps:
       - uses: actions/checkout@v6
         with:
