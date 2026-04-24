@@ -143,7 +143,6 @@ async def test_required_resources(ops_test: OpsTest, required_resources):
 
 
 @pytest.mark.abort_on_fail
-@pytest.mark.skip_if_deployed
 async def test_cos_agent_relation(ops_test: OpsTest, provided_collectors):
     """Test adding relation with grafana-agent."""
     redfish_present = True if "redfish" in provided_collectors else False
@@ -742,7 +741,6 @@ class TestCharmWithHW:
 
 
 @pytest.mark.abort_on_fail
-@pytest.mark.skip_if_deployed
 async def test_on_remove_event(app, ops_test, nvidia_present):
     """Test _on_remove event cleans up the service on the host machine."""
     await asyncio.gather(
