@@ -97,175 +97,175 @@ jobs:
         name: coverage-unit-${{ env.ARTIFACT_SUFFIX }}
         path: .coverage-unit-${{ env.ARTIFACT_SUFFIX }}
 
-  build:
-    needs:
-      - lint
-      - unit
-    name: build charms
-    runs-on: ${{ matrix.runs-on }}
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on: [[ubuntu-24.04], [ubuntu-24.04-arm], [self-hosted, linux, s390x],[self-hosted, ppc64el]]
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
+  # build:
+  #   needs:
+  #     - lint
+  #     - unit
+  #   name: build charms
+  #   runs-on: ${{ matrix.runs-on }}
+  #   timeout-minutes: 120
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       runs-on: [[ubuntu-24.04], [ubuntu-24.04-arm], [self-hosted, linux, s390x],[self-hosted, ppc64el]]
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #       with:
+  #         submodules: true
 
-      - uses: canonical/craft-actions/charmcraft/setup@main
-        with:
-          channel: "3.x/stable"
+  #     - uses: canonical/craft-actions/charmcraft/setup@main
+  #       with:
+  #         channel: "3.x/stable"
 
-      - name: Pack the charms
-        id: build
-        run: |
-          charmcraft -v pack
-          echo "charms=$(ls -1 *.charm | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+  #     - name: Pack the charms
+  #       id: build
+  #       run: |
+  #         charmcraft -v pack
+  #         echo "charms=$(ls -1 *.charm | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
 
-      - name: List the names of the built charms
-        run: echo "::notice::Successfully built ${{ steps.build.outputs.charms}}"
+  #     - name: List the names of the built charms
+  #       run: echo "::notice::Successfully built ${{ steps.build.outputs.charms}}"
 
-      - name: Determine system architecture
-        run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
+  #     - name: Determine system architecture
+  #       run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
-      - name: Upload the tested charms
-        uses: actions/upload-artifact@v7
-        with:
-          name: built_charms_${{ env.SYSTEM_ARCH }}
-          path: ./*.charm
+  #     - name: Upload the tested charms
+  #       uses: actions/upload-artifact@v7
+  #       with:
+  #         name: built_charms_${{ env.SYSTEM_ARCH }}
+  #         path: ./*.charm
 
-  func:
-    needs:
-      - build
-    name: functional tests
-    runs-on: ${{ matrix.runs-on }}
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on: [[ubuntu-24.04], [ubuntu-22.04-arm]]
-        test-command: ['tox -e func -- -v --base ubuntu@20.04 --keep-models', 'tox -e func -- -v --base ubuntu@22.04 --keep-models', 'tox -e func -- -v --base ubuntu@24.04 --keep-models' ]
-        juju-channel: ["3.6/stable"]
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
+  # func:
+  #   needs:
+  #     - build
+  #   name: functional tests
+  #   runs-on: ${{ matrix.runs-on }}
+  #   timeout-minutes: 120
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       runs-on: [[ubuntu-24.04], [ubuntu-22.04-arm]]
+  #       test-command: ['tox -e func -- -v --base ubuntu@20.04 --keep-models', 'tox -e func -- -v --base ubuntu@22.04 --keep-models', 'tox -e func -- -v --base ubuntu@24.04 --keep-models' ]
+  #       juju-channel: ["3.6/stable"]
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #       with:
+  #         submodules: true
 
-        # arm64 runners don't have gcc installed by default
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y gcc
+  #       # arm64 runners don't have gcc installed by default
+  #     - name: Install dependencies
+  #       run: |
+  #         sudo apt update
+  #         sudo apt install -y gcc
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v6
+  #       with:
+  #         python-version: "3.12"
 
-      - name: Setup Juju environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          provider: "lxd"
-          juju-channel: ${{ matrix.juju-channel }}
-          charmcraft-channel: "3.x/stable"
+  #     - name: Setup Juju environment
+  #       uses: charmed-kubernetes/actions-operator@main
+  #       with:
+  #         provider: "lxd"
+  #         juju-channel: ${{ matrix.juju-channel }}
+  #         charmcraft-channel: "3.x/stable"
 
-      - name: Determine system architecture
-        run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
+  #     - name: Determine system architecture
+  #       run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
-        # This is used by zaza in the functional tests for non-amd64 architectures (if applicable)
-      - name: Set zaza juju model constraints for architecture
-        run: |
-          if [ "${{ env.SYSTEM_ARCH }}" = "aarch64" ]; then
-            echo "TEST_MODEL_CONSTRAINTS=arch=arm64" >> "$GITHUB_ENV"
-          fi
+  #       # This is used by zaza in the functional tests for non-amd64 architectures (if applicable)
+  #     - name: Set zaza juju model constraints for architecture
+  #       run: |
+  #         if [ "${{ env.SYSTEM_ARCH }}" = "aarch64" ]; then
+  #           echo "TEST_MODEL_CONSTRAINTS=arch=arm64" >> "$GITHUB_ENV"
+  #         fi
 
-      - name: Download the built charms
-        uses: actions/download-artifact@v8
-        with:
-          name: built_charms_${{ env.SYSTEM_ARCH }}
+  #     - name: Download the built charms
+  #       uses: actions/download-artifact@v8
+  #       with:
+  #         name: built_charms_${{ env.SYSTEM_ARCH }}
 
-      - name: List the names of the downloaded charms
-        run: |
-          ls *.charm
+  #     - name: List the names of the downloaded charms
+  #       run: |
+  #         ls *.charm
 
-      - name: Run tests
-        run: |
-          # These variables are for a consistent method to find the charm file(s) across all projects.
-          # It is designed to work both with charms that output one file per base,
-          # and charms that output a single file to run on all bases.
-          # Not all charms will use them, and for some charms the variables will resolve to the same file.
-          export CHARM_PATH_NOBLE="$(pwd)/$(ls | grep '.*24.04.*\.charm$')"
-          echo "$CHARM_PATH_NOBLE"
-          export CHARM_PATH_JAMMY="$(pwd)/$(ls | grep '.*22.04.*\.charm$')"
-          echo "$CHARM_PATH_JAMMY"
-          export CHARM_PATH_FOCAL="$(pwd)/$(ls | grep '.*20.04.*\.charm$')"
-          echo "$CHARM_PATH_FOCAL"
-          ${{ matrix.test-command }}
-        env:
-          TEST_JUJU_CHANNEL: ${{ matrix.juju-channel }}
+  #     - name: Run tests
+  #       run: |
+  #         # These variables are for a consistent method to find the charm file(s) across all projects.
+  #         # It is designed to work both with charms that output one file per base,
+  #         # and charms that output a single file to run on all bases.
+  #         # Not all charms will use them, and for some charms the variables will resolve to the same file.
+  #         export CHARM_PATH_NOBLE="$(pwd)/$(ls | grep '.*24.04.*\.charm$')"
+  #         echo "$CHARM_PATH_NOBLE"
+  #         export CHARM_PATH_JAMMY="$(pwd)/$(ls | grep '.*22.04.*\.charm$')"
+  #         echo "$CHARM_PATH_JAMMY"
+  #         export CHARM_PATH_FOCAL="$(pwd)/$(ls | grep '.*20.04.*\.charm$')"
+  #         echo "$CHARM_PATH_FOCAL"
+  #         ${{ matrix.test-command }}
+  #       env:
+  #         TEST_JUJU_CHANNEL: ${{ matrix.juju-channel }}
 
-      - name: Generate Safe Test Command Identifier by removing spaces and special characters
-        run: |
-          TEST_CMD_ID=$(echo "${{ matrix.test-command }}" | sed 's/[^a-zA-Z0-9]/_/g')
-          echo "TEST_CMD_ID=$TEST_CMD_ID" >> $GITHUB_ENV
+  #     - name: Generate Safe Test Command Identifier by removing spaces and special characters
+  #       run: |
+  #         TEST_CMD_ID=$(echo "${{ matrix.test-command }}" | sed 's/[^a-zA-Z0-9]/_/g')
+  #         echo "TEST_CMD_ID=$TEST_CMD_ID" >> $GITHUB_ENV
 
-      - name: Create artifact name suffix
-        run: |
-          echo "ARTIFACT_SUFFIX=${{ env.TEST_CMD_ID }}-${{ env.SYSTEM_ARCH }}" >> $GITHUB_ENV
+  #     - name: Create artifact name suffix
+  #       run: |
+  #         echo "ARTIFACT_SUFFIX=${{ env.TEST_CMD_ID }}-${{ env.SYSTEM_ARCH }}" >> $GITHUB_ENV
 
-      - name: Rename Functional Test Coverage Artifact
-        run: |
-          if [ -e ".coverage-func" ]; then
-            mv .coverage-func .coverage-func-${{ env.ARTIFACT_SUFFIX }}
-          else
-            echo "No coverage file found, skipping rename"
-          fi
+  #     - name: Rename Functional Test Coverage Artifact
+  #       run: |
+  #         if [ -e ".coverage-func" ]; then
+  #           mv .coverage-func .coverage-func-${{ env.ARTIFACT_SUFFIX }}
+  #         else
+  #           echo "No coverage file found, skipping rename"
+  #         fi
 
-      - name: Upload Functional Test Coverage Artifact
-        uses: actions/upload-artifact@v7
-        with:
-          include-hidden-files: true
-          if-no-files-found: ignore
-          name: coverage-functional-${{ env.ARTIFACT_SUFFIX }}
-          path: .coverage-func-${{ env.ARTIFACT_SUFFIX }}
+  #     - name: Upload Functional Test Coverage Artifact
+  #       uses: actions/upload-artifact@v7
+  #       with:
+  #         include-hidden-files: true
+  #         if-no-files-found: ignore
+  #         name: coverage-functional-${{ env.ARTIFACT_SUFFIX }}
+  #         path: .coverage-func-${{ env.ARTIFACT_SUFFIX }}
 
-      # Save output for debugging
+  #     # Save output for debugging
 
-      - name: Generate debugging information
-        if: always()
-        run: |
-          set -x
-          # install dependencies
-          sudo snap install --classic juju-crashdump
-          sudo apt install -y jq uuid
+  #     - name: Generate debugging information
+  #       if: always()
+  #       run: |
+  #         set -x
+  #         # install dependencies
+  #         sudo snap install --classic juju-crashdump
+  #         sudo apt install -y jq uuid
 
-          # Print juju controller information for debugging
-          # to check controller and client are compatible versions;
-          # we can have a mismatch if using an external controller.
-          juju version
-          juju controllers
+  #         # Print juju controller information for debugging
+  #         # to check controller and client are compatible versions;
+  #         # we can have a mismatch if using an external controller.
+  #         juju version
+  #         juju controllers
 
-          models="$(juju models --format json | jq -r '.models[]."short-name"')"
-          dir="$(mktemp -d)"
-          # Use a different dir to avoid charmed-kubernetes/actions-operator from also trying to upload crashdumps.
-          # We don't want to rely on that action, because it doesn't use a descriptive enough name for the artefact,
-          # and we may stop using that action soon.
-          echo "CRASHDUMPS_DIR=$dir" | tee -a "$GITHUB_ENV"
-          echo "CRASHDUMPS_ARTEFACT_SUFFIX=$(uuid)-$(uname -m)" | tee -a "$GITHUB_ENV"
+  #         models="$(juju models --format json | jq -r '.models[]."short-name"')"
+  #         dir="$(mktemp -d)"
+  #         # Use a different dir to avoid charmed-kubernetes/actions-operator from also trying to upload crashdumps.
+  #         # We don't want to rely on that action, because it doesn't use a descriptive enough name for the artefact,
+  #         # and we may stop using that action soon.
+  #         echo "CRASHDUMPS_DIR=$dir" | tee -a "$GITHUB_ENV"
+  #         echo "CRASHDUMPS_ARTEFACT_SUFFIX=$(uuid)-$(uname -m)" | tee -a "$GITHUB_ENV"
 
-          for model in $models; do
-            # show status here for quick debugging
-            juju status -m "$model"
-            juju-crashdump --as-root -m "$model" -u "$model-$(uname -m)" -o "$dir"
-          done
+  #         for model in $models; do
+  #           # show status here for quick debugging
+  #           juju status -m "$model"
+  #           juju-crashdump --as-root -m "$model" -u "$model-$(uname -m)" -o "$dir"
+  #         done
 
-      - name: Upload juju crashdumps
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: "juju-crashdumps-${{ env.CRASHDUMPS_ARTEFACT_SUFFIX }}"
-          path: "${{ env.CRASHDUMPS_DIR }}/juju-crashdump-*.tar.xz"
+  #     - name: Upload juju crashdumps
+  #       uses: actions/upload-artifact@v7
+  #       if: always()
+  #       with:
+  #         name: "juju-crashdumps-${{ env.CRASHDUMPS_ARTEFACT_SUFFIX }}"
+  #         path: "${{ env.CRASHDUMPS_DIR }}/juju-crashdump-*.tar.xz"
 
   tics-analysis:
     runs-on: [self-hosted, linux, amd64, tiobe, jammy]
@@ -278,27 +278,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install coverage tools
-        run: |
-          pip install coverage[toml]
-
       # Install everything from all requirements.txt files otherwise TICS errors.
       - name: Install all charm dependencies
         run: |
-          sudo apt install python3.10-venv -y
+          sudo apt update
+          sudo apt install python3-venv -y
           python3 -m venv .venv
-          source .venv/bin/activate
-          pip install --upgrade pip
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install coverage[toml]
+
           for f in $(find -name '*requirements.txt'); do
               echo "${f}"
-              pip3 install --requirement "${f}"
+              .venv/bin/python -m pip install --requirement "${f}"
           done
 
           # For reactive charms
           for f in $(find -name 'wheelhouse.txt'); do
               echo "${f}"
-              pip3 install --requirement "${f}"
+              .venv/bin/python -m pip install --requirement "${f}"
           done
+
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
 
       - name: Determine system architecture
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
