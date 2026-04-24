@@ -272,7 +272,7 @@ jobs:
     # if: >
     #   (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
     #   (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-    needs: func
+    needs: unit
     steps:
       - uses: actions/checkout@v6
         with:
@@ -285,6 +285,10 @@ jobs:
       # Install everything from all requirements.txt files otherwise TICS errors.
       - name: Install all charm dependencies
         run: |
+          sudo apt install python3.10-venv -y
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
           for f in $(find -name '*requirements.txt'); do
               echo "${f}"
               pip3 install --requirement "${f}"
