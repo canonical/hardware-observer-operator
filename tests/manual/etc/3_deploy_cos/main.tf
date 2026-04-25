@@ -14,7 +14,7 @@ locals {
 }
 
 module "cos-lite-terraform" {
-  source = "git::https://github.com/canonical/snap-openstack.git//sunbeam-python/sunbeam/features/observability/etc/deploy-cos"
+  source = "git::https://github.com/canonical/snap-openstack.git//sunbeam-python/sunbeam/features/observability/etc/deploy-cos?ref=9e81465a91e068224077ad3f6fbf44705800139b"
 
   model      = local.cos_model_name
   cloud      = var.k8s_cloud_name
