@@ -278,23 +278,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install coverage tools
-        run: |
-          pip install coverage[toml]
-
       # Install everything from all requirements.txt files otherwise TICS errors.
       - name: Install all charm dependencies
         run: |
+          # run in a virtualenv to ensure dependencies will not conflict with the system python packages
+          sudo apt update
+          sudo apt install python3-venv -y
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install coverage[toml]
+
           for f in $(find -name '*requirements.txt'); do
               echo "${f}"
-              pip3 install --requirement "${f}"
+              .venv/bin/python -m pip install --requirement "${f}"
           done
 
           # For reactive charms
           for f in $(find -name 'wheelhouse.txt'); do
               echo "${f}"
-              pip3 install --requirement "${f}"
+              .venv/bin/python -m pip install --requirement "${f}"
           done
+
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
 
       - name: Determine system architecture
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
