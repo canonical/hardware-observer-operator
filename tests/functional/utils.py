@@ -5,7 +5,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 import yaml
 from async_lru import alru_cache
@@ -80,7 +80,7 @@ async def get_hardware_exporter_config(ops_test, unit_name) -> dict:
 
 async def get_generic_exporter_metrics(
     ops_test, unit_name: str, port: int, metric_name: str
-) -> Optional[list[Metric]]:
+) -> Optional[List[Metric]]:
     """Return parsed prometheus metric output from Smartctl Exporter on unit.
 
     Raises MetricsFetchError if command to fetch metrics didn't execute successfully.
@@ -96,7 +96,7 @@ async def get_generic_exporter_metrics(
 @alru_cache
 async def get_hardware_exporter_metrics(
     ops_test, unit_name: str
-) -> Optional[dict[str, list[Metric]]]:
+) -> Optional[Dict[str, List[Metric]]]:
     """Return parsed prometheus metric output from Hardware Exporter on unit.
 
     Raises MetricsFetchError if command to fetch metrics didn't execute successfully.
@@ -127,7 +127,7 @@ async def assert_snap_installed(ops_test, unit_name: str, snap_name: str) -> boo
     return True
 
 
-def assert_metrics(metrics: list[Metric], expected_metric_values_map: dict[str, float]) -> bool:
+def assert_metrics(metrics: List[Metric], expected_metric_values_map: Dict[str, float]) -> bool:
     """Assert whether values in obtained list of metrics for a collector are as expected.
 
     Returns False if all expected metrics are not found in the list of provided metrics.
@@ -178,7 +178,7 @@ def _parse_single_metric(metric: str) -> Optional[Metric]:
         return None
 
 
-def parse_generic_exporter_metrics(metrics_input: str, metric_name: str) -> list[Metric]:
+def parse_generic_exporter_metrics(metrics_input: str, metric_name: str) -> List[Metric]:
     """Parse raw metrics and return a list of parsed Metric Objects.
 
     For example, parsing this metrics_input for metric_name "smartctl",
@@ -208,7 +208,7 @@ def parse_generic_exporter_metrics(metrics_input: str, metric_name: str) -> list
     return parsed_metrics
 
 
-def parse_hardware_exporter_metrics(metrics_input: str) -> dict[str, list[Metric]]:
+def parse_hardware_exporter_metrics(metrics_input: str) -> Dict[str, List[Metric]]:
     """Parse raw metrics and return dictionary of parsed Metric objects for each collector.
 
     For example, parsing this metrics_input,

@@ -10,7 +10,7 @@ terraform {
 provider "juju" {}
 
 module "grafana-agent" {
-  source = "git::https://github.com/canonical/snap-openstack.git//sunbeam-python/sunbeam/features/observability/etc/deploy-grafana-agent"
+  source = "git::https://github.com/canonical/snap-openstack.git//sunbeam-python/sunbeam/features/observability/etc/deploy-grafana-agent?ref=9e81465a91e068224077ad3f6fbf44705800139b"
 
   grafana-agent-base             = var.grafana_agent_base
   grafana-agent-channel          = "1/stable" # Can move back to latest/stable when the charm is updated

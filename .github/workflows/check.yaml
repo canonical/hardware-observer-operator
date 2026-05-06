@@ -298,8 +298,6 @@ jobs:
               .venv/bin/python -m pip install --requirement "${f}"
           done
 
-          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
-
           # Symlink venv to a short path so TICS version string stays under 31 chars
           sudo ln -s "$GITHUB_WORKSPACE/.venv" /opt/venv
           echo "/opt/venv/bin" >> $GITHUB_PATH

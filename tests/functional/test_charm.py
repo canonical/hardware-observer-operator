@@ -321,7 +321,10 @@ class TestCharmWithHW:
                 app.set_config({"exporter-log-level": "RANDOM_LEVEL"}),
                 ops_test.model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=TIMEOUT),
             )
-            assert unit.workload_status_message == AppStatus.INVALID_CONFIG_EXPORTER_LOG_LEVEL
+            assert (
+                unit.workload_status_message.startswith("Invalid config:")
+                and "exporter-log-level" in unit.workload_status_message
+            )
 
         async with ops_test.fast_forward():
             await asyncio.gather(

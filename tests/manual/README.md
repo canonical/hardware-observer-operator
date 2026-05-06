@@ -14,6 +14,9 @@ environment for testing Hardware Observer Operator with COS-Lite integrations.
 > The use of testflinger is restricted. External contributor will not be able to use Testflinger to allocate physical
 > machine. However, the terraform plan should still work if you somehow have access to a machine with hardware devices.
 
+> [NOTICE]
+> The terraform plan is using [MicroK8s charm][microk8s charm] to deploy the Kubernetes cluster directly on to the machine. However, the charm only supports Ubuntu 20.04 and 22.04, so the terraform plan will only work on machines with these versions. Future work for the terraform plan could include deploying the charm onto a 22.04 LXD VM instead - or better migrating to [Canonical K8s charm][canonical-k8s charm] since MicroK8s charm is no longer under active development.
+
 ## Quick start
 
 The overall workflow is outlined below:
@@ -35,3 +38,5 @@ terragrunt run-all apply
 ```
 
 [testflinger]: https://canonical-testflinger.readthedocs-hosted.com/en/latest/
+[microk8s charm]: https://charmhub.io/microk8s
+[canonical-k8s charm]: https://charmhub.io/k8s

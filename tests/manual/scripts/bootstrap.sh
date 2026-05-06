@@ -28,12 +28,15 @@ if ! sudo modprobe nvidia; then
     echo "Failed to add nvidia kernel module"
 fi
 
-# Workaround for https://bugs.launchpad.net/juju/+bug/1964513
 USER=$(whoami)
-BRIDGE="br0"
-if [ -z "$(sudo --user $USER lxc storage list --format csv)" ]; then
-    echo 'Bootstrapping LXD'
-    cat <<EOF | sudo --user $USER lxd init --preseed
+UBUNTU_MAJOR=$(lsb_release -sr | cut -d. -f1)
+
+if [ "$UBUNTU_MAJOR" -lt 24 ]; then
+    # Workaround for https://bugs.launchpad.net/juju/+bug/1964513 (pre-Noble issue)
+    BRIDGE="br0"
+    if [ -z "$(sudo --user $USER lxc storage list --format csv)" ]; then
+        echo 'Bootstrapping LXD'
+        cat <<EOF | sudo --user $USER lxd init --preseed
 networks:
 - config:
     ipv4.address: auto
@@ -55,10 +58,18 @@ profiles:
       type: disk
   name: default
 EOF
+    fi
+else
+    BRIDGE="lxdbr0"
+    if ! ip link show "$BRIDGE" > /dev/null 2>&1; then
+        echo 'Bootstrapping LXD'
+        sudo --user $USER lxd init --auto
+    fi
 fi
-BR0_ADDR=$(ip -4 -j a sho dev $BRIDGE | jq -r .[].addr_info[0].local)
-if [ -z "$BR0_ADDR" ]; then
-    echo 'Failed to configure LXD with bridge $BRIDGE'
+
+BRIDGE_ADDR=$(ip -4 -j a sho dev $BRIDGE | jq -r .[].addr_info[0].local)
+if [ -z "$BRIDGE_ADDR" ]; then
+    echo "Failed to configure LXD with bridge $BRIDGE"
     exit 1
 fi
 
