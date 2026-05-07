@@ -286,7 +286,7 @@ jobs:
           sudo apt install python3-venv -y
           python3 -m venv .venv
           .venv/bin/python -m pip install --upgrade pip
-          .venv/bin/python -m pip install coverage[toml]
+          .venv/bin/python -m pip install coverage[toml] pylint
 
           for f in $(find -name '*requirements.txt'); do
               echo "${f}"
@@ -299,7 +299,9 @@ jobs:
               .venv/bin/python -m pip install --requirement "${f}"
           done
 
-          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+          # Symlink venv to a short path so TICS version string stays under 31 chars
+          sudo ln -s "$GITHUB_WORKSPACE/.venv" /opt/venv
+          echo "/opt/venv/bin" >> $GITHUB_PATH
 
       - name: Determine system architecture
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
