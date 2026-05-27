@@ -286,7 +286,7 @@ jobs:
           sudo apt install python3-venv -y
           python3 -m venv .venv
           .venv/bin/python -m pip install --upgrade pip
-          .venv/bin/python -m pip install coverage[toml] pylint
+          .venv/bin/python -m pip install coverage[toml] pylint flake8
 
           for f in $(find -name '*requirements.txt'); do
               echo "${f}"
