@@ -1,3 +1,6 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 """Exporter service helper."""
 
 import os
@@ -445,11 +448,11 @@ class DCGMExporter(SnapExporter):
         super().__init__(config)
 
     @property
-    def channel(self):
+    def channel(self) -> str:
         return self._channel
 
     @channel.setter
-    def channel(self, value):
+    def channel(self, value: str) -> None:
         cuda_version = get_cuda_version_from_driver()
         if value == "auto":
             self._channel = self._automatic_channel_selection(cuda_version)
@@ -459,12 +462,16 @@ class DCGMExporter(SnapExporter):
         elif "v3" in value:
             self._channel = value
 
-    def _automatic_channel_selection(self, cuda_version: str) -> str:
+    def _automatic_channel_selection(self, cuda_version: int) -> str:
         """Automatically select the snap channel based on the NVIDIA driver version."""
         if cuda_version >= 11 and cuda_version <= 13:
             return f"v4-cuda{cuda_version}/stable"
-        if cuda_version < 11:
+        elif cuda_version < 11:
             return "v3/stable"
+        else:
+            raise ValueError(
+                f"No compatible DCGM snap channel found for CUDA version {cuda_version}."
+            )
 
     @staticmethod
     def hw_tools() -> Set[HWTool]:
@@ -622,7 +629,8 @@ class HardwareExporter(RenderableExporter):
                 username=self.bmc_conn_params.get("username", ""),
                 password=self.bmc_conn_params.get("password", ""),
                 timeout=self.bmc_conn_params.get(
-                    "timeout", self.settings.redfish_timeout  # type: ignore
+                    "timeout",
+                    self.settings.redfish_timeout,  # type: ignore
                 ),
                 max_retry=self.settings.redfish_max_retry,  # type: ignore
             )

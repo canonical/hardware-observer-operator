@@ -1,10 +1,12 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 import stat
 import subprocess
 import unittest
 from pathlib import Path
 from unittest import mock
 
-import ops
 import ops.testing
 import pytest
 import requests
@@ -1206,7 +1208,8 @@ def test_snap_strategy_remove_fail(snap_exporter, mock_snap_lib):
         ({}, True),
     ],
 )
-def test_snap_strategy_check(snap_exporter, mock_snap_lib, services, expected):
+@mock.patch("hw_tools.time.sleep")
+def test_snap_strategy_check(mock_sleep, snap_exporter, mock_snap_lib, services, expected):
     mock_snap_client = mock.MagicMock()
     mock_snap_client.services = services
     mock_snap_lib.SnapCache.return_value = {"my-snap": mock_snap_client}

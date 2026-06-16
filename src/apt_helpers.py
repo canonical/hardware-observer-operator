@@ -1,3 +1,6 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 """Apt helper module for missing features in operator_libs_linux."""
 
 import re

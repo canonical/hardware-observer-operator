@@ -8,7 +8,6 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import ops
 import ops.testing
 import pytest
 from ops._main import _Abort
@@ -718,10 +717,10 @@ class TestCharm(unittest.TestCase):
                 (True, "Charm config is valid."),
             ),
             (
-                "exporter invalied",
+                "exporter invalid",
                 [10000, 10001],
-                [(True, ""), (False, "Invalied msg")],
-                (False, "Invalied msg"),
+                [(True, ""), (False, "Invalid msg")],
+                (False, "Invalid msg"),
             ),
             (
                 "happy case",

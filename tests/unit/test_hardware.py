@@ -1,3 +1,6 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 import subprocess
 import unittest
 from unittest import mock
@@ -203,6 +206,14 @@ def test_get_nvidia_driver_version_file_not_found(mock_driver_path):
     mock_driver_path.read_text.side_effect = FileNotFoundError
 
     with pytest.raises(FileNotFoundError):
+        get_nvidia_driver_version()
+
+
+@mock.patch("hardware.NVIDIA_DRIVER_PATH")
+def test_get_nvidia_driver_version_no_match(mock_driver_path):
+    mock_driver_path.read_text.return_value = "unexpected content without version"
+
+    with pytest.raises(ValueError, match="Could not find NVIDIA driver version from file content"):
         get_nvidia_driver_version()
 
 

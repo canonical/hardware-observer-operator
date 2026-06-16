@@ -71,7 +71,7 @@ torchtusk/
 └── README.md
 ```
 
-where the **name of the directory** is the `job_queue`; the file **job.tpl.yaml** is the [job defintion][job-schema];
+where the **name of the directory** is the `job_queue`; the file **job.tpl.yaml** is the [job definition][job-schema];
 and `README.md` contains the testable items on that machine. Alternatively, you can simply copy an existing job, and
 update the job with different information.
 

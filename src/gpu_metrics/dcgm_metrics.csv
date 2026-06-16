@@ -48,7 +48,7 @@ DCGM_FI_DEV_FB_USED, gauge, Frame buffer memory used (in MB).
 # NVLink
 DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL, counter, Total number of NVLink bandwidth counters for all lanes
 
-# VGPU License status 
+# VGPU License status
 DCGM_FI_DEV_VGPU_LICENSE_STATUS, gauge, vGPU License status
 
 # Remapped rows
@@ -123,7 +123,7 @@ DCGM_FI_PROF_PCIE_RX_BYTES,      gauge, The rate of data received over the PCIe 
 
 # Features and modes
 DCGM_FI_DEV_COMPUTE_MODE,            gauge, Compute mode
-DCGM_FI_DEV_PERSISTENCE_MODE,        gauge, Persistance mode (1 or 0)
+DCGM_FI_DEV_PERSISTENCE_MODE,        gauge, Persistence mode (1 or 0)
 DCGM_FI_DEV_CC_MODE,                 gauge, ConfidentialCompute/AmpereProtectedMemory status (1 or 0)
 DCGM_FI_DEV_ECC_CURRENT,             gauge, Current ECC mode
 DCGM_FI_DEV_VIRTUAL_MODE,            gauge, Virtualization mode

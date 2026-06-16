@@ -6,9 +6,12 @@ type: charm
 
 parts:
   charm:
-    plugin: charm
     source: .
-    build-packages: [git]
+    plugin: uv
+    build-snaps:
+    - astral-uv
+    build-packages:
+    - git
 
 platforms:
   ubuntu@20.04:amd64:

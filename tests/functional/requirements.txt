@@ -1,6 +1,0 @@
-async-lru
-pytest
-pytest-operator
-protobuf
-tenacity
-pydantic < 2

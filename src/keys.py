@@ -1,3 +1,6 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 """Static parameters for keys."""
 
 HPPUBLICKEY1024 = """

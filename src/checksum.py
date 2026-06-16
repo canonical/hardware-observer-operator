@@ -14,6 +14,7 @@
 #
 # For further info, check https://github.com/canonical/charmcraft
 """Checksum definition, check functions and related utils."""
+
 import hashlib
 import logging
 import typing as t
