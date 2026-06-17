@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8', '3.10', '3.12']
+        python-version: ['3.8', '3.10', '3.12', '3.14']
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v6
@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8', '3.10', '3.12']
+        python-version: ['3.8', '3.10', '3.12', '3.14']
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v6
@@ -190,6 +190,8 @@ jobs:
           # It is designed to work both with charms that output one file per base,
           # and charms that output a single file to run on all bases.
           # Not all charms will use them, and for some charms the variables will resolve to the same file.
+          export CHARM_PATH_RESOLUTE="$(pwd)/$(ls | grep '.*26.04.*\.charm$')"
+          echo "$CHARM_PATH_RESOLUTE"
           export CHARM_PATH_NOBLE="$(pwd)/$(ls | grep '.*24.04.*\.charm$')"
           echo "$CHARM_PATH_NOBLE"
           export CHARM_PATH_JAMMY="$(pwd)/$(ls | grep '.*22.04.*\.charm$')"

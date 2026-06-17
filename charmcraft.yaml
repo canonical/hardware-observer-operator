@@ -22,15 +22,19 @@ platforms:
   ubuntu@20.04:amd64:
   ubuntu@22.04:amd64:
   ubuntu@24.04:amd64:
+  ubuntu@26.04:amd64:
   ubuntu@20.04:arm64:
   ubuntu@22.04:arm64:
   ubuntu@24.04:arm64:
+  ubuntu@26.04:arm64:
   ubuntu@20.04:s390x:
   ubuntu@22.04:s390x:
   ubuntu@24.04:s390x:
+  ubuntu@26.04:s390x:
   ubuntu@20.04:ppc64el:
   ubuntu@22.04:ppc64el:
   ubuntu@24.04:ppc64el:
+  ubuntu@26.04:ppc64el:
 
 actions:
   redetect-hardware:

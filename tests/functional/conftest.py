@@ -22,7 +22,7 @@ def pytest_addoption(parser):
         "--base",
         type=str.lower,
         default="ubuntu@22.04",
-        choices=["ubuntu@20.04", "ubuntu@22.04", "ubuntu@24.04"],
+        choices=["ubuntu@20.04", "ubuntu@22.04", "ubuntu@24.04", "ubuntu@26.04"],
         help="Set base for the applications.",
     )
 
