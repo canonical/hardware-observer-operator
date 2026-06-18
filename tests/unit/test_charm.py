@@ -32,6 +32,10 @@ class TestCharm(unittest.TestCase):
         self.harness = ops.testing.Harness(HardwareObserverCharm)
         self.addCleanup(self.harness.cleanup)
 
+        unlink_patcher = mock.patch("pathlib.Path.unlink")
+        self.mock_path_unlink = unlink_patcher.start()
+        self.addCleanup(unlink_patcher.stop)
+
         detect_available_tools_patcher = mock.patch.object(charm, "detect_available_tools")
         self.mock_detect_available_tools = detect_available_tools_patcher.start()
         self.mock_detect_available_tools.return_value = {
