@@ -12,6 +12,11 @@ parts:
     - astral-uv
     build-packages:
     - git
+    - rustc
+    - cargo
+    - pkg-config
+    - openssl
+    - libssl-dev
 
 platforms:
   ubuntu@20.04:amd64:
