@@ -1,8 +1,3 @@
-# Test basic deployment:
-# ubuntu:juju-info <-> grafana-agent:juju-info
-# ubuntu:juju-info <-> hardware-observer:general-info
-# grafana-agent:cos-agent <-> hardware-observer:cos-agent
-
 default-base: {{ base }}
 
 machines:
@@ -14,16 +9,26 @@ applications:
     num_units: 1
     to:
       - "0"
+{% if base == "ubuntu@20.04" %}
   grafana-agent:
     charm: grafana-agent
-    channel: 1/stable
+{% else %}
+  opentelemetry-collector:
+    charm: opentelemetry-collector
+{% endif %}
+    channel: 2/stable
   hardware-observer:
     charm: {{ charm }}
     options:
         redfish-disable: {{ redfish_disable }}
 
 relations:
+{% if base == "ubuntu@20.04" %}
 - - grafana-agent:juju-info
   - ubuntu:juju-info
+{% else %}
+- - opentelemetry-collector:juju-info
+  - ubuntu:juju-info
+{% endif %}
 - - hardware-observer:general-info
   - ubuntu:juju-info

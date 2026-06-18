@@ -1,3 +1,3 @@
-output "model_name" {
-  value = var.machine_model
+output "model_name_uuid" {
+  value = var.machine_model_uuid
 }
