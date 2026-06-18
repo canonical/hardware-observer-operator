@@ -115,7 +115,7 @@ class RenderableExporter(BaseExporter):
         self.port: int
 
         self.settings = settings
-        self.environment = Environment(loader=FileSystemLoader(charm_dir / "templates"))
+        self.environment = Environment(loader=FileSystemLoader(charm_dir / "src" / "templates"))
         self.service_template = self.environment.get_template(self.settings.service_template)
         self.exporter_service_path = self.settings.service_path
         self.exporter_name = self.settings.name
