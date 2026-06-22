@@ -1,3 +1,6 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 """Hardware support config and command helper."""
 
 import json
@@ -90,8 +93,10 @@ def hwinfo(*args: str) -> t.Dict[str, str]:
 
     Args:
         args: Probe for a particular hardware class.
+
     Returns:
         hw_info: hardware information dictionary
+
     """
     apt.add_package("hwinfo", update_cache=False)
     hw_classes = list(args)
@@ -119,13 +124,15 @@ def get_nvidia_driver_version() -> int:
     """Get the NVIDIA driver version installed on the system."""
     try:
         nvidia_driver_version = NVIDIA_DRIVER_PATH.read_text()
-        match = re.search(r"NVRM version:.*?(\d+\.\d+(?:\.\d+)*)", nvidia_driver_version)
-        if match:
-            return int(match.group(1).split(".")[0])
     except FileNotFoundError as e:
         msg = "NVIDIA driver version file not found."
         logger.error(msg)
         raise FileNotFoundError(msg) from e
+
+    match = re.search(r"NVRM version:.*?(\d+\.\d+(?:\.\d+)*)", nvidia_driver_version)
+    if not match:
+        raise ValueError("Could not find NVIDIA driver version from file content.")
+    return int(match.group(1).split(".")[0])
 
 
 def get_cuda_version_from_driver() -> int:

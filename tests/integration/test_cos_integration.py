@@ -180,7 +180,7 @@ async def _add_cross_controller_relations(k8s_ctl, lxd_ctl, k8s_model, lxd_model
             f"{k8s_ctl.controller_name}:admin/{k8s_model.name}.{saas}",
         ]
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        await lxd_model.add_relation("grafana-agent", saas),
+        (await lxd_model.add_relation("grafana-agent", saas),)
 
     # `idle_period` needs to be greater than the scrape interval to make sure metrics ingested.
     await asyncio.gather(

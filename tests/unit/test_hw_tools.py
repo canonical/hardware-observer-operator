@@ -1,10 +1,12 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 import stat
 import subprocess
 import unittest
 from pathlib import Path
 from unittest import mock
 
-import ops
 import ops.testing
 import pytest
 import requests
@@ -131,8 +133,10 @@ class TestHWToolHelper(unittest.TestCase):
         mock_stored_tools = mock.patch.object(
             HardwareObserverCharm, "stored_tools", new_callable=mock.PropertyMock
         )
+        unlink_patcher = mock.patch("pathlib.Path.unlink")
         self.mock_dashboards = mock_dashboards.start()
         self.mock_stored_tools = mock_stored_tools.start()
+        self.mock_path_unlink = unlink_patcher.start()
 
         self.harness = ops.testing.Harness(HardwareObserverCharm)
         self.harness.begin()
@@ -140,6 +144,7 @@ class TestHWToolHelper(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
         self.addCleanup(mock_stored_tools.stop)
         self.addCleanup(mock_dashboards.stop)
+        self.addCleanup(unlink_patcher.stop)
 
         self.hw_tool_helper = HWToolHelper()
 
@@ -1206,7 +1211,8 @@ def test_snap_strategy_remove_fail(snap_exporter, mock_snap_lib):
         ({}, True),
     ],
 )
-def test_snap_strategy_check(snap_exporter, mock_snap_lib, services, expected):
+@mock.patch("hw_tools.time.sleep")
+def test_snap_strategy_check(mock_sleep, snap_exporter, mock_snap_lib, services, expected):
     mock_snap_client = mock.MagicMock()
     mock_snap_client.services = services
     mock_snap_lib.SnapCache.return_value = {"my-snap": mock_snap_client}

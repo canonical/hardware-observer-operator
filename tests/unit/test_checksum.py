@@ -1,3 +1,6 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from unittest import mock
 
 from checksum import PERCCLI_VERSION_INFOS, STORCLI_VERSION_INFOS, validate_checksum

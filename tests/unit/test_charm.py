@@ -8,7 +8,6 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import ops
 import ops.testing
 import pytest
 from ops._main import _Abort
@@ -32,6 +31,10 @@ class TestCharm(unittest.TestCase):
     def setUp(self):
         self.harness = ops.testing.Harness(HardwareObserverCharm)
         self.addCleanup(self.harness.cleanup)
+
+        unlink_patcher = mock.patch("pathlib.Path.unlink")
+        self.mock_path_unlink = unlink_patcher.start()
+        self.addCleanup(unlink_patcher.stop)
 
         detect_available_tools_patcher = mock.patch.object(charm, "detect_available_tools")
         self.mock_detect_available_tools = detect_available_tools_patcher.start()
@@ -718,10 +721,10 @@ class TestCharm(unittest.TestCase):
                 (True, "Charm config is valid."),
             ),
             (
-                "exporter invalied",
+                "exporter invalid",
                 [10000, 10001],
-                [(True, ""), (False, "Invalied msg")],
-                (False, "Invalied msg"),
+                [(True, ""), (False, "Invalid msg")],
+                (False, "Invalid msg"),
             ),
             (
                 "happy case",

@@ -14,6 +14,7 @@
 #
 # For further info, check https://github.com/canonical/charmcraft
 """Platform-related Charmcraft utilities."""
+
 import dataclasses
 import platform
 import typing as t

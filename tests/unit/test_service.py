@@ -1,4 +1,4 @@
-# Copyright 2024 Canotical Ltd.
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 import pathlib
@@ -123,7 +123,6 @@ class TestRenderableExporter(unittest.TestCase):
                     "render_service": True,
                 },
                 {
-                    "verify_render_files_exist": True,
                     "verify_render_files_exist": True,
                     "install_resources": True,
                     "configure": True,
@@ -799,6 +798,11 @@ class TestDCGMSnapExporter(unittest.TestCase):
     def test_automatic_channel_selection_v3(self, _):
         self.exporter.channel = "auto"  # forces setter again with patched value
         self.assertEqual(self.exporter.channel, "v3/stable")
+
+    @mock.patch("service.get_cuda_version_from_driver", return_value=14)
+    def test_automatic_channel_selection_unsupported_cuda(self, _):
+        with self.assertRaises(ValueError):
+            self.exporter.channel = "auto"
 
     @mock.patch("hardware.get_nvidia_driver_version", return_value=580)
     def test_channel_dcgm_exporter(self, _):

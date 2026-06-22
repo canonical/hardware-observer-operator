@@ -1,6 +1,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 """Literals for the charm."""
+
 import logging
 
 import pydantic
@@ -56,7 +57,7 @@ class HWObserverConfig(pydantic.BaseModel):
 
     @pydantic.validator("hardware_exporter_port", "smartctl_exporter_port")
     @classmethod
-    def validate_port(cls, value):
+    def validate_port(cls, value: int) -> int:
         """Validate that port is within valid range."""
         if not 1 <= value <= 65535:
             raise ValueError(f"Port must be in range [1, 65535], got {value}")
@@ -64,7 +65,7 @@ class HWObserverConfig(pydantic.BaseModel):
 
     @pydantic.validator("exporter_log_level")
     @classmethod
-    def validate_log_level(cls, value):
+    def validate_log_level(cls, value: str) -> str:
         """Validate and normalise log level to uppercase."""
         upper = value.upper()
         allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
@@ -74,7 +75,7 @@ class HWObserverConfig(pydantic.BaseModel):
 
     @pydantic.validator("collect_timeout")
     @classmethod
-    def validate_collect_timeout(cls, value):
+    def validate_collect_timeout(cls, value: int) -> int:
         """Validate that collect timeout is positive."""
         if value <= 0:
             raise ValueError(f"collect-timeout must be > 0, got {value}")
@@ -82,7 +83,7 @@ class HWObserverConfig(pydantic.BaseModel):
 
     @pydantic.validator("dcgm_snap_channel", pre=True)
     @classmethod
-    def validate_dcgm_channel(cls, value):
+    def validate_dcgm_channel(cls, value: str) -> str:
         """Validate the DCGM snap channel format and driver compatibility."""
         if value == "auto":
             return value
@@ -112,7 +113,7 @@ class HWObserverConfig(pydantic.BaseModel):
 
     @pydantic.validator("redfish_disable", pre=True)
     @classmethod
-    def validate_redfish_disable(cls, value):
+    def validate_redfish_disable(cls, value: bool) -> bool:
         """Validate the Redfish disable option.
 
         Juju already checks for boolean values, but we want to log a warning.
@@ -126,7 +127,7 @@ class HWObserverConfig(pydantic.BaseModel):
 
     @pydantic.validator("ipmi_driver_type", pre=True)
     @classmethod
-    def validate_ipmi_driver_type(cls, value):
+    def validate_ipmi_driver_type(cls, value: str) -> str:
         """Validate the IPMI driver type option."""
         driver = value.upper()
         choices = {"LAN", "LAN_2_0", "KCS", "SSIF", "OPENIPMI", "SUNBMC", ""}
@@ -138,7 +139,7 @@ class HWObserverConfig(pydantic.BaseModel):
 
     @pydantic.root_validator
     @classmethod
-    def check_ipmi_redfish_compatibility(cls, values):
+    def check_ipmi_redfish_compatibility(cls, values: dict) -> dict:
         """Ensure IPMI LAN mode is not used together with Redfish enabled.
 
         Using IPMI over LAN and Redfish simultaneously may conflict; require

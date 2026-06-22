@@ -10,6 +10,7 @@ Logging these events allows for the identification of unauthorized changes to sy
 such as unapproved restarts or unexpected shutdowns, which may indicate security incidents
 or availability attacks, or changes to security settings.
 """
+
 from datetime import datetime, timezone
 from enum import Enum
 from logging import getLogger
@@ -48,13 +49,14 @@ EXPORTER_NAME_TO_SERVICE = {
 }
 
 
-def log_ssdlc_system_event(event: SSDLCSysEvent, service: str, msg: str = ""):
+def log_ssdlc_system_event(event: SSDLCSysEvent, service: str, msg: str = "") -> None:
     """Log system startup event in SSDLC required format.
 
     Args:
         event: The SSDLC system event type
         service: exporter_name string (e.g., "hardware-exporter", "dcgm")
         msg: Optional additional message
+
     """
     # Map exporter_name to Service enum
     service_enum = EXPORTER_NAME_TO_SERVICE.get(service)

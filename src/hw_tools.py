@@ -1,3 +1,6 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 """Helper for hardware tools.
 
 Define strategy for install, remove and verifier for different hardware.

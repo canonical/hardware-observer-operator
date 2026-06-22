@@ -1,15 +1,61 @@
-# This file is centrally managed as a template file in https://github.com/canonical/solutions-engineering-automation
-# To update the file:
-# - Edit it in the canonical/solutions-engineering-automation repository.
-# - Open a PR with the changes.
-# - When the PR merges, the soleng-terraform bot will open a PR to the target repositories with the changes.
+[project]
+name = "hardware-observer-operator"
+version = "0.0.0"
+requires-python = ">=3.8"
+dependencies = [
+    "cosl",
+    "distro",
+    "ops>=2.2.0",
+    "jinja2",
+    "redfish",
+    "pydantic<2",
+    "prometheus-hardware-exporter",
+]
 
-[tool.setuptools_scm]
+[tool.uv]
+package = false
 
-[tool.flake8]
-max-line-length = 99
-max-doc-length = 99
-max-complexity = 10
+[tool.uv.sources]
+prometheus-hardware-exporter = {git = "https://github.com/canonical/prometheus-hardware-exporter.git", tag = "v1.2.1"}
+
+[dependency-groups]
+reformat = [
+    "ruff",
+]
+lint = [
+    "mypy",
+    "ruff",
+    "codespell",
+    "types-requests>=2.32.0.20241016",
+]
+unit = [
+    "coverage",
+    "parameterized",
+    "pytest",
+    "pytest-cov",
+]
+func = [
+    "pytest",
+    "pytest-cov",
+    "pytest-operator",
+    "async-lru",
+    "protobuf",
+    "tenacity",
+]
+integration = [
+    "juju~=3.5.0",
+    "pytest",
+    "pytest-operator",
+    "prometheus-client",
+    "pyinstaller",
+    "tenacity",
+]
+tics = [
+    "coverage[toml]",
+]
+
+[tool.ruff]
+line-length = 99
 exclude = [
     ".git",
     "__pycache__",
@@ -28,47 +74,34 @@ exclude = [
     "hooks/charmhelpers",
     "tests/charmhelpers",
 ]
-select = ["E", "W", "F", "C", "N", "R", "D", "H"]
-# Ignore W503, E501 because using black creates errors with this
-# Ignore D107 Missing docstring in __init__
-# Ignore D415 Docstring first line punctuation (doesn't make sense for properties)
-# Ignore N818 Exceptions end with "Error" (not all exceptions are errors)
-# D100, D101, D102, D103: Ignore missing docstrings in tests
-ignore = ["C901", "W503", "E501", "D107", "D415", "N818", "D100", "D101", "D102", "D103", "W504"]
-per-file-ignores = ["tests/*:D100,D101,D102,D103,D104"]
-# Check for properly formatted copyright header in each file
-copyright-check = "True"
-copyright-author = "Canonical Ltd."
-copyright-regexp = "Copyright\\s\\d{4}([-,]\\d{4})*\\s+%(author)s"
 
-[tool.black]
-line-length = 99
-exclude = '''
-/(
-    | .eggs
-    | .git
-    | .tox
-    | .venv
-    | .build
-    | build
-    | lib
-    | report
-    | docs
-    | mod
-    | hooks/charmhelpers
-    | tests/charmhelpers
-)/
-'''
+[tool.ruff.lint]
+select = ["E", "W", "F", "C90", "N", "D", "I", "CPY"]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "D107",   # missing docstring in __init__
+    "D203",   # one-blank-line-before-class (incompatible with D211)
+    "D213",   # multi-line-summary-second-line (incompatible with D212)
+    "D415",   # first line should end with punctuation
+    "D100",   # missing docstring in public module
+    "D101",   # missing docstring in public class
+    "D102",   # missing docstring in public method
+    "D103",   # missing docstring in public function
+    "N818",   # exception name should end with Error
+]
 
-[tool.isort]
-profile = "black"
-line_length = 99
-skip_glob = [".eggs", ".git", ".tox", ".venv", ".build", "build", "lib", "report", "mod/*", "hooks/charmhelpers", "tests/charmhelpers"]
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D100", "D101", "D102", "D103", "D104"]
 
-[tool.pylint]
-max-line-length = 99
-disable = ["E1102"]
-ignore = ['.eggs', '.git', '.tox', '.venv', '.build', 'lib', 'report', 'tests', 'docs', "mod", "hooks/charmhelpers", "tests/charmhelpers"]
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 99
+
+[tool.ruff.lint.flake8-copyright]
+notice-rgx = "Copyright\\s\\d{4}([-,]\\d{4})*\\s+Canonical Ltd\\."
+min-file-size = 1
 
 [tool.mypy]
 warn_unused_ignores = true
@@ -80,15 +113,10 @@ no_namespace_packages = true
 exclude = ['.eggs', '.git', '.tox', '.venv', '.build', 'lib', 'report', 'tests', 'docs', "mod", "hooks/charmhelpers", "tests/charmhelpers"]
 
 [tool.codespell]
-skip = ".eggs,.tox,.git,.venv,venv,build,.build,lib,report,docs,poetry.lock,htmlcov,mod,hooks/charmhelpers,tests/charmhelpers"
+skip = ".eggs,.tox,.git,.venv,venv,build,.build,lib,report,docs,htmlcov,mod,hooks/charmhelpers,tests/charmhelpers,uv.lock"
 quiet-level = 3
 check-filenames = true
 ignore-words-list = "assertIn"
-
-## Ignore unsupported imports
-[[tool.mypy.overrides]]
-module = ["charmhelpers.*", "setuptools"]
-ignore_missing_imports = true
 
 [tool.coverage.run]
 relative_files = true

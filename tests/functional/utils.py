@@ -1,3 +1,6 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 """Helper functions to run functional tests for hardware-observer."""
 
 import json
@@ -136,9 +139,9 @@ def assert_metrics(metrics: List[Metric], expected_metric_values_map: Dict[str, 
     seen_metrics = 0
     for metric in metrics:
         if metric.name in expected_metric_values_map:
-            assert metric.value == expected_metric_values_map.get(
-                metric.name
-            ), f"{metric.name} value is incorrect"
+            assert metric.value == expected_metric_values_map.get(metric.name), (
+                f"{metric.name} value is incorrect"
+            )
             seen_metrics += 1
 
     return False if seen_metrics != len(expected_metric_values_map) else True

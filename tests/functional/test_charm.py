@@ -62,7 +62,7 @@ async def test_build_and_deploy(  # noqa: C901, function is too complex
     Assert on the unit status before any relations/configurations take place.
     Optionally attach required resources when testing with real hardware.
     """
-    # This is required for subordinate appliation to choose right revison
+    # This is required for subordinate application to choose right revision
     # on different architecture.
     # See issue: https://bugs.launchpad.net/juju/+bug/2067749
     await ops_test.model.set_constraints({"arch": architecture})
