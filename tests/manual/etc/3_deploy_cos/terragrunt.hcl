@@ -1,7 +1,7 @@
 dependency "add_machine" {
   config_path = "../1_add_machine"
   mock_outputs = {
-    machine_model = "mocked_machine_model"
+    machine_model_uuid = "e4c5d24c-6af1-11f1-aa1e-f7711261c97f"
   }
 }
 
@@ -28,7 +28,7 @@ terraform {
 }
 
 inputs = {
-  machine_model        = "${dependency.add_machine.outputs.machine_model}"
+  machine_model_uuid   = "${dependency.add_machine.outputs.machine_model_uuid}"
   k8s_cloud_name       = "${dependency.add_k8s_cloud.outputs.k8s_cloud_name}"
   k8s_cloud_credential = "${dependency.add_k8s_cloud.outputs.k8s_cloud_credential}"
   metallb_ip_ranges    = run_cmd("--terragrunt-quiet", find_in_parent_folders("./scripts/get-preferred-ip.sh"))

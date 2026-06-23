@@ -8,7 +8,13 @@ sudo apt update
 sudo snap install juju
 sudo snap install terraform --classic
 sudo snap install charmcraft --classic
-sudo apt-get install tox jq ubuntu-drivers-common -y
+sudo snap install astral-uv --classic
+sudo apt-get install jq ubuntu-drivers-common -y
+
+uv tool install tox --with tox-uv
+uv tool update-shell
+
+export PATH="/home/ubuntu/.local/bin:$PATH"
 
 # Download terragrunt
 if [ ! -e /usr/local/bin/terragrunt ]; then

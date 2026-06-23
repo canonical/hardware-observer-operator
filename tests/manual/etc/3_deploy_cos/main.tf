@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     juju = {
-      version = "~> 0.23.1"
+      version = "= 1.3.1"
       source  = "juju/juju"
     }
   }
@@ -14,7 +14,7 @@ locals {
 }
 
 module "cos-lite-terraform" {
-  source = "git::https://github.com/canonical/snap-openstack.git//sunbeam-python/sunbeam/features/observability/etc/deploy-cos?ref=9e81465a91e068224077ad3f6fbf44705800139b"
+  source = "git::https://github.com/canonical/snap-openstack.git//sunbeam-python/sunbeam/features/observability/etc/deploy-cos?ref=fa2e56ce687c046b4c931512564787eac419e3ab"
 
   model      = local.cos_model_name
   cloud      = var.k8s_cloud_name
@@ -25,12 +25,17 @@ module "cos-lite-terraform" {
     workload-storage = "microk8s-hostpath"
   }
 
-  # Add some temporary overrides, can remove when these channels are updated to latest/stable
   alertmanager-channel = "1/stable"
-  prometheus-channel = "1/stable"
-  grafana-channel = "1/stable"
-  catalogue-channel = "1/stable"
-  loki-channel = "1/stable"
+  prometheus-channel   = "1/stable"
+  grafana-channel      = "1/stable"
+  catalogue-channel    = "1/stable"
+  loki-channel         = "1/stable"
+}
+
+data "juju_model" "cos" {
+  owner      = "admin"
+  name       = local.cos_model_name
+  depends_on = [module.cos-lite-terraform]
 }
 
 resource "juju_application" "metallb" {
@@ -38,7 +43,7 @@ resource "juju_application" "metallb" {
   trust = true
   units = 1
 
-  model = local.cos_model_name
+  model_uuid = data.juju_model.cos.uuid
   config = {
     iprange = var.metallb_ip_ranges
   }
@@ -49,6 +54,6 @@ resource "juju_application" "metallb" {
     base    = "ubuntu@22.04"
   }
 
-  depends_on = [module.cos-lite-terraform]
+  depends_on = [module.cos-lite-terraform, data.juju_model.cos]
 
 }
