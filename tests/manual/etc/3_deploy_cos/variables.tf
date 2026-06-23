@@ -1,5 +1,5 @@
-variable "machine_model" {
-  description = "The machine model name"
+variable "machine_model_uuid" {
+  description = "The machine model uuid"
 }
 
 variable "metallb_ip_ranges" {

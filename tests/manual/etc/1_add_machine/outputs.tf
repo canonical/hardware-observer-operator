@@ -1,5 +1,5 @@
-output "machine_model" {
-  value = juju_model.hw-obs.name
+output "machine_model_uuid" {
+  value = juju_model.hw-obs.uuid
 }
 output "ubuntu_name" {
   value = juju_application.ubuntu.name

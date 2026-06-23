@@ -1,8 +1,8 @@
-variable "machine_model" {
-  description = "The machine model name"
+variable "machine_model_uuid" {
+  description = "The machine model uuid"
 }
 
-variable "grafana_agent_base" {
+variable "opentelemetry_collector_base" {
   description = "The base for grafana agent"
 }
 

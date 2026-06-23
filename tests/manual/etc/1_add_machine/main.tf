@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     juju = {
-      version = "~> 0.17.0"
+      version = "=1.3.1"
       source  = "juju/juju"
     }
   }
@@ -18,7 +18,7 @@ resource "juju_model" "hw-obs" {
 }
 
 resource "juju_machine" "machine" {
-  model = juju_model.hw-obs.name
+  model_uuid = juju_model.hw-obs.uuid
 
   ssh_address      = var.ssh_address
   public_key_file  = var.public_key_file
@@ -26,11 +26,10 @@ resource "juju_machine" "machine" {
 }
 
 resource "juju_application" "ubuntu" {
-  name  = "ubuntu"
-  model = juju_model.hw-obs.name
+  name       = "ubuntu"
+  model_uuid = juju_model.hw-obs.uuid
 
-  units     = 1
-  placement = juju_machine.machine.machine_id
+  machines = [juju_machine.machine.machine_id]
 
   charm {
     name    = "ubuntu"
@@ -40,11 +39,10 @@ resource "juju_application" "ubuntu" {
 }
 
 resource "juju_application" "microk8s" {
-  name  = "microk8s"
-  model = juju_model.hw-obs.name
+  name       = "microk8s"
+  model_uuid = juju_model.hw-obs.uuid
 
-  units     = 1
-  placement = juju_machine.machine.machine_id
+  machines = [juju_machine.machine.machine_id]
   config = {
     hostpath_storage = true
   }
@@ -57,10 +55,8 @@ resource "juju_application" "microk8s" {
 }
 
 resource "juju_application" "hardware-observer" {
-  name  = "hardware-observer"
-  model = juju_model.hw-obs.name
-
-  units = 0
+  name       = "hardware-observer"
+  model_uuid = juju_model.hw-obs.uuid
 
   charm {
     name    = "hardware-observer"
@@ -70,7 +66,7 @@ resource "juju_application" "hardware-observer" {
 }
 
 resource "juju_integration" "ubuntu-to-hardware-observer" {
-  model = juju_model.hw-obs.name
+  model_uuid = juju_model.hw-obs.uuid
 
   application {
     name     = juju_application.ubuntu.name

@@ -91,6 +91,17 @@ def base(request):
 
 
 @pytest.fixture(scope="module")
+def observability_agent_app(base: str) -> str:
+    """Return the observability agent app name based on the base.
+
+    grafana-agent is used for ubuntu@20.04; opentelemetry-collector for all other bases.
+    """
+    if base == "ubuntu@20.04":
+        return "grafana-agent"
+    return "opentelemetry-collector"
+
+
+@pytest.fixture(scope="module")
 def nvidia_present(request):
     return request.config.getoption("--nvidia")
 

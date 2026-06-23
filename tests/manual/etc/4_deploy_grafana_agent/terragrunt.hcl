@@ -2,7 +2,7 @@ dependency "add_machine" {
   config_path = "../1_add_machine"
   mock_outputs = {
     machine_base           = "mocked_os@mocked_release"
-    machine_model          = "mocked_machine_model"
+    machine_model_uuid     = "e4c5d24c-6af1-11f1-aa1e-f7711261c97f"
     ubuntu_name            = "mocked_ubuntu_name"
     hardware_observer_name = "mocked_hardware_observer_name"
   }
@@ -18,16 +18,16 @@ dependency "deploy_cos" {
 }
 
 terraform {
-  after_hook "wait-for-grafana-agent" {
+  after_hook "wait-for-observability-agent" {
     commands     = ["apply"]
-    execute      = [find_in_parent_folders("./scripts/wait-for-application.sh"), "hw-obs", "grafana-agent"]
+    execute      = [find_in_parent_folders("./scripts/wait-for-application.sh"), "hw-obs", "opentelemetry-collector"]
     run_on_error = true
   }
 }
 
 inputs = {
-  machine_model                  = "${dependency.add_machine.outputs.machine_model}"
-  grafana_agent_base             = "${dependency.add_machine.outputs.machine_base}"
+  machine_model_uuid             = "${dependency.add_machine.outputs.machine_model_uuid}"
+  opentelemetry_collector_base   = "${dependency.add_machine.outputs.machine_base}"
   ubuntu_name                    = "${dependency.add_machine.outputs.ubuntu_name}"
   hardware_observer_name         = "${dependency.add_machine.outputs.hardware_observer_name}"
   receive-remote-write-offer-url = "${dependency.deploy_cos.outputs.receive-remote-write-offer-url}"
