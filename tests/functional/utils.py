@@ -61,15 +61,20 @@ class SnapConfigError(Exception):
     pass
 
 
-async def run_command_on_unit(ops_test, unit_name: str, command: str) -> dict:
+async def run_command_on_unit(
+    ops_test, unit_name: str, command: str, *, shell: bool = False
+) -> dict:
     """Run command on unit and return results."""
-    complete_command = ["exec", "--unit", unit_name, "--", *command.split()]
-    return_code, stdout, _ = await ops_test.juju(*complete_command)
-    results = {
+    if shell:
+        complete_command = ["exec", "--unit", unit_name, "--", "bash", "-c", command]
+    else:
+        complete_command = ["exec", "--unit", unit_name, "--", *command.split()]
+    return_code, stdout, stderr = await ops_test.juju(*complete_command)
+    return {
         "return-code": return_code,
         "stdout": stdout,
+        "stderr": stderr,
     }
-    return results
 
 
 async def get_hardware_exporter_config(ops_test, unit_name) -> dict:

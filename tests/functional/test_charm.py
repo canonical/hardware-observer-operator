@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import asyncio
+import base64
 import logging
 import os
 from enum import Enum
@@ -28,6 +29,7 @@ from utils import (
 )
 
 from config import DEFAULT_BIND_ADDRESS, TOOLS_DIR
+from keys import HP_KEYS
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,10 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 PRINCIPAL_APP_NAME = "ubuntu"
 TIMEOUT = 600
+
+HPE_SDR_REPO_LINE = "deb https://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
+HPE_SOURCE_LIST_PATH = "/etc/apt/sources.list.d/hpe-mcp-validation.list"
+HPE_KEYRING_DIR = "/etc/apt/trusted.gpg.d"
 
 
 class AppStatus(str, Enum):
@@ -190,6 +196,77 @@ async def test_redfish_credential_validation(ops_test: OpsTest, provided_collect
 
     for unit in ops_test.model.applications[APP_NAME].units:
         assert unit.workload_status_message == AppStatus.READY
+
+
+@pytest.mark.abort_on_fail
+async def test_hpe_key_validation(ops_test: OpsTest, unit):
+    """Validate HPE GPG keys by adding them and the HPE SDR apt source to the unit.
+
+    This test:
+    1. Writes each key from HP_KEYS to the unit's apt trusted keyring via
+       base64-encoded transfer (avoids shell-quoting issues with PGP blocks).
+    2. Adds the HPE SDR repository source to sources.list.d.
+    3. Runs ``sudo apt update`` and asserts exit code 0, confirming the keys
+       are valid and trusted by apt.
+    4. Cleans up all added key and source files.
+    """
+    unit_name = unit.name
+    added_keyring_files = []
+
+    try:
+        # Import each HPE GPG key into the apt trusted keyring.
+        # Keys are base64-encoded to safely transfer multi-line PGP blocks
+        # through the shell without quoting issues.
+        for idx, key in enumerate(HP_KEYS):
+            keyring_path = f"{HPE_KEYRING_DIR}/hpe-key-{idx}.gpg"
+            key_b64 = base64.b64encode(key.encode()).decode()
+            shell_cmd = f"echo '{key_b64}' | base64 -d | sudo gpg --dearmor -o {keyring_path}"
+            result = await run_command_on_unit(ops_test, unit_name, shell_cmd, shell=True)
+            rc, stdout, stderr = result["return-code"], result["stdout"], result["stderr"]
+            assert rc == 0, (
+                f"Failed to import HPE key {idx} to {keyring_path}: {(stderr or stdout).strip()}"
+            )
+            added_keyring_files.append(keyring_path)
+            logger.info("Imported HPE key %d to %s", idx, keyring_path)
+
+        # Add the HPE SDR apt source
+        shell_cmd = f"echo '{HPE_SDR_REPO_LINE}' | sudo tee {HPE_SOURCE_LIST_PATH} > /dev/null"
+        result = await run_command_on_unit(ops_test, unit_name, shell_cmd, shell=True)
+        rc, stdout, stderr = result["return-code"], result["stdout"], result["stderr"]
+        assert rc == 0, (
+            f"Failed to write HPE apt source to {HPE_SOURCE_LIST_PATH}: "
+            f"{(stderr or stdout).strip()}"
+        )
+        logger.info("Added HPE SDR source to %s", HPE_SOURCE_LIST_PATH)
+
+        # Run apt update and check for GPG failures in the output.
+        # apt update exits 0 even when GPG verification fails, so the exit
+        # code alone cannot be trusted; parse the output instead.
+        result = await run_command_on_unit(ops_test, unit_name, "sudo apt update", shell=True)
+        rc, stdout, stderr = result["return-code"], result["stdout"], result["stderr"]
+        output = (stdout or "") + (stderr or "")
+        gpg_errors = [
+            line
+            for line in output.splitlines()
+            if "NO_PUBKEY" in line
+            or "GPG error" in line
+            or "signatures couldn't be verified" in line
+        ]
+        assert not gpg_errors, (
+            "'sudo apt update' reported GPG key failures for HPE repo:\n" + "\n".join(gpg_errors)
+        )
+        logger.info("'sudo apt update' succeeded; HPE keys are valid")
+
+    finally:
+        # Clean up: remove added keyring files and the source list entry
+        for keyring_path in added_keyring_files:
+            await run_command_on_unit(
+                ops_test, unit_name, f"sudo rm -f {keyring_path}", shell=True
+            )
+        await run_command_on_unit(
+            ops_test, unit_name, f"sudo rm -f {HPE_SOURCE_LIST_PATH}", shell=True
+        )
+        logger.info("Cleaned up HPE key and source files")
 
 
 @pytest.mark.realhw
