@@ -48,18 +48,39 @@ tests:
 
   - interval: 1m
     input_series:
-      - series: some_other_metric{instance="ubuntu-0"}
-        values: '1x10'
+      # unit/0: DCMI available. No alert.
+      - series: up{juju_model="test-model", juju_model_uuid="uuid-1", juju_application="hardware-observer", juju_unit="hardware-observer/0", instance="ubuntu-0"}
+        values: '1x15'
+      - series: ipmi_dcmi_command_success{juju_model="test-model", juju_model_uuid="uuid-1", juju_application="hardware-observer", juju_unit="hardware-observer/0", instance="ubuntu-0"}
+        values: '1x15'
+
+      # unit/1: DCMI unsupported by the BMC. Alert fires.
+      - series: up{juju_model="test-model", juju_model_uuid="uuid-1", juju_application="hardware-observer", juju_unit="hardware-observer/1", instance="ubuntu-1"}
+        values: '1x15'
+
+      # unit/2: target unreachable. No alert, already covered by HostDown rule.
+      - series: up{juju_model="test-model", juju_model_uuid="uuid-1", juju_application="hardware-observer", juju_unit="hardware-observer/2", instance="ubuntu-2"}
+        values: '0x15'
 
     alert_rule_test:
-      - eval_time: 6m
+      - eval_time: 4m
+        alertname: IPMIDCMICommandSuccessMetricsMissing
+        exp_alerts: []
+
+      - eval_time: 10m
         alertname: IPMIDCMICommandSuccessMetricsMissing
         exp_alerts:
           - exp_labels:
               severity: critical
+              juju_model: test-model
+              juju_model_uuid: uuid-1
+              juju_application: hardware-observer
+              juju_unit: hardware-observer/1
+              instance: ubuntu-1
             exp_annotations:
-              summary: IPMI DCMI command success metrics missing. (instance )
+              summary: IPMI DCMI command success metrics missing. (instance ubuntu-1)
               description: |
                 The ipmi_dcmi_command_success metric has been missing for over 5 minutes.
                 This may indicate IPMI DCMI command timeouts, or that IPMI tools/services are not installed or supported on this hardware.
-                  LABELS = map[]
+                If this hardware does not support IPMI DCMI, silence this alert for this unit.
+                  LABELS = map[instance:ubuntu-1 juju_application:hardware-observer juju_model:test-model juju_model_uuid:uuid-1 juju_unit:hardware-observer/1]
