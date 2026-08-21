@@ -2,7 +2,11 @@ groups:
 - name: IpmiDcmi
   rules:
     - alert: IPMIDCMICommandSuccessMetricsMissing
-      expr: absent_over_time(ipmi_dcmi_command_success[5m])
+      expr: |
+        group by (juju_model, juju_model_uuid, juju_application, juju_unit, instance) (up == 1)
+        unless
+        group by (juju_model, juju_model_uuid, juju_application, juju_unit, instance) (ipmi_dcmi_command_success)
+      for: 5m
       labels:
         severity: critical
       annotations:
@@ -10,6 +14,7 @@ groups:
         description: |
           The ipmi_dcmi_command_success metric has been missing for over 5 minutes.
           This may indicate IPMI DCMI command timeouts, or that IPMI tools/services are not installed or supported on this hardware.
+          If this hardware does not support IPMI DCMI, silence this alert for this unit.
             LABELS = {{ $labels }}
 
     - alert: IPMIDCMICommandFailed
