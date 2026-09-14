@@ -12,11 +12,12 @@ applications:
 {% if base == "ubuntu@20.04" %}
   grafana-agent:
     charm: grafana-agent
+    channel: 2/stable
 {% else %}
   opentelemetry-collector:
     charm: opentelemetry-collector
-{% endif %}
     channel: 0.130/stable
+{% endif %}
   hardware-observer:
     charm: {{ charm }}
     options:
