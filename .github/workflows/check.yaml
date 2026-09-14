@@ -139,6 +139,7 @@ jobs:
           - "tox -e func -- -v --base ubuntu@20.04 --keep-models"
           - "tox -e func -- -v --base ubuntu@22.04 --keep-models"
           - "tox -e func -- -v --base ubuntu@24.04 --keep-models"
+          - "tox -e func -- -v --base ubuntu@26.04 --keep-models"
     steps:
       - uses: actions/checkout@v6
         with:
