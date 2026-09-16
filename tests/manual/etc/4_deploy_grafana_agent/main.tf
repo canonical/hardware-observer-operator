@@ -13,7 +13,7 @@ module "opentelemetry-collector" {
   source = "git::https://github.com/canonical/snap-openstack.git//sunbeam-python/sunbeam/features/observability/etc/deploy-grafana-agent?ref=fa2e56ce687c046b4c931512564787eac419e3ab"
 
   opentelemetry-collector-base     = var.opentelemetry_collector_base
-  opentelemetry-collector-channel  = "2/stable"
+  opentelemetry-collector-channel  = "0.130/stable"
   principal-application-model-uuid = var.machine_model_uuid
   receive-remote-write-offer-url   = var.receive-remote-write-offer-url
   grafana-dashboard-offer-url      = var.grafana-dashboard-offer-url
